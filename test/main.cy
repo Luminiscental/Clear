@@ -14,9 +14,11 @@ func fibb(val n: long): long {
     if (n == 1 || n == 2) {
 
         return 1
-    }
 
-    return fibb(n - 1) + fibb(n - 2)
+    } else {
+
+        return fibb(n - 1) + fibb(n - 2)
+    }
 }
 
 func prod(val a: double, val b: double): double {

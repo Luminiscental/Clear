@@ -12,6 +12,11 @@ variable_re = "(?:val|var)\s+(?:" + name_re + ")\s*(?::\s*(?:" + name_re + "))?(
 # 0: condition
 if_re_capturing = "if\s*\((.*)\)"
 
+# 0: condition
+else_if_re_capturing = "else\s+if\s*\((.*)\)"
+
+else_re = "else"
+
 # 0: init, 1: condition, 2: increment
 for_re_capturing = "for\s*\((.*)\s*;\s*(.*)\s*;\s*(.*)\)"
 
@@ -32,7 +37,6 @@ void print(T first, Arguments... args) {
 }
 """
 
-# TODO: else, else if, e.t.c.
 # TODO: import / module stuff
 # TODO: namespacing
 # TODO: classes
@@ -53,8 +57,10 @@ class StatementType(Enum):
     NONE = 0
     VARIABLE = 1
     IF = 2
-    FOR = 3
-    FUNCTION = 4
+    ELSE_IF = 3
+    ELSE = 4
+    FOR = 5
+    FUNCTION = 6
 
 class CrystalVariable:
 
@@ -114,6 +120,22 @@ class CrystalIf:
 
         return "if(" + self.condition + ")"
 
+class CrystalElseIf:
+
+    def __init__(self, condition):
+
+        self.condition = condition
+
+    def __str__(self):
+
+        return "else if(" + self.condition + ")"
+
+class CrystalElse:
+
+    def __str__(self):
+
+        return "else"
+
 class CrystalFor:
 
     def __init__(self, init, condition, increment):
@@ -153,6 +175,8 @@ class CrystalStatement:
 
         match_variable = re.search(variable_re_capturing, line)
         match_if = re.search(if_re_capturing, line)
+        match_else_if = re.search(else_if_re_capturing, line)
+        match_else = re.search(else_re, line)
         match_for = re.search(for_re_capturing, line)
         match_func = re.search(func_re_capturing, line)
 
@@ -175,6 +199,17 @@ class CrystalStatement:
             self.statement_type = StatementType.IF
             self.as_if = CrystalIf(tokens[0])
 
+        elif match_else_if:
+
+            tokens = match_else_if.groups()
+            self.statement_type = StatementType.ELSE_IF
+            self.as_else_if = CrystalElseIf(tokens[0])
+
+        elif match_else:
+
+            self.statement_type = StatementType.ELSE
+            self.as_else = CrystalElse()
+
         elif match_variable:
 
             tokens = match_variable.groups()
@@ -195,6 +230,14 @@ class CrystalStatement:
         elif self.statement_type == StatementType.IF:
 
             return str(self.as_if)
+
+        elif self.statement_type == StatementType.ELSE_IF:
+
+            return str(self.as_else_if)
+
+        elif self.statement_type == StatementType.ELSE:
+
+            return str(self.as_else)
 
         elif self.statement_type == StatementType.FOR:
 
@@ -229,6 +272,34 @@ class Scope:
             elif self.as_statement.statement_type == StatementType.VARIABLE:
 
                 raise CompileException("Variable declarations do not open a scope: \"" + header + "\"")
+
+            elif self.as_statement.statement_type == StatementType.ELSE_IF or self.as_statement.statement_type == StatementType.ELSE:
+
+                valid_else = True
+
+                if not parent or len(parent.children) == 0:
+
+                    valid_else = False
+
+                else:
+
+                    last_scope = parent.children[-1]
+
+                    if not last_scope.scope_type == ScopeType.STATEMENT:
+
+                        valid_else = False
+
+                    else:
+
+                        last_statement = last_scope.as_statement
+
+                        if not last_statement.statement_type == StatementType.IF and not last_statement.statement_type == StatementType.ELSE_IF:
+
+                            valid_else = False
+
+                if not valid_else:
+
+                    raise CompileException("Else statement without preceding if statement: \"" + header + "\"")
 
         else:
 
@@ -268,8 +339,9 @@ class ScopeTree:
         self.root = Scope(root = True)
         self.current = self.root
 
-    def push_scope(self, scope):
+    def push_scope(self, header):
 
+        scope = Scope(header, self.current)
         self.current.add_child(scope)
         self.current = scope
 
@@ -277,9 +349,9 @@ class ScopeTree:
 
         self.current = self.current.parent
 
-    def add_statement(self, statement):
+    def add_statement(self, header):
 
-        self.current.add_child(statement)
+        self.current.add_child(CrystalStatement(header))
 
     def __str__(self):
 
@@ -298,7 +370,7 @@ def parse_source(source):
 
             if token == "{":
 
-                result.push_scope(Scope(header))
+                result.push_scope(header)
                 header = ""
 
             elif token == "}":
@@ -311,7 +383,7 @@ def parse_source(source):
 
         if header:
 
-            result.add_statement(CrystalStatement(header))
+            result.add_statement(header)
 
     return result
 
