@@ -5,6 +5,19 @@ import sys
 
 name_re = "[a-zA-Z][a-zA-Z0-9]*"
 
+# 0: val/var, 1: name, 2: type or None, 3: value or None
+variable_re_capturing = "(val|var)\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?(?:(?:\s*=\s*)(.*))?"
+variable_re = "(?:val|var)\s+(?:" + name_re + ")\s*(?::\s*(?:" + name_re + "))?(?:(?:\s*=\s*)(?:.*))?"
+
+# 0: condition
+if_re_capturing = "if\s*\((.*)\)"
+
+# 0: init, 1: condition, 2: increment
+for_re_capturing = "for\s*\((.*)\s*;\s*(.*)\s*;\s*(.*)\)"
+
+# 0: name, 1: params, 2: return type or None
+func_re_capturing = "func\s+(" + name_re + ")\s*\(((?:(?:" + variable_re + ")(?:\s*,\s*" + variable_re + ")*)?)\)\s*(?::\s*(" + name_re + "))?"
+
 cy_header = """
 """
 
@@ -19,6 +32,7 @@ void print(T first, Arguments... args) {
 }
 """
 
+# TODO: else, else if, e.t.c.
 # TODO: import / module stuff
 # TODO: namespacing
 # TODO: classes
@@ -32,29 +46,41 @@ class CompileException(Exception):
 class ScopeType(Enum):
 
     DEFAULT = 0
-    FUNCTION = 1
-    IF = 2
-    FOR = 3
+    STATEMENT = 1
 
 class StatementType(Enum):
 
     NONE = 0
     VARIABLE = 1
+    IF = 2
+    FOR = 3
+    FUNCTION = 4
 
 class CrystalVariable:
 
-    def __init__(self, declaration):
+    def __init__(self, mutable, name, value_type = None, value_init = None):
 
-        tokens = re.search("(val|var)\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?(?:(?:\s*=\s*)(.*))?", declaration).groups()
-
-        self.mutable = tokens[0] == "var"
-        self.name = tokens[1]
-        self.type = tokens[2]
-        self.value = tokens[3]
+        self.mutable = mutable
+        self.name = name
+        self.type = value_type
+        self.value = value_init
 
         if not self.type and not self.value:
 
             raise CompileException("Cannot declare implicitly typed variable without a value: \"" + declaration + "\"")
+
+    @staticmethod
+    def parse(declaration):
+
+        match_variable = re.search(variable_re_capturing, declaration)
+
+        if not match_variable:
+
+            # this should never happen
+            raise CompileException("Expression \"" + declaration + "\" does not declare a variable")
+
+        tokens = match_variable.groups()
+        return CrystalVariable(tokens[0] == "var", tokens[1], tokens[2], tokens[3])
 
     def __str__(self):
 
@@ -78,14 +104,82 @@ class CrystalVariable:
 
         return result
 
+class CrystalIf:
+
+    def __init__(self, condition):
+
+        self.condition = condition
+
+    def __str__(self):
+
+        return "if(" + self.condition + ")"
+
+class CrystalFor:
+
+    def __init__(self, init, condition, increment):
+
+        self.init = CrystalStatement(init)
+        self.condition = condition
+        self.increment = CrystalStatement(increment)
+
+    def __str__(self):
+
+        return "for(" + str(self.init) + self.condition + ";" + str(self.increment)[:-1] + ")"
+
+class CrystalFunction:
+
+    def __init__(self, name, param_string, return_string):
+
+        self.name = name
+        self.params = [CrystalVariable.parse(param) for param in param_string.split(",") if param]
+        self.return_type = return_string
+
+        if name == "main":
+
+            if self.return_type:
+
+                raise CompileException("Main function does not return but was declared as returning " + self.return_type)
+
+            self.return_type = "int"
+
+    def __str__(self):
+
+        r = self.return_type if self.return_type else "void"
+        return r + " " +  self.name + "(" + ",".join([str(p) for p in self.params]) + ")"
+
 class CrystalStatement:
 
     def __init__(self, line):
 
-        if line.startswith("val") or line.startswith("var"):
+        match_variable = re.search(variable_re_capturing, line)
+        match_if = re.search(if_re_capturing, line)
+        match_for = re.search(for_re_capturing, line)
+        match_func = re.search(func_re_capturing, line)
 
+        if match_func:
+
+            tokens = match_func.groups()
+
+            self.statement_type = StatementType.FUNCTION
+            self.as_func = CrystalFunction(tokens[0], tokens[1], tokens[2])
+
+        elif match_for:
+
+            tokens = match_for.groups()
+            self.statement_type = StatementType.FOR
+            self.as_for = CrystalFor(tokens[0], tokens[1], tokens[2])
+
+        elif match_if:
+
+            tokens = match_if.groups()
+            self.statement_type = StatementType.IF
+            self.as_if = CrystalIf(tokens[0])
+
+        elif match_variable:
+
+            tokens = match_variable.groups()
             self.statement_type = StatementType.VARIABLE
-            self.as_variable = CrystalVariable(line)
+            self.as_variable = CrystalVariable(tokens[0] == "var", tokens[1], tokens[2], tokens[3])
 
         else:
 
@@ -98,51 +192,21 @@ class CrystalStatement:
 
             return str(self.as_variable) + ";"
 
+        elif self.statement_type == StatementType.IF:
+
+            return str(self.as_if)
+
+        elif self.statement_type == StatementType.FOR:
+
+            return str(self.as_for)
+
+        elif self.statement_type == StatementType.FUNCTION:
+
+            return str(self.as_func)
+
         elif self.statement_type == StatementType.NONE:
 
             return self.as_string + ";"
-
-class CrystalFunction:
-
-    def __init__(self, header):
-
-        tokens = re.search("func\s+(" + name_re + ")\s*\((.*)\)\s*(?::\s*(.*))?", header).groups()
-        self.name = tokens[0]
-        self.params = [CrystalVariable(declaration) for declaration in tokens[1].split(",") if declaration]
-        self.return_type = tokens[2]
-
-        if self.name == "main":
-
-            self.return_type = "int"
-
-    def __str__(self):
-
-        r = self.return_type if self.return_type else "void"
-        return r + " " +  self.name + "(" + ",".join([str(p) for p in self.params]) + ")"
-
-class CrystalIf:
-
-    def __init__(self, header):
-
-        tokens = re.search("if\s*\((.*)\)", header).groups()
-        self.condition = tokens[0]
-
-    def __str__(self):
-
-        return "if(" + self.condition + ")"
-
-class CrystalFor:
-
-    def __init__(self, header):
-
-        tokens = re.search("for\s*\((.*)\s*;\s*(.*)\s*;\s*(.*)\)", header).groups()
-        self.init = CrystalStatement(tokens[0])
-        self.condition = tokens[1]
-        self.increment = CrystalStatement(tokens[2])
-
-    def __str__(self):
-
-        return "for(" + str(self.init) + self.condition + ";" + str(self.increment)[:-1] + ")"
 
 class Scope:
 
@@ -155,24 +219,16 @@ class Scope:
 
         if header:
 
-            if header.startswith("func"):
+            self.scope_type = ScopeType.STATEMENT
+            self.as_statement = CrystalStatement(header)
 
-                self.scope_type = ScopeType.FUNCTION
-                self.as_func = CrystalFunction(header)
+            if self.as_statement.statement_type == StatementType.NONE:
 
-            elif header.startswith("if"):
+                raise CompileException("Unknown scope type for header: \"" + header + "\"")
 
-                self.scope_type = ScopeType.IF
-                self.as_if = CrystalIf(header)
+            elif self.as_statement.statement_type == StatementType.VARIABLE:
 
-            elif header.startswith("for"):
-
-                self.scope_type = ScopeType.FOR
-                self.as_for = CrystalFor(header)
-
-            else:
-
-                raise CompileException("Unknown scope type for header: \"", header, "\"")
+                raise CompileException("Variable declarations do not open a scope: \"" + header + "\"")
 
         else:
 
@@ -180,23 +236,16 @@ class Scope:
 
     def add_child(self, child):
 
+        child.parent = self
         self.children.append(child)
 
     def __str__(self):
 
         result = ""
 
-        if self.scope_type == ScopeType.FUNCTION:
+        if self.scope_type == ScopeType.STATEMENT:
 
-            result = result + str(self.as_func)
-
-        elif self.scope_type == ScopeType.IF:
-
-            result = result + str(self.as_if)
-
-        elif self.scope_type == ScopeType.FOR:
-
-            result = result + str(self.as_for)
+            result = result + str(self.as_statement)
 
         if not self.root:
 
@@ -222,7 +271,6 @@ class ScopeTree:
     def push_scope(self, scope):
 
         self.current.add_child(scope)
-        scope.parent = self.current
         self.current = scope
 
     def pop_scope(self):
