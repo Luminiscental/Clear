@@ -26,10 +26,30 @@ func prod(val a: double, val b: double): double {
     return a * b
 }
 
+class Foo {
+
+    public var x: int
+}
+
+class Bar : Foo {
+
+    public var y: int
+
+    public func Bar(val y: int) {
+
+        this->y = y
+        this->x = 3
+    }
+}
+
 func main() {
 
     print("-- Hello World! --")
     print()
     print("11! = ", factorial(11), ", 18th fibb = ", fibb(18))
     print("3.14 * 2.72 = ", prod(3.14, 2.72))
+
+    val b = Bar(7)
+
+    print("Bar ( x: ", b.x, ", y: ", b.y, " )")
 }

@@ -6,8 +6,8 @@ import sys
 name_re = "[a-zA-Z][a-zA-Z0-9]*"
 
 # 0: val/var, 1: name, 2: type or None, 3: value or None
-variable_re_capturing = "(val|var)\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?(?:(?:\s*=\s*)(.*))?"
-variable_re = "(?:val|var)\s+(?:" + name_re + ")\s*(?::\s*(?:" + name_re + "))?(?:(?:\s*=\s*)(?:.*))?"
+variable_re_capturing = "(private\s+|public\s+)?(val|var)\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?(?:(?:\s*=\s*)(.*))?"
+variable_re = "(?:private\s+|public\s+)?(?:val|var)\s+(?:" + name_re + ")\s*(?::\s*(?:" + name_re + "))?(?:(?:\s*=\s*)(?:.*))?"
 
 # 0: condition
 if_re_capturing = "if\s*\((.*)\)"
@@ -23,6 +23,9 @@ for_re_capturing = "for\s*\((.*)\s*;\s*(.*)\s*;\s*(.*)\)"
 # 0: name, 1: params, 2: return type or None
 func_re_capturing = "func\s+(" + name_re + ")\s*\(((?:(?:" + variable_re + ")(?:\s*,\s*" + variable_re + ")*)?)\)\s*(?::\s*(" + name_re + "))?"
 
+# 0: name, 1: base class or None
+class_re_capturing = "class\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?"
+
 cy_header = """
 """
 
@@ -37,355 +40,195 @@ void print(T first, Arguments... args) {
 }
 """
 
-# TODO: import / module stuff
-# TODO: namespacing
-# TODO: classes
-# TODO: other for loop forms, switch case
-# TODO: templates
-# TODO: varargs
+# TODO: __str__
 
-class CompileException(Exception):
-    pass
+class CrystalReturn:
 
-class ScopeType(Enum):
+    # TODO
 
-    DEFAULT = 0
-    STATEMENT = 1
+    def __init__(self, body_node):
 
-class StatementType(Enum):
+        pass
 
-    NONE = 0
-    VARIABLE = 1
-    IF = 2
-    ELSE_IF = 3
-    ELSE = 4
-    FOR = 5
-    FUNCTION = 6
+class CrystalParams:
 
-class CrystalVariable:
+    # TODO
 
-    def __init__(self, mutable, name, value_type = None, value_init = None):
+    def __init__(self, param_node):
 
-        self.mutable = mutable
-        self.name = name
-        self.type = value_type
-        self.value = value_init
-
-        if not self.type and not self.value:
-
-            raise CompileException("Cannot declare implicitly typed variable without a value: \"" + declaration + "\"")
-
-    @staticmethod
-    def parse(declaration):
-
-        match_variable = re.search(variable_re_capturing, declaration)
-
-        if not match_variable:
-
-            # this should never happen
-            raise CompileException("Expression \"" + declaration + "\" does not declare a variable")
-
-        tokens = match_variable.groups()
-        return CrystalVariable(tokens[0] == "var", tokens[1], tokens[2], tokens[3])
-
-    def __str__(self):
-
-        result = ""
-
-        if not self.mutable:
-
-            result = result + "const"
-            result = result + " "
-
-        result = result + self.type if self.type else "auto"
-        result = result + " "
-
-        result = result + self.name
-        result = result + " "
-
-        if self.value:
-
-            result = result + "=" + self.value
-            result = result + " "
-
-        return result
-
-class CrystalIf:
-
-    def __init__(self, condition):
-
-        self.condition = condition
-
-    def __str__(self):
-
-        return "if(" + self.condition + ")"
-
-class CrystalElseIf:
-
-    def __init__(self, condition):
-
-        self.condition = condition
-
-    def __str__(self):
-
-        return "else if(" + self.condition + ")"
-
-class CrystalElse:
-
-    def __str__(self):
-
-        return "else"
-
-class CrystalFor:
-
-    def __init__(self, init, condition, increment):
-
-        self.init = CrystalStatement(init)
-        self.condition = condition
-        self.increment = CrystalStatement(increment)
-
-    def __str__(self):
-
-        return "for(" + str(self.init) + self.condition + ";" + str(self.increment)[:-1] + ")"
+        pass
 
 class CrystalFunction:
 
-    def __init__(self, name, param_string, return_string):
+    def __init__(self, name, params, ret, body):
 
         self.name = name
-        self.params = [CrystalVariable.parse(param) for param in param_string.split(",") if param]
-        self.return_type = return_string
+        self.params = CrystalParams(params)
 
-        if name == "main":
+        if ret:
 
-            if self.return_type:
+            ret_match = re.search("\s*:\s*(" + name_re + ")", ret)
 
-                raise CompileException("Main function does not return but was declared as returning " + self.return_type)
+            if not ret_match:
 
-            self.return_type = "int"
+                raise CompileException("Invalid return expression for function")
 
-    def __str__(self):
-
-        r = self.return_type if self.return_type else "void"
-        return r + " " +  self.name + "(" + ",".join([str(p) for p in self.params]) + ")"
-
-class CrystalStatement:
-
-    def __init__(self, line):
-
-        match_variable = re.search(variable_re_capturing, line)
-        match_if = re.search(if_re_capturing, line)
-        match_else_if = re.search(else_if_re_capturing, line)
-        match_else = re.search(else_re, line)
-        match_for = re.search(for_re_capturing, line)
-        match_func = re.search(func_re_capturing, line)
-
-        if match_func:
-
-            tokens = match_func.groups()
-
-            self.statement_type = StatementType.FUNCTION
-            self.as_func = CrystalFunction(tokens[0], tokens[1], tokens[2])
-
-        elif match_for:
-
-            tokens = match_for.groups()
-            self.statement_type = StatementType.FOR
-            self.as_for = CrystalFor(tokens[0], tokens[1], tokens[2])
-
-        elif match_if:
-
-            tokens = match_if.groups()
-            self.statement_type = StatementType.IF
-            self.as_if = CrystalIf(tokens[0])
-
-        elif match_else_if:
-
-            tokens = match_else_if.groups()
-            self.statement_type = StatementType.ELSE_IF
-            self.as_else_if = CrystalElseIf(tokens[0])
-
-        elif match_else:
-
-            self.statement_type = StatementType.ELSE
-            self.as_else = CrystalElse()
-
-        elif match_variable:
-
-            tokens = match_variable.groups()
-            self.statement_type = StatementType.VARIABLE
-            self.as_variable = CrystalVariable(tokens[0] == "var", tokens[1], tokens[2], tokens[3])
+            self.ret = ret_match.groups()[0]
 
         else:
 
-            self.statement_type = StatementType.NONE
-            self.as_string = line
+            self.ret = None
 
-    def __str__(self):
+        self.body = CrystalReturn(body)
 
-        if self.statement_type == StatementType.VARIABLE:
+def parse_block(header, others):
 
-            return str(self.as_variable) + ";"
+    if isinstance(header, CrystalNode):
 
-        elif self.statement_type == StatementType.IF:
+        return None, 0
 
-            return str(self.as_if)
+    func_match = re.search("func\s+" + name_re, header)
 
-        elif self.statement_type == StatementType.ELSE_IF:
+    if func_match:
 
-            return str(self.as_else_if)
+        name = func_match.groups()[0]
+        params = others[0]
 
-        elif self.statement_type == StatementType.ELSE:
+        if not params or not isinstance(params, CrystalNode) or params.type != "(":
 
-            return str(self.as_else)
+            raise CompileException("Function declaration without param block")
 
-        elif self.statement_type == StatementType.FOR:
+        if not others[1]:
 
-            return str(self.as_for)
+            raise CompileException("Function declaration requires body")
 
-        elif self.statement_type == StatementType.FUNCTION:
+        ret = None
+        body_index = 1
 
-            return str(self.as_func)
+        if not isinstance(others[1], CrystalNode):
 
-        elif self.statement_type == StatementType.NONE:
+            ret = others[1]
+            body_index = 2
 
-            return self.as_string + ";"
+        body = others[body_index]
 
-class Scope:
+        if not isinstance(body, CrystalNode) or body.type != "{":
 
-    def __init__(self, header = "", parent = None, root = False):
+            raise CompileException("Function declaration requires a body")
 
-        self.root = root
-        self.parent = parent
-        self.header = header
+        return CrystalFunction(name, params, ret, body), body_index + 1
+
+    return None
+
+'''
+self.type : either "{", "(", or "[" - the type of block this is
+self.children : a list of strings and nodes that are contained in this block
+self.parent : the block this is a part of, for the root block parent is None
+'''
+
+class CrystalNode:
+
+    def __init__(self, opener):
+
+        self.type = opener
         self.children = []
+        self.parent = None
 
-        if header:
+    def add_line(self, line):
 
-            self.scope_type = ScopeType.STATEMENT
-            self.as_statement = CrystalStatement(header)
+        self.children.append(line)
 
-            if self.as_statement.statement_type == StatementType.NONE:
+    def add_child(self, opener):
 
-                raise CompileException("Unknown scope type for header: \"" + header + "\"")
+        node = CrystalNode(opener)
+        node.parent = self
+        self.children.append(node)
 
-            elif self.as_statement.statement_type == StatementType.VARIABLE:
+    def collapse(self):
 
-                raise CompileException("Variable declarations do not open a scope: \"" + header + "\"")
+        new_children = []
+        num_children = len(self.children)
 
-            elif self.as_statement.statement_type == StatementType.ELSE_IF or self.as_statement.statement_type == StatementType.ELSE:
+        skip_indices = []
 
-                valid_else = True
+        for i in range(0, num_children):
 
-                if not parent or len(parent.children) == 0:
+            if i in skip_indices:
 
-                    valid_else = False
+                continue
 
-                else:
+            child = self.children[i]
+            after_child = self.children[i + 1:]
 
-                    last_scope = parent.children[-1]
+            as_block, consumed = parse_block(child, after_child)
 
-                    if not last_scope.scope_type == ScopeType.STATEMENT:
+            if as_block:
 
-                        valid_else = False
-
-                    else:
-
-                        last_statement = last_scope.as_statement
-
-                        if not last_statement.statement_type == StatementType.IF and not last_statement.statement_type == StatementType.ELSE_IF:
-
-                            valid_else = False
-
-                if not valid_else:
-
-                    raise CompileException("Else statement without preceding if statement: \"" + header + "\"")
-
-        else:
-
-            self.scope_type = ScopeType.DEFAULT
-
-    def add_child(self, child):
-
-        child.parent = self
-        self.children.append(child)
-
-    def __str__(self):
-
-        result = ""
-
-        if self.scope_type == ScopeType.STATEMENT:
-
-            result = result + str(self.as_statement)
-
-        if not self.root:
-
-            result = result + "{\n"
-
-        for child in self.children:
-
-            result = result + str(child) + "\n"
-
-        if not self.root:
-
-            result = result + "}"
-
-        return result
-
-class ScopeTree:
-
-    def __init__(self):
-
-        self.root = Scope(root = True)
-        self.current = self.root
-
-    def push_scope(self, header):
-
-        scope = Scope(header, self.current)
-        self.current.add_child(scope)
-        self.current = scope
-
-    def pop_scope(self):
-
-        self.current = self.current.parent
-
-    def add_statement(self, header):
-
-        self.current.add_child(CrystalStatement(header))
-
-    def __str__(self):
-
-        return str(self.root)
-
-def parse_source(source):
-
-    result = ScopeTree()
-
-    for line in source.splitlines():
-
-        tokens = line.split()
-        header = ""
-
-        for token in tokens:
-
-            if token == "{":
-
-                result.push_scope(header)
-                header = ""
-
-            elif token == "}":
-
-                result.pop_scope()
+                skip_indices.extend(consumed)
+                new_children.append(as_block)
 
             else:
 
-                header = header + token + " "
+                new_children.append(child)
 
-        if header:
+        self.children = new_children
 
-            result.add_statement(header)
+'''
+self.root : the root block
+self.current : the block currently being parsed into
+'''
 
-    return result
+class CrystalAst:
+
+    def __init__(self):
+
+        self.root = CrystalNode()
+        self.current = self.root
+
+    def add_line(self, line):
+
+        self.current.add_line(line)
+
+    def push_block(self, opener):
+
+        self.current.add_child(opener)
+        self.current = self.current.last_child
+
+    def pop_block(self):
+
+        self.current = self.current.parent
+
+    def parse_line(self, line):
+
+        acc = ""
+
+        for c in line:
+
+            if c == "(" or c == "{" or c == "[":
+
+                add_line(acc)
+                acc = ""
+                push_block(c)
+
+            else:
+
+                acc = acc + c
+
+    def collapse(self):
+
+        self.root.collapse()
+
+def parse_source(source):
+
+    ast = CrystalAst()
+
+    for line in source.splitlines():
+
+        ast.parse_line(line)
+
+    ast.collapse()
+
+    return ast
 
 def main():
 
