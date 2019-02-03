@@ -42,21 +42,44 @@ void print(T first, Arguments... args) {
 
 # TODO: __str__
 
-class CrystalReturn:
+class CrystalVariable:
 
     # TODO
+
+    pass
+
+class CrystalReturn:
 
     def __init__(self, body_node):
 
-        pass
+        if body_node.type != "{":
+
+            raise CompileException("Function body enclosed in wrong block type")
+
+        for child in body_node.children:
+
+            # TODO
+
+            pass
+
+'''
+self.params : list of CrystalVariable instances for each input variable
+'''
 
 class CrystalParams:
 
-    # TODO
-
     def __init__(self, param_node):
 
-        pass
+        if param_node.type != "(":
+
+            raise CompileException("Function parameters enclosed in wrong block type")
+
+        if len(param_node.children) != 1:
+
+            raise CompileException("Function parameters must be a list of variables")
+
+        param_string = param_node.children[0]
+        self.params = [CrystalVariable(param) for param in param_string.split(",")]
 
 '''
 self.name : name of the function as a string
@@ -101,7 +124,7 @@ def parse_block(header, others):
         name = func_match.groups()[0]
         params = others[0]
 
-        if not params or not isinstance(params, CrystalNode) or params.type != "(":
+        if not params or not isinstance(params, CrystalNode):
 
             raise CompileException("Function declaration without param block")
 
@@ -119,7 +142,7 @@ def parse_block(header, others):
 
         body = others[body_index]
 
-        if not isinstance(body, CrystalNode) or body.type != "{":
+        if not isinstance(body, CrystalNode):
 
             raise CompileException("Function declaration requires a body")
 
@@ -130,7 +153,7 @@ def parse_block(header, others):
 '''
 self.type : either "{", "(", or "[" - the type of block this is
 self.children : a list of strings and CrystalNode instances that are contained in this block
-self.parent : CrystalNode that self is contained in, or None for the root node 
+self.parent : CrystalNode that self is contained in, or None for the root node
 '''
 
 class CrystalNode:
@@ -181,7 +204,7 @@ class CrystalNode:
         self.children = new_children
 
 '''
-self.root : CrystalNode instance for the root scope 
+self.root : CrystalNode instance for the root scope
 self.current : CrystalNode instance that is currently having children appended
 '''
 
