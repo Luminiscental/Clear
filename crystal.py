@@ -58,6 +58,13 @@ class CrystalParams:
 
         pass
 
+'''
+self.name : name of the function as a string
+self.params : a CrystalParams instance for storing the function signature
+self.ret : the return type as a string
+self.body : a CrystalReturn instance for storing the returning {-scope of the function body
+'''
+
 class CrystalFunction:
 
     def __init__(self, name, params, ret, body):
@@ -122,8 +129,8 @@ def parse_block(header, others):
 
 '''
 self.type : either "{", "(", or "[" - the type of block this is
-self.children : a list of strings and nodes that are contained in this block
-self.parent : the block this is a part of, for the root block parent is None
+self.children : a list of strings and CrystalNode instances that are contained in this block
+self.parent : CrystalNode that self is contained in, or None for the root node 
 '''
 
 class CrystalNode:
@@ -174,8 +181,8 @@ class CrystalNode:
         self.children = new_children
 
 '''
-self.root : the root block
-self.current : the block currently being parsed into
+self.root : CrystalNode instance for the root scope 
+self.current : CrystalNode instance that is currently having children appended
 '''
 
 class CrystalAst:
