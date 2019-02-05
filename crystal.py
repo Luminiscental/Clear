@@ -40,13 +40,20 @@ void print(T first, Arguments... args) {
 }
 """
 
+class CompileException(Exception):
+
+    pass
+
 # TODO: __str__
 
 class CrystalVariable:
 
-    # TODO
+    def __init__(self, declaration, parameter = False):
 
-    pass
+        # TODO
+
+        tokens = [token for token in re.split("\s+|(:)", declaration) if token]
+        print(str(tokens))
 
 class CrystalReturn:
 
@@ -76,10 +83,10 @@ class CrystalParams:
 
         if len(param_node.children) != 1:
 
-            raise CompileException("Function parameters must be a list of variables")
+            raise CompileException("Function parameters must be a list of variables, got " + str(len(param_node.children)) + " children instead")
 
         param_string = param_node.children[0]
-        self.params = [CrystalVariable(param) for param in param_string.split(",")]
+        self.params = [CrystalVariable(param, parameter = True) for param in param_string.split(",")]
 
 '''
 self.name : name of the function as a string
@@ -95,13 +102,14 @@ class CrystalFunction:
         self.name = name
         self.params = CrystalParams(params)
 
-        if ret:
+        if ret.strip():
 
+            # TODO: Abstract out type annotations
             ret_match = re.search("\s*:\s*(" + name_re + ")", ret)
 
             if not ret_match:
 
-                raise CompileException("Invalid return expression for function")
+                raise CompileException("Invalid return expression for function: \"" + ret + "\"")
 
             self.ret = ret_match.groups()[0]
 
@@ -111,13 +119,19 @@ class CrystalFunction:
 
         self.body = CrystalReturn(body)
 
+'''
+header: the line header to attempt to parse as a statement
+others: children of scope following header
+
+return: parsed statement, number of children after the header composing the statement or None, 0 if no statement parsed
+'''
 def parse_block(header, others):
 
     if isinstance(header, CrystalNode):
 
         return None, 0
 
-    func_match = re.search("func\s+" + name_re, header)
+    func_match = re.search("func\s+(" + name_re + ")", header)
 
     if func_match:
 
@@ -128,9 +142,9 @@ def parse_block(header, others):
 
             raise CompileException("Function declaration without param block")
 
-        if not others[1]:
+        if len(others) < 2 or not others[1]:
 
-            raise CompileException("Function declaration requires body")
+            raise CompileException("Function declaration requires body, only children after name: " + str(others))
 
         ret = None
         body_index = 1
@@ -144,11 +158,11 @@ def parse_block(header, others):
 
         if not isinstance(body, CrystalNode):
 
-            raise CompileException("Function declaration requires a body")
+            raise CompileException("Function declaration requires a body, no node followed name and params.")
 
         return CrystalFunction(name, params, ret, body), body_index + 1
 
-    return None
+    return None, 0
 
 '''
 self.type : either "{", "(", or "[" - the type of block this is
@@ -158,7 +172,7 @@ self.parent : CrystalNode that self is contained in, or None for the root node
 
 class CrystalNode:
 
-    def __init__(self, opener):
+    def __init__(self, opener = "{"):
 
         self.type = opener
         self.children = []
@@ -179,11 +193,11 @@ class CrystalNode:
         new_children = []
         num_children = len(self.children)
 
-        skip_indices = []
+        collapsed_child_indices = []
 
         for i in range(0, num_children):
 
-            if i in skip_indices:
+            if i in collapsed_child_indices:
 
                 continue
 
@@ -194,7 +208,7 @@ class CrystalNode:
 
             if as_block:
 
-                skip_indices.extend(consumed)
+                collapsed_child_indices.extend(range(i, i + consumed))
                 new_children.append(as_block)
 
             else:
@@ -222,7 +236,7 @@ class CrystalAst:
     def push_block(self, opener):
 
         self.current.add_child(opener)
-        self.current = self.current.last_child
+        self.current = self.current.children[-1]
 
     def pop_block(self):
 
@@ -234,11 +248,19 @@ class CrystalAst:
 
         for c in line:
 
+            # TODO: Strings
+
             if c == "(" or c == "{" or c == "[":
 
-                add_line(acc)
+                self.add_line(acc)
                 acc = ""
-                push_block(c)
+                self.push_block(c)
+
+            elif c == ")" or c == "}" or c == "]":
+
+                self.add_line(acc)
+                acc = ""
+                self.pop_block()
 
             else:
 
@@ -260,6 +282,22 @@ def parse_source(source):
 
     return ast
 
+def _main():
+
+    source = """func main(x: Int): Int {
+    return x
+}
+"""
+
+    try:
+
+        ast = parse_source(cy_header + source)
+
+    except CompileException as e:
+
+        print("Could not compile:")
+        print(e)
+
 def main():
 
     if len(sys.argv) < 2:
@@ -270,22 +308,22 @@ def main():
     source_file_name = sys.argv[1]
     dest_file_name = sys.argv[2] if len(sys.argv) > 2 else source_file_name.replace(".cy", ".cpp")
 
-    source_file = open(source_file_name, "r")
-    source = source_file.read()
-    source_file.close()
+    with open(source_file_name, "r") as source_file:
 
-    try:
+        source = source_file.read()
 
-        ast = parse_source(cy_header + source)
+        try:
 
-        dest_file = open(dest_file_name, "w")
-        dest_file.write(cpp_header + str(ast))
-        dest_file.close()
+            ast = parse_source(cy_header + source)
 
-    except CompileException as e:
+            with open(dest_file_name, "w") as dest_file:
 
-        print("Could not compile:")
-        print(e)
+                dest_file.write(cpp_header + str(ast))
+
+        except CompileException as e:
+
+            print("Could not compile:")
+            print(e)
 
 if __name__ == "__main__":
 
