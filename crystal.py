@@ -5,27 +5,6 @@ import sys
 
 name_re = "[a-zA-Z][a-zA-Z0-9]*"
 
-# 0: val/var, 1: name, 2: type or None, 3: value or None
-variable_re_capturing = "(private\s+|public\s+)?(val|var)\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?(?:(?:\s*=\s*)(.*))?"
-variable_re = "(?:private\s+|public\s+)?(?:val|var)\s+(?:" + name_re + ")\s*(?::\s*(?:" + name_re + "))?(?:(?:\s*=\s*)(?:.*))?"
-
-# 0: condition
-if_re_capturing = "if\s*\((.*)\)"
-
-# 0: condition
-else_if_re_capturing = "else\s+if\s*\((.*)\)"
-
-else_re = "else"
-
-# 0: init, 1: condition, 2: increment
-for_re_capturing = "for\s*\((.*)\s*;\s*(.*)\s*;\s*(.*)\)"
-
-# 0: name, 1: params, 2: return type or None
-func_re_capturing = "func\s+(" + name_re + ")\s*\(((?:(?:" + variable_re + ")(?:\s*,\s*" + variable_re + ")*)?)\)\s*(?::\s*(" + name_re + "))?"
-
-# 0: name, 1: base class or None
-class_re_capturing = "class\s+(" + name_re + ")\s*(?::\s*(" + name_re + "))?"
-
 cy_header = """
 """
 
@@ -46,28 +25,120 @@ class CompileException(Exception):
 
 # TODO: __str__
 
+class CrystalExpression:
+
+    def __init__(self, string):
+
+        # TODO
+
+        pass
+
+class CrystalStatement:
+
+    # TODO
+
+    pass
+
+'''
+self.mutable : True if var, False if val
+self.name : string containing the name of this variable
+self.type : string containing the type of this variable
+self.value : CrystalExpression for the value this variable is initialized with
+'''
+
 class CrystalVariable:
 
     def __init__(self, declaration, parameter = False):
 
-        # TODO
+        tokens = [token for token in re.split("\s+|(:)|(=)", declaration) if token]
 
-        tokens = [token for token in re.split("\s+|(:)", declaration) if token]
-        print(str(tokens))
+        if len(tokens) < 2:
+
+            raise CompileException("variables need a mutability signifier and a name, found only " + str(len(tokens)) + " tokens")
+
+        if tokens[0] != "val" and tokens[0] != "var":
+
+            raise CompileException("Variables must be declared with either val or var")
+
+        self.mutable = tokens[0] == "var"
+        self.name = tokens[1]
+        self.type = None
+        self.value = None
+
+        def check_value(check_tokens):
+
+            if check_tokens[0] == "=":
+
+                if len(check_tokens) < 2:
+
+                    raise CompileException("Value specification indicated but not provided")
+
+                self.value = CrystalExpression(check_tokens[1])
+
+                if len(check_tokens) > 2:
+
+                    raise CompileException("Unexpected tokens in variable declaration: " + str(check_tokens[2:]))
+
+            else:
+
+                raise CompileException("Unexpected token " + check_tokens[0])
+
+        if len(tokens) > 2:
+            
+            extra_tokens = tokens[2:]
+
+            if extra_tokens[0] == ":":
+
+                if len(extra_tokens) < 2:
+
+                    raise CompileException("Type specification indicated but not provided")
+
+                self.type = extra_tokens[1]
+
+                if len(extra_tokens) > 2:
+
+                    check_value(extra_tokens[2:])
+
+            else:
+                
+                check_value(extra_tokens)
+
+'''
+self.statements : list of CrystalStatement instances for all the code executed in this block
+self.return_statement : the final statement that returns a value
+'''
 
 class CrystalReturn:
 
     def __init__(self, body_node):
 
+        self.statements = []
+        self.return_statement = None
+
         if body_node.type != "{":
 
             raise CompileException("Function body enclosed in wrong block type")
 
+        return_found = False
+
         for child in body_node.children:
 
-            # TODO
+            if return_found:
 
-            pass
+                raise CompileException("Statements found after return statement")
+
+'''
+            statement = CrystalStatement(child)
+
+            if statement.returns:
+
+                self.return_statement = statement
+                return_found = True
+
+            else:
+
+                self.statements.append(statement)
+'''
 
 '''
 self.params : list of CrystalVariable instances for each input variable
@@ -86,7 +157,7 @@ class CrystalParams:
             raise CompileException("Function parameters must be a list of variables, got " + str(len(param_node.children)) + " children instead")
 
         param_string = param_node.children[0]
-        self.params = [CrystalVariable(param, parameter = True) for param in param_string.split(",")]
+        self.params = [CrystalVariable(param, parameter = True) for param in param_string.split(",") if param]
 
 '''
 self.name : name of the function as a string

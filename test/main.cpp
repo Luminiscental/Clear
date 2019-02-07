@@ -7,4 +7,4 @@ void print(T first, Arguments... args) {
     std::cout << first;
     print(args...);
 }
-<__main__.CrystalAst object at 0x7fa2a7934cf8>
+<__main__.CrystalAst object at 0x7faf5f13bf60>

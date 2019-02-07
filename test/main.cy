@@ -21,25 +21,9 @@ func fibb(val n: long): long {
     }
 }
 
-func prod(val a: double, val b: double): double {
+func defaulting(val x: double = 3.14) {
 
-    return a * b
-}
-
-class Foo {
-
-    public var x: int
-}
-
-class Bar : Foo {
-
-    public var y: int
-
-    public func Bar(val y: int) {
-
-        this->y = y
-        this->x = 3
-    }
+    print("defaulting: { x = ", x, " }")
 }
 
 func main() {
@@ -47,9 +31,10 @@ func main() {
     print("-- Hello World! --")
     print()
     print("11! = ", factorial(11), ", 18th fibb = ", fibb(18))
-    print("3.14 * 2.72 = ", prod(3.14, 2.72))
 
-    val b = Bar(7)
+    val x = 3
+    print("x = ", x)
 
-    print("Bar ( x: ", b.x, ", y: ", b.y, " )")
+    defaulting()
+    defaulting(3.1415926536)
 }
