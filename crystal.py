@@ -3,6 +3,8 @@ from enum import Enum
 import re
 import sys
 
+closers = { "{": "}", "(": ")", "[": "]" }
+
 name_re = "[a-zA-Z][a-zA-Z0-9]*"
 
 cy_header = """
@@ -32,6 +34,10 @@ class CrystalExpression:
         # TODO
 
         pass
+
+    def __str__(self):
+
+        return "Expression"
 
 class CrystalStatement:
 
@@ -103,6 +109,10 @@ class CrystalVariable:
                 
                 check_value(extra_tokens)
 
+    def __str__(self):
+
+        return ("mutable" if self.mutable else "") + "variable: " + self.name + ", type: " + (self.type if self.type else "auto") + (", value: " + str(self.value) if self.value else "")
+
 '''
 self.statements : list of CrystalStatement instances for all the code executed in this block
 self.return_statement : the final statement that returns a value
@@ -127,18 +137,20 @@ class CrystalReturn:
 
                 raise CompileException("Statements found after return statement")
 
-'''
-            statement = CrystalStatement(child)
+#            statement = CrystalStatement(child)
+#
+#            if statement.returns:
+#
+#                self.return_statement = statement
+#                return_found = True
+#
+#            else:
+#
+#                self.statements.append(statement)
 
-            if statement.returns:
+    def __str__(self):
 
-                self.return_statement = statement
-                return_found = True
-
-            else:
-
-                self.statements.append(statement)
-'''
+        return "Function body"
 
 '''
 self.params : list of CrystalVariable instances for each input variable
@@ -158,6 +170,14 @@ class CrystalParams:
 
         param_string = param_node.children[0]
         self.params = [CrystalVariable(param, parameter = True) for param in param_string.split(",") if param]
+
+    def __str__(self):
+
+        result = "("
+
+        result = result + ",".join([str(param) for param in self.params])
+
+        return result + ")"
 
 '''
 self.name : name of the function as a string
@@ -189,6 +209,10 @@ class CrystalFunction:
             self.ret = None
 
         self.body = CrystalReturn(body)
+
+    def __str__(self):
+
+        return "function: " + self.name + str(self.params) + (self.ret if self.ret else "void") + str(self.body)
 
 '''
 header: the line header to attempt to parse as a statement
@@ -249,6 +273,18 @@ class CrystalNode:
         self.children = []
         self.parent = None
 
+    def __str__(self):
+
+        result = self.type
+
+        for child in self.children:
+
+            result = result + str(child) + "\n"
+
+        result = result + closers[self.type]
+
+        return result
+
     def add_line(self, line):
 
         self.children.append(line)
@@ -299,6 +335,10 @@ class CrystalAst:
 
         self.root = CrystalNode()
         self.current = self.root
+
+    def __str__(self):
+
+        return str(self.root)
 
     def add_line(self, line):
 
@@ -352,22 +392,6 @@ def parse_source(source):
     ast.collapse()
 
     return ast
-
-def _main():
-
-    source = """func main(x: Int): Int {
-    return x
-}
-"""
-
-    try:
-
-        ast = parse_source(cy_header + source)
-
-    except CompileException as e:
-
-        print("Could not compile:")
-        print(e)
 
 def main():
 
