@@ -401,7 +401,18 @@ def main():
         sys.exit(1)
 
     source_file_name = sys.argv[1]
-    dest_file_name = sys.argv[2] if len(sys.argv) > 2 else source_file_name.replace(".cy", ".cpp")
+
+    if len(sys.argv) > 2:
+
+        dest_file_name = sys.argv[2]
+
+    elif source_file_name[-3:] == ".cr":
+
+        dest_file_name = source_file_name.replace(".cr", ".cpp")
+
+    else:
+
+        dest_file_name = source_file_name + ".cpp"
 
     with open(source_file_name, "r") as source_file:
 
