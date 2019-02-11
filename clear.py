@@ -258,7 +258,7 @@ def parse_block(header, others):
 
             raise CompileException("Function declaration requires a body, no node followed name and params.")
 
-        return CrystalFunction(name, params, ret, body), body_index + 1
+        return CrystalFunction(name, params, ret, body), body_index + 2
 
     return None, 0
 
@@ -299,6 +299,12 @@ class CrystalNode:
         self.children.append(node)
 
     def collapse(self):
+
+        for child in self.children:
+
+            if isinstance(child, CrystalNode):
+
+                child.collapse()
 
         new_children = []
         num_children = len(self.children)
