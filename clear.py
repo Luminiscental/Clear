@@ -10,7 +10,9 @@ name_re = "[a-zA-Z][a-zA-Z0-9]*"
 cy_header = """
 """
 
-cpp_header = """#include <iostream>
+cpp_header = """// cpp_header:
+
+#include <iostream>
 void print() {
     std::cout << std::endl;
 }
@@ -19,7 +21,12 @@ void print(T first, Arguments... args) {
     std::cout << first;
     print(args...);
 }
+
 """
+
+def indent_block(block):
+
+    return "".join(["\t" + line + "\n" for line in block.splitlines()])
 
 class CompileException(Exception):
 
@@ -111,7 +118,7 @@ class CrystalVariable:
 
     def __str__(self):
 
-        return ("mutable" if self.mutable else "") + "variable: " + self.name + ", type: " + (self.type if self.type else "auto") + (", value: " + str(self.value) if self.value else "")
+        return ("mutable " if self.mutable else "") + "variable: " + self.name + ": " + (self.type if self.type else "auto") + (" = " + str(self.value) if self.value else "")
 
 '''
 self.statements : list of CrystalStatement instances for all the code executed in this block
@@ -173,11 +180,7 @@ class CrystalParams:
 
     def __str__(self):
 
-        result = "("
-
-        result = result + ",".join([str(param) for param in self.params])
-
-        return result + ")"
+        return "(" + ",".join([str(param) for param in self.params]) + ")"
 
 '''
 self.name : name of the function as a string
@@ -212,7 +215,7 @@ class CrystalFunction:
 
     def __str__(self):
 
-        return "function: " + self.name + str(self.params) + (self.ret if self.ret else "void") + str(self.body)
+        return "function: " + self.name + str(self.params) + ":" + (self.ret if self.ret else "void") + "\n" + str(self.body)
 
 '''
 header: the line header to attempt to parse as a statement
@@ -279,9 +282,9 @@ class CrystalNode:
 
         for child in self.children:
 
-            result = result + str(child) + "\n"
+            result = result + indent_block(str(child)) + "\n"
 
-        result = result + closers[self.type]
+        result = result + (closers[self.type] if self.type else "")
 
         return result
 
