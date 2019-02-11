@@ -1,6 +1,6 @@
 #!/bin/sh
 
-python crystal.py test/main.cy
+python clear.py test/main.cr
 g++ test/main.cpp -o test/main
 test/main
 
