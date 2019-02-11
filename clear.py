@@ -278,15 +278,7 @@ class CrystalNode:
 
     def __str__(self):
 
-        result = self.type
-
-        for child in self.children:
-
-            result = result + indent_block(str(child)) + "\n"
-
-        result = result + (closers[self.type] if self.type else "")
-
-        return result
+        return self.type + "\n" + "\n".join([indent_block(str(child)) for child in self.children]) + closers[self.type]
 
     def add_line(self, line):
 
