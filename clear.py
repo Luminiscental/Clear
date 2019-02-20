@@ -2,6 +2,11 @@
 from enum import Enum
 import sys
 
+def char_range(c1, c2):
+    """Generates the characters from `c1` to `c2`, inclusive."""
+    for c in range(ord(c1), ord(c2) + 1):
+        yield chr(c)
+
 class CompileException(Exception):
     pass
 
@@ -108,6 +113,16 @@ def tokenize(source):
             raise CompileException("Unterminated string literal")
         return i + 1, line, Token(lexeme=source[start - 1:i + 1], token_type=TokenType.STRING, line=line, value=source[start:i])
 
+    def consume_number(i, character):
+        start = i
+        while i < len(source) and source[i] in char_range('0', '9'):
+            i = i + 1
+        if i + 1 < len(source) and source[i] == '.' and source[i + 1] in char_range('0', '9'):
+            i = i + 1
+            while i < len(source) and source[i] in char_range('0', '9'):
+                i = i + 1
+        return i, Token(lexeme=source[start:i], token_type=TokenType.NUMBER, line=line, value=float(source[start:i]))
+
     i = 0
     while i < len(source):
         c = source[i]
@@ -134,6 +149,10 @@ def tokenize(source):
             continue
         elif c == '"':
             i, line, token = consume_string(i, line)
+            result.append(token)
+            continue
+        elif c in char_range('0', '9'):
+            i, token = consume_number(i, c)
             result.append(token)
             continue
         else:
