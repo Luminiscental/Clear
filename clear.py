@@ -78,31 +78,52 @@ def tokenize(source):
     result = []
     line = 1
 
+    def consume_unambiguous(i, character):
+        return i + 1, Token(lexeme=c, token_type=unambiguous_characters[c], line=line)
+
+    def consume_or_equals(i, character, next_character):
+        types = or_equals_characters[character]
+
+        if next_character == '=':
+            return i + 2, Token(lexeme=character, token_type=types[1], line=line)
+        else:
+            return i + 1, Token(lexeme=character, token_type=types[0], line=line)
+
+    def consume_slash(i, next_character):
+        if next_character == '/':
+            while i < len(source) and source[i] != '\n':
+                i = i + 1
+            return i, None
+        else:
+            return i + 1, Token(lexeme='/', token_type=TokenType.SLASH, line=line)
+
+    def consume_string(i, line):
+        i = i + 1
+        start = i
+        while i < len(source) and source[i] != '"':
+            if source[i] == '\n':
+                line = line + 1
+            i = i + 1
+        if i == len(source):
+            raise CompileException("Unterminated string literal")
+        return i + 1, line, Token(lexeme=source[start - 1:i + 1], token_type=TokenType.STRING, line=line, value=source[start:i])
+
     i = 0
     while i < len(source):
         c = source[i]
+        next_c = source[i + 1] if i + 1 < len(source) else ""
         if c in unambiguous_characters:
-            result.append(Token(lexeme=c, token_type=unambiguous_characters[c], line=line))
-            i = i + 1
+            i, token = consume_unambiguous(i, c)
+            result.append(token)
             continue
         elif c in or_equals_characters:
-            without_equals = or_equals_characters[c][0]
-            with_equals = or_equals_characters[c][1]
-
-            if i + 1 < len(source) and source[i + 1] == '=':
-                result.append(Token(lexeme=c, token_type=with_equals, line=line))
-                i = i + 1
-            else:
-                result.append(Token(lexeme=c, token_type=without_equals, line=line))
-            i = i + 1
+            i, token = consume_or_equals(i, c, next_c)
+            result.append(token)
             continue
         elif c == '/':
-            if i + 1 < len(source) and source[i + 1] == '/':
-                while i < len(source) and source[i] != '\n':
-                    i = i + 1
-            else:
-                result.append(Token(lexeme='/', token_type=TokenType.SLASH, line=line))
-                i = i + 1
+            i, token = consume_slash(i, next_c)
+            if token:
+                result.append(token)
             continue
         elif c in flat_whitespace:
             i = i + 1
@@ -112,16 +133,8 @@ def tokenize(source):
             i = i + 1
             continue
         elif c == '"':
-            i = i + 1
-            start = i
-            while i < len(source) and source[i] != '"':
-                if source[i] == '\n':
-                    line = line + 1
-                i = i + 1
-            if i == len(source):
-                raise CompileException("Unterminated string literal")
-            result.append(Token(lexeme=source[start - 1:i + 1], token_type=TokenType.STRING, line=line, value=source[start:i]))
-            i = i + 1
+            i, line, token = consume_string(i, line)
+            result.append(token)
             continue
         else:
             raise CompileException("Un-recognized character: '" + c + "'")
