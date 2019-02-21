@@ -2,10 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "common.h"
+#include "chunk.h"
+
 typedef struct {
 
     char *buffer;
-    long length;
+    size_t length;
 
 } FileBuffer;
 
@@ -26,7 +29,8 @@ FileBuffer readFile(const char *fileName) {
         return result;
     }
 
-    long fileLength = ftell(inFile);
+    size_t fileLength = ftell(inFile);
+    printf("File has length %zu\n", fileLength);
 
     if (fseek(inFile, 0, SEEK_SET)) {
 
@@ -46,15 +50,6 @@ FileBuffer readFile(const char *fileName) {
     return result;
 }
 
-void run(FileBuffer byteCode) {
-
-    for (long i = 0; i < byteCode.length; i++) {
-
-        char byte = byteCode.buffer[i];
-        printf("%d\n", byte);
-    }
-}
-
 int main(int argc, char **argv) {
 
     if (argc < 2) {
@@ -70,9 +65,24 @@ int main(int argc, char **argv) {
         printf("Could not read file!\n");
     }
 
-    run(byteCode);
+    Chunk chunk;
+    initChunk(&chunk);
+
+    for (size_t i = 0; i < byteCode.length; i++) {
+
+        writeChunk(&chunk, byteCode.buffer[i]);
+    }
 
     free(byteCode.buffer);
+
+    for (int i = 0; i < chunk.count; i++) {
+
+        printf("%d\n", chunk.code[i]);
+    }
+
+    // Interpret chunk
+
+    freeChunk(&chunk);
 
     return 0;
 }
