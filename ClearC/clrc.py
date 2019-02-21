@@ -58,7 +58,7 @@ def main():
         sys.exit(1)
 
     source_file_name = sys.argv[1]
-    dest_file_name = source_file_name.replace('.cr', '.crb')
+    dest_file_name = source_file_name + '.b'
 
     with open(source_file_name, 'r') as source_file:
         source = source_file.read()
