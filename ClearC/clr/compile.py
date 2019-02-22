@@ -2,10 +2,7 @@
 import struct
 from enum import Enum
 from clr.tokens import tokenize
-
-class ClrCompileError(Exception):
-
-    pass
+from clr.errors import ClrCompileError
 
 class OpCode(Enum):
 
@@ -105,6 +102,9 @@ def _assemble(code_list):
 def parse_source(source):
 
     tokens = tokenize(source)
+
+    for token in tokens:
+        print(token)
 
     constants = Constants()
     program = Program()
