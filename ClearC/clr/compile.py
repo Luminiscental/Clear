@@ -1,6 +1,7 @@
 
 import struct
 from enum import Enum
+from clr.tokens import tokenize
 
 class OpCode(Enum):
 
@@ -102,6 +103,8 @@ def _assemble(code_list):
     return raw_bytes
 
 def parse_source(source):
+
+    tokens = tokenize(source)
 
     constants = Constants()
     program = Program()

@@ -19,6 +19,10 @@ def main():
         source = source_file.read()
 
     try:
+        print('Source code:')
+        print(source)
+        print()
+        print('Compiling:')
         byte_code = parse_source(source)
         if debug:
             disassemble(byte_code)
