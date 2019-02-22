@@ -26,8 +26,6 @@ def main():
         print('Could not compile:')
         print(e)
     else:
-        for byte in byte_code:
-            print(byte, end=',')
         print()
         print(dest_file_name)
         with open(dest_file_name, 'wb') as dest_file:

@@ -12,7 +12,7 @@ void *reallocate(void *previous, size_t oldSize, size_t newSize) {
 
     memoryUsage += newSize - oldSize;
 
-    printf("memory: %zuB\n", memoryUsage);
+    printf("\t\t\t\tmemory: %zuB\n", memoryUsage);
 
     if (newSize == 0) {
 

@@ -78,11 +78,6 @@ int main(int argc, char **argv) {
 
     free(byteCode.buffer);
 
-    for (int i = 0; i < chunk.count; i++) {
-
-        printf("%d\n", chunk.code[i]);
-    }
-
     interpret(&vm, &chunk);
 
     freeVM(&vm);
