@@ -42,7 +42,7 @@ class Constants:
 
     def add(self, value):
         if value in self.values:
-            self.values.index(value)
+            return self.values.index(value)
         else:
             self.values.append(value)
             self.count += 1
