@@ -44,7 +44,12 @@ def _disassemble_byte(byte, offset, remaining):
     return {
         OpCode.STORE_CONST.value : _disassemble_store,
         OpCode.PRINT.value : _disassemble_simple,
-        OpCode.LOAD_CONST.value : _disassemble_constant
+        OpCode.LOAD_CONST.value : _disassemble_constant,
+        OpCode.NEGATE.value : _disassemble_simple,
+        OpCode.ADD.value : _disassemble_simple,
+        OpCode.SUBTRACT.value : _disassemble_simple,
+        OpCode.MULTIPLY.value : _disassemble_simple,
+        OpCode.DIVIDE.value : _disassemble_simple
     }.get(byte, unknown_op)(byte, remaining)
 
 def disassemble(byte_code):
