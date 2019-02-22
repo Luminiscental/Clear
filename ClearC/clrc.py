@@ -2,7 +2,7 @@
 import struct
 import sys
 from clr.dis import disassemble
-from clr.compile import parse_source, CompileException
+from clr.compile import parse_source, CompileException, OpCode
 
 debug = True
 
@@ -26,16 +26,12 @@ def main():
         print('Could not compile:')
         print(e)
     else:
-        raw_bytes = bytearray()
-        for code in byte_code:
-            byte = bytes([code])[0]
-            print(byte)
-            raw_bytes.append(byte)
-        print(raw_bytes)
+        for byte in byte_code:
+            print(byte, end=',')
+        print()
         print(dest_file_name)
-
         with open(dest_file_name, 'wb') as dest_file:
-            dest_file.write(raw_bytes)
+            dest_file.write(byte_code)
 
 if __name__ == '__main__':
 

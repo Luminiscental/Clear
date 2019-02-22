@@ -4,6 +4,7 @@
 
 #include "common.h"
 #include "chunk.h"
+#include "vm.h"
 
 typedef struct {
 
@@ -58,6 +59,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
+    VM vm = initVM();
+
     FileBuffer byteCode = readFile(argv[1]);
 
     if (byteCode.buffer == NULL) {
@@ -80,8 +83,9 @@ int main(int argc, char **argv) {
         printf("%d\n", chunk.code[i]);
     }
 
-    // Interpret chunk
+    interpret(&vm, &chunk);
 
+    freeVM(&vm);
     freeChunk(&chunk);
 
     return 0;

@@ -1,14 +1,16 @@
 
+import struct
 from clr.compile import OpCode
 
-def _disassemble_store(code, remaining):
+def _disassemble_store(byte, remaining):
 
-    opcode = OpCode(code)
-    print('{0:16}'.format(str(opcode)), end='')
+    code = OpCode(byte)
+    print('{0:16}'.format(str(code)), end='')
 
     def store_number():
-        print('<num {}>'.format(remaining[1]))
-        return 3
+        value = struct.unpack('d', remaining[1:9])[0]
+        print('<num {}>'.format(value))
+        return 10
 
     def store_err():
         return 1
@@ -17,24 +19,25 @@ def _disassemble_store(code, remaining):
         OpCode.NUMBER.value : store_number
     }.get(remaining[0], store_err)()
 
-def _disassemble_simple(code, remaining):
+def _disassemble_simple(byte, remaining):
 
-    opcode = OpCode(code)
-    print(str(opcode))
+    code = OpCode(byte)
+    print(str(code))
     return 1
 
-def _disassemble_constant(code, remaining):
+def _disassemble_constant(byte, remaining):
 
-    opcode = OpCode(code)
-    print('{0:16}'.format(str(opcode)), end='')
-    print('{}'.format(remaining[0]))
+    code = OpCode(byte)
+    value_index = remaining[0]
+    print('{0:16}'.format(str(code)), end='')
+    print('{}'.format(value_index))
     return 2
 
-def _disassemble_code(code, offset, remaining):
+def _disassemble_byte(byte, offset, remaining):
 
     print('{0:04} '.format(offset), end='')
 
-    def unknown_op(code, remaining):
+    def unknown_op(byte, remaining):
         print('<UNKNOWN OP>')
         return 1
 
@@ -42,18 +45,18 @@ def _disassemble_code(code, offset, remaining):
         OpCode.STORE_CONST.value : _disassemble_store,
         OpCode.PRINT.value : _disassemble_simple,
         OpCode.LOAD_CONST.value : _disassemble_constant
-    }.get(code, unknown_op)(code, remaining)
+    }.get(byte, unknown_op)(byte, remaining)
 
 def disassemble(byte_code):
 
     print('=' * 16)
     offset = 0
     acc = 0
-    for code in byte_code:
+    for byte in byte_code:
         if acc > 0:
             acc -= 1
             continue
-        consume = _disassemble_code(code, offset,
+        consume = _disassemble_byte(byte, offset,
                                     byte_code[offset + 1:])
         offset += consume
         if consume > 1:
