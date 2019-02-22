@@ -31,3 +31,10 @@ void freeValueArray(ValueArray *array) {
     initValueArray(array);
 }
 
+void printValue(Value value, bool endLine) {
+
+    printf("<num %g>", value);
+
+    if (endLine) printf("\n");
+}
+

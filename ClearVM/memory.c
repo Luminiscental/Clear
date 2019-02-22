@@ -10,9 +10,13 @@ void *reallocate(void *previous, size_t oldSize, size_t newSize) {
 
     static size_t memoryUsage = 0;
 
+#ifdef DEBUG_MEM
+
     memoryUsage += newSize - oldSize;
 
-    printf("\t\t\t\tmemory: %zuB\n", memoryUsage);
+    printf("\t\t\t\t\t\t\t\tmemory: %zuB\n", memoryUsage);
+
+#endif
 
     if (newSize == 0) {
 

@@ -2,3 +2,5 @@ ClearC/__pycache__
 ClearVM/build
 __pycache__
 build
+.color_coded
+.ycm_extra_conf.py

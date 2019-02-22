@@ -31,7 +31,7 @@ FileBuffer readFile(const char *fileName) {
     }
 
     size_t fileLength = ftell(inFile);
-    printf("File has length %zu\n", fileLength);
+    printf("File has length %zu\n\n", fileLength);
 
     if (fseek(inFile, 0, SEEK_SET)) {
 
@@ -59,7 +59,8 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    VM vm = initVM();
+    VM vm;
+    initVM(&vm);
 
     FileBuffer byteCode = readFile(argv[1]);
 

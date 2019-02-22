@@ -5,10 +5,30 @@
 
 #include "common.h"
 
-VM initVM() {
+void initVM(VM *vm) {
 
-    VM result;
-    return result;
+    resetStack(vm);
+}
+
+void resetStack(VM *vm) {
+
+    vm->stackTop = vm->stack;
+}
+
+void push(VM *vm, Value value) {
+
+    *vm->stackTop = value;
+    vm->stackTop++;
+}
+
+Value pop(VM *vm) {
+
+    vm->stackTop--;
+    return *vm->stackTop;
+}
+
+void freeVM(VM *vm) {
+
 }
 
 InterpretResult interpret(VM *vm, Chunk *chunk) {
@@ -33,30 +53,57 @@ double readDouble(VM *vm) {
     return *read;
 }
 
-Value readConstant(VM *vm) {
-
-    return vm->chunk->constants.values[readByte(vm)];
-}
-
 InterpretResult run(VM *vm) {
 
     while (true) {
 
         uint8_t instruction = readByte(vm);
 
+#ifdef DEBUG
+
+        printf("          ");
+
+        for (Value *slot = vm->stack; slot < vm->stackTop; slot++) {
+
+            printf("[ ");
+            printValue(*slot, false);
+            printf(" ]");
+        }
+        printf("\n");
+
+#endif
+
         switch (instruction) {
 
             case OP_PRINT: {
 
-                printf("Pop: print\n");
+                Value value = pop(vm);
+
+#ifdef DEBUG
+
+                printf("OP_PRINT\n");
+
+#endif
+
+                printf("|| print %f\n", value);
                 return INTERPRET_OK;
 
             } break;
 
             case OP_LOAD_CONST: {
 
-                Value constant = readConstant(vm);
-                printf("Push: %f\n", constant);
+                uint8_t index = readByte(vm);
+                Value constant = vm->chunk->constants.values[index];
+
+#ifdef DEBUG
+
+                printf("%-16s %4d '", "OP_LOAD_CONST", index);
+                printValue(constant, false);
+                printf("'\n");
+
+#endif
+
+                push(vm, constant);
 
             } break;
                 
@@ -75,30 +122,104 @@ InterpretResult run(VM *vm) {
 
                     default: {
 
-                        printf("Invalid constant type!\n");
+                        printf("|| Invalid constant type!\n");
                         return INTERPRET_ERR;
 
                     } break;
                 }
 
+#ifdef DEBUG
+
+                printf("%-19s ", "OP_STORE_CONST");
+                printValue(value, true);
+
+#endif
+
                 int index = addConstant(vm->chunk, value);
-                printf("Store constant %d (%f)\n", index, value);
 
             } break;
 
+            case OP_NEGATE: {
+
+#ifdef DEBUG
+
+                printf("OP_NEGATE\n");
+
+#endif
+
+                push(vm, -pop(vm));
+
+            } break;
+
+            case OP_ADD: {
+
+#ifdef DEBUG
+
+                printf("OP_ADD\n");
+
+#endif
+
+                double b = pop(vm);
+                double a = pop(vm);
+
+                push(vm, a + b);
+
+            } break;
+
+            case OP_SUBTRACT: {
+
+#ifdef DEBUG
+
+                printf("OP_SUBTRACT\n");
+
+#endif
+
+                double b = pop(vm);
+                double a = pop(vm);
+
+                push(vm, a - b);
+
+            } break;
+
+            case OP_MULTIPLY: {
+
+#ifdef DEBUG
+
+                printf("OP_MULTIPLY\n");
+
+#endif
+
+                double b = pop(vm);
+                double a = pop(vm);
+
+                push(vm, a * b);
+
+            } break;
+
+            case OP_DIVIDE: {
+
+#ifdef DEBUG
+
+                printf("OP_DIVIDE\n");
+
+#endif
+
+                double b = pop(vm);
+                double a = pop(vm);
+
+                push(vm, a / b);
+
+            } break;
+
+#undef BINARY_OP
+
             default: {
 
-                printf("Invalid op code!\n");
+                printf("|| Invalid op code!\n");
                 return INTERPRET_ERR;
 
             } break;
         }
     }
-
-#undef READ_CONSTANT
-#undef READ_BYTE
 }
 
-void freeVM(VM *vm) {
-
-}

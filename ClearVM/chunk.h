@@ -9,7 +9,12 @@ typedef enum {
     OP_STORE_CONST = 0,
     OP_NUMBER = 1,
     OP_PRINT = 2,
-    OP_LOAD_CONST = 3
+    OP_LOAD_CONST = 3,
+    OP_NEGATE = 4,
+    OP_ADD = 5,
+    OP_SUBTRACT = 6,
+    OP_MULTIPLY = 7,
+    OP_DIVIDE = 8
 
 } OpCode;
 

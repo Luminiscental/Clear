@@ -21,6 +21,9 @@ echo "-- Running bytecode --"
 
 ./clr ../../test/main.clr.b
 
+echo ""
+echo ""
+
 popd
 popd
 
