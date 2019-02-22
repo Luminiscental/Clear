@@ -56,7 +56,7 @@ class Token:
         self.line = line
 
     def __repr__(self):
-        return "Token({}, {}, {})".format(
+        return "Token({}, '{}', {})".format(
                 self.token_type, self.lexeme, self.line)
 
 def tokenize(source):
@@ -99,7 +99,7 @@ def tokenize(source):
 
         elif char in equal_suffix_tokens:
             suffix_type = equal_suffix_tokens[char]
-            tokens.append(suffix_type.nonpresent, char, line)
+            tokens.append(Token(suffix_type.nonpresent, char, line))
 
         elif char.isdigit():
             pass # TODO
