@@ -2,55 +2,56 @@
 import struct
 from clr.compile import OpCode
 
-def _disassemble_store(byte, remaining):
+class ClrDisassembleError(Exception):
 
-    code = OpCode(byte)
-    print('{0:16}'.format(str(code)), end='')
-
-    def store_number():
-        value = struct.unpack('d', remaining[1:9])[0]
-        print('<num {}>'.format(value))
-        return 10
-
-    def store_err():
-        return 1
-
-    return {
-        OpCode.NUMBER.value : store_number
-    }.get(remaining[0], store_err)()
-
-def _disassemble_simple(byte, remaining):
-
-    code = OpCode(byte)
-    print(str(code))
-    return 1
-
-def _disassemble_constant(byte, remaining):
-
-    code = OpCode(byte)
-    value_index = remaining[0]
-    print('{0:16}'.format(str(code)), end='')
-    print('{}'.format(value_index))
-    return 2
+    pass
 
 def _disassemble_byte(byte, offset, remaining):
 
     print('{0:04} '.format(offset), end='')
 
-    def unknown_op(byte, remaining):
-        print('<UNKNOWN OP>')
+    def disassemble_store():
+        code = OpCode(byte)
+        print('{0:16}'.format(str(code)), end='')
+
+        def store_number():
+            value = struct.unpack('d', remaining[1:9])[0]
+            print('<num {}>'.format(value))
+            return 10
+
+        def store_err():
+            raise ClrDisassembleError("Unrecognized constant type {}!"
+                    % remaining[0])
+
+        return {
+            OpCode.NUMBER.value : store_number
+        }.get(remaining[0], store_err)()
+
+    def disassemble_simple():
+        code = OpCode(byte)
+        print(str(code))
         return 1
 
+    def disassemble_constant():
+        code = OpCode(byte)
+        value_index = remaining[0]
+        print('{0:16}'.format(str(code)), end='')
+        print('{}'.format(value_index))
+        return 2
+
+    def disassembl_err():
+        raise ClrDisassembleError("Unrecognized op code {}!" % byte)
+
     return {
-        OpCode.STORE_CONST.value : _disassemble_store,
-        OpCode.PRINT.value : _disassemble_simple,
-        OpCode.LOAD_CONST.value : _disassemble_constant,
-        OpCode.NEGATE.value : _disassemble_simple,
-        OpCode.ADD.value : _disassemble_simple,
-        OpCode.SUBTRACT.value : _disassemble_simple,
-        OpCode.MULTIPLY.value : _disassemble_simple,
-        OpCode.DIVIDE.value : _disassemble_simple
-    }.get(byte, unknown_op)(byte, remaining)
+        OpCode.STORE_CONST.value : disassemble_store,
+        OpCode.PRINT.value : disassemble_simple,
+        OpCode.LOAD_CONST.value : disassemble_constant,
+        OpCode.NEGATE.value : disassemble_simple,
+        OpCode.ADD.value : disassemble_simple,
+        OpCode.SUBTRACT.value : disassemble_simple,
+        OpCode.MULTIPLY.value : disassemble_simple,
+        OpCode.DIVIDE.value : disassemble_simple
+    }.get(byte, disassembl_err)()
 
 def disassemble(byte_code):
 

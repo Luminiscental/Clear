@@ -1,8 +1,8 @@
 
 import struct
 import sys
-from clr.dis import disassemble
-from clr.compile import parse_source, CompileException, OpCode
+from clr.dis import disassemble, ClrDisassembleError
+from clr.compile import parse_source, ClrCompileError, OpCode
 
 debug = True
 
@@ -21,8 +21,12 @@ def main():
     try:
         byte_code = parse_source(source)
         if debug:
-            disassemble(byte_code)
-    except CompileException as e:
+            try:
+                disassemble(byte_code)
+            except ClrDisassembleError as e:
+                print('Could not disassemble:')
+                print(e)
+    except ClrCompileError as e:
         print('Could not compile:')
         print(e)
     else:

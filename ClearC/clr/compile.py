@@ -2,6 +2,10 @@
 import struct
 from enum import Enum
 
+class ClrCompileError(Exception):
+
+    pass
+
 class OpCode(Enum):
 
     STORE_CONST = 0
@@ -29,10 +33,6 @@ class OpCode(Enum):
             OpCode.MULTIPLY : 'OP_MULTIPLY',
             OpCode.DIVIDE : 'OP_DIVIDE'
         }.get(self, '<UNKNOWN OP>')
-
-class CompileException(Exception):
-
-    pass
 
 class Constants:
 
