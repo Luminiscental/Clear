@@ -3,6 +3,7 @@ from enum import Enum
 import re
 from collections import namedtuple
 from clr.errors import ClrCompileError
+from clr.trie import Trie, TrieResult
 
 class TokenType(Enum):
 
@@ -85,6 +86,27 @@ def tokenize(source):
         '>': SuffixType(TokenType.GREATER_EQUAL, TokenType.GREATER)
     }
 
+    keyword_types = {
+        "and" : TokenType.AND,
+        "class" : TokenType.CLASS,
+        "else" : TokenType.ELSE,
+        "false" : TokenType.FALSE,
+        "for" : TokenType.FOR,
+        "func" : TokenType.FUNC,
+        "if" : TokenType.IF,
+        "or" : TokenType.OR,
+        "print" : TokenType.PRINT,
+        "return" : TokenType.RETURN,
+        "super" : TokenType.SUPER,
+        "this" : TokenType.THIS,
+        "true" : TokenType.TRUE,
+        "var" : TokenType.VAR,
+        "val" : TokenType.VAL,
+        "while" : TokenType.WHILE
+    }
+
+    keyword_trie = Trie(keyword_types)
+
     # Replace // followed by a string of non-newline characters with nothing
     source = re.sub(r'//.*', '', source)
 
@@ -139,11 +161,14 @@ def tokenize(source):
 
         elif parsing_identifier:
             if char.isalpha() or char.isdigit() or char == '_':
+                result, _ = keyword_trie.step(char)
                 acc.append(char)
+                if result == TrieResult.FINISH:
+                    lexeme = ''.join(acc)
+                    store_acc(keyword_types[lexeme])
                 continue
 
             else:
-                # TODO: Keywords using trie
                 parsing_identifier = False
                 store_acc(TokenType.IDENTIFIER)
 
@@ -162,16 +187,22 @@ def tokenize(source):
             tokens.append(Token(suffix_type.nonpresent, char, line))
 
         elif char.isdigit():
-            parsing_number = True
             acc.append(char)
+            parsing_number = True
 
         elif char == '"':
-            parsing_string = True
             acc.append(char)
+            parsing_string = True
 
         elif char.isalpha() or char == '_':
-            parsing_identifier = True
+            if tokens and tokens[-1].token_type in keyword_types.values():
+                acc.extend(tokens[-1].lexeme)
+                del tokens[-1]
+            else:
+                keyword_trie.reset()
+            keyword_trie.step(char)
             acc.append(char)
+            parsing_identifier = True
 
         elif char == '\n':
             line += 1

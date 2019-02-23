@@ -2,7 +2,7 @@
 import struct
 import sys
 from clr.dis import disassemble, ClrDisassembleError
-from clr.compile import parse_source, ClrCompileError, OpCode
+from clr.compile import parse_source, ClrCompileError
 
 debug = True
 

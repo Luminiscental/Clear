@@ -50,11 +50,11 @@ class Trie:
                     self.pointer = root
                     break
             else:
-                return TrieResult.BREAK, self.pointer.string
+                return TrieResult.BREAK, None
         else:
             find = self.pointer.get(char)
             if find is None:
-                return TrieResult.BREAK, self.pointer.string
+                return TrieResult.BREAK, None 
             else:
                 self.pointer = find
 

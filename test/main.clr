@@ -1,10 +1,15 @@
 
-// Simple test expression
+// Simple test program:
 
-1.385858.eat() + 2 * (7 - "hello world){}{}\\/") // silly string
-abc ellflfl.idosoa kdjflsj / jakflghjalfdk + ksadf"alksjd"lkasdjf
-a multi_line string "woah...
-that's crazy\n
-"
-__line__ == 3 + 1 is lovely();
+func fibb(val n) {
+
+    if (n == 0) {
+
+        print "base case";
+        return 1;
+    }
+
+    print "recursive case";
+    return n * fibb(n - 1);
+}
 
