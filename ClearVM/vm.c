@@ -17,14 +17,31 @@ void resetStack(VM *vm) {
 
 void push(VM *vm, Value value) {
 
-    *vm->stackTop = value;
-    vm->stackTop++;
+    if (vm->stackTop >= vm->stack + STACK_MAX - 1) {
+
+        // TODO: Error handling
+        printf("|| Stack overflow!\n");
+
+    } else {
+
+        *vm->stackTop = value;
+        vm->stackTop++;
+    }
 }
 
 Value pop(VM *vm) {
 
-    vm->stackTop--;
-    return *vm->stackTop;
+    if (vm->stackTop <= vm->stack) {
+
+        // TODO: Error handling
+        printf("|| Stack underflow!\n");
+        return 0;
+
+    } else {
+
+        vm->stackTop--;
+        return *vm->stackTop;
+    }
 }
 
 void freeVM(VM *vm) {
@@ -41,16 +58,34 @@ InterpretResult interpret(VM *vm, Chunk *chunk) {
 
 uint8_t readByte(VM *vm) {
 
-    return *vm->ip++;
+    if (1 + vm->ip - vm->chunk->code > vm->chunk->count) {
+
+        // TODO: Error handling
+        printf("|| Ran out of bytes!\n");
+        return -1;
+
+    } else {
+
+        return *vm->ip++;
+    }
 }
 
 double readDouble(VM *vm) {
 
-    double *read = (double*) vm->ip;
+    if (8 + vm->ip - vm->chunk->code > vm->chunk->count) {
 
-    vm->ip += 8;
+        // TODO: Error handling
+        printf("|| Ran out of bytes!\n");
+        return 0.0;
 
-    return *read;
+    } else {
+
+        double *read = (double*) vm->ip;
+
+        vm->ip += 8;
+
+        return *read;
+    }
 }
 
 InterpretResult run(VM *vm) {
@@ -69,6 +104,7 @@ InterpretResult run(VM *vm) {
             printValue(*slot, false);
             printf(" ]");
         }
+
         printf("\n");
 
 #endif
@@ -93,6 +129,13 @@ InterpretResult run(VM *vm) {
             case OP_LOAD_CONST: {
 
                 uint8_t index = readByte(vm);
+
+                if (index >= vm->chunk->constants.count) {
+
+                    printf("|| Constant out of index!\n");
+                    return INTERPRET_ERR;
+                }
+
                 Value constant = vm->chunk->constants.values[index];
 
 #ifdef DEBUG
@@ -210,8 +253,6 @@ InterpretResult run(VM *vm) {
                 push(vm, a / b);
 
             } break;
-
-#undef BINARY_OP
 
             default: {
 

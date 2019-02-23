@@ -8,9 +8,9 @@
 
 void *reallocate(void *previous, size_t oldSize, size_t newSize) {
 
-    static size_t memoryUsage = 0;
-
 #ifdef DEBUG_MEM
+
+    static size_t memoryUsage = 0;
 
     memoryUsage += newSize - oldSize;
 

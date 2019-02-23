@@ -55,7 +55,7 @@ int main(int argc, char **argv) {
 
     if (argc < 2) {
 
-        printf("Incorrect usage: Please pass a .crb file to run\n");
+        printf("Incorrect usage: Please pass a .crl.b file to run\n");
         return 1;
     }
 
@@ -67,6 +67,7 @@ int main(int argc, char **argv) {
     if (byteCode.buffer == NULL) {
 
         printf("Could not read file!\n");
+        return 1;
     }
 
     Chunk chunk;
