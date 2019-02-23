@@ -47,6 +47,8 @@ class TokenType(Enum):
     VAR = 35,
     VAL = 36,
     WHILE = 38,
+    # special
+    SPACE = 39
 
 class Token:
 
@@ -91,7 +93,8 @@ def tokenize(source):
         if char in simple_tokens:
             tokens.append(Token(simple_tokens[char], char, line))
 
-        elif char == '=' and tokens[-1].lexeme in equal_suffix_tokens:
+        elif (char == '=' and tokens[-1].lexeme in equal_suffix_tokens
+                          and tokens[-1].token_type != TokenType.EQUAL_EQUAL):
             suffix_type = equal_suffix_tokens[tokens[-1].lexeme]
             tokens[-1] = Token(suffix_type.present,
                                tokens[-1].lexeme + '=',
@@ -110,11 +113,15 @@ def tokenize(source):
         elif char == '\n':
             line += 1
 
-        elif char == ' ':
+        elif char.isspace():
+            tokens.append(Token(TokenType.SPACE, ' ', line))
             continue
 
         else:
             raise ClrCompileError("Unrecognized character '{}'".format(char))
+
+    tokens = [token for token in tokens
+            if token.token_type != TokenType.SPACE]
 
     return tokens
 
