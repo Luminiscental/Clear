@@ -113,64 +113,75 @@ def tokenize(source):
     tokens = []
     line = 1
 
-    parsing_number = False
-    parsing_decimal = False
-    parsing_string = False
-    parsing_identifier = False
+    class ParseState(Enum):
+        NUMBER = 0,
+        DECIMAL = 1,
+        STRING = 2,
+        IDENTIFIER = 3,
+        ANY = 4
+
+    parse_state = ParseState.ANY
     acc = []
 
     def store_acc(token_type):
         tokens.append(Token(token_type, ''.join(acc), line))
         del acc[:]
 
+    def parse_number(char):
+        if char.isdigit():
+            acc.append(char)
+            return True, None
+        elif char == '.':
+            acc.append(char)
+            return True, ParseState.DECIMAL
+        else:
+            store_acc(TokenType.NUMBER)
+            return False, ParseState.ANY
+
+    def parse_decimal(char):
+        if char.isdigit():
+            acc.append(char)
+            return True, None
+        else:
+            store_acc(TokenType.NUMBER)
+            return False, ParseState.ANY
+
+    def parse_string(char):
+        if char == '"':
+            acc.append(char)
+            store_acc(TokenType.STRING)
+            return True, ParseState.ANY
+        else:
+            acc.append(char)
+            return True, None
+
+    def parse_identifier(char):
+        if char.isalpha() or char.isdigit() or char == '_':
+            result, _ = keyword_trie.step(char)
+            acc.append(char)
+            if result == TrieResult.FINISH:
+                lexeme = ''.join(acc)
+                store_acc(keyword_types[lexeme])
+                return True, ParseState.ANY
+            return True, None
+        else:
+            store_acc(TokenType.IDENTIFIER)
+            return False, ParseState.ANY
+
+    state_parsers = {
+        ParseState.NUMBER : parse_number,
+        ParseState.DECIMAL : parse_decimal,
+        ParseState.STRING : parse_string,
+        ParseState.IDENTIFIER : parse_identifier
+    }
+
     for char in source:
-        if parsing_number:
-            if char.isdigit():
-                acc.append(char)
+        if parse_state in state_parsers:
+            consumed, next_state = state_parsers[parse_state](char)
+            if next_state:
+                parse_state = next_state
+            if consumed:
                 continue
-
-            elif char == '.':
-                parsing_number = False
-                parsing_decimal = True
-                acc.append(char)
-                continue
-
-            else:
-                parsing_number = False
-                store_acc(TokenType.NUMBER)
-
-        elif parsing_decimal:
-            if char.isdigit():
-                acc.append(char)
-                continue
-
-            else:
-                parsing_decimal = False
-                store_acc(TokenType.NUMBER)
-
-        elif parsing_string:
-            if char == '"':
-                acc.append(char)
-                parsing_string = False
-                store_acc(TokenType.STRING)
-                continue
-
-            else:
-                acc.append(char)
-                continue
-
-        elif parsing_identifier:
-            if char.isalpha() or char.isdigit() or char == '_':
-                result, _ = keyword_trie.step(char)
-                acc.append(char)
-                if result == TrieResult.FINISH:
-                    lexeme = ''.join(acc)
-                    store_acc(keyword_types[lexeme])
-                continue
-
-            else:
-                parsing_identifier = False
-                store_acc(TokenType.IDENTIFIER)
 
         if char in simple_tokens:
             tokens.append(Token(simple_tokens[char], char, line))
@@ -188,11 +199,18 @@ def tokenize(source):
 
         elif char.isdigit():
             acc.append(char)
-            parsing_number = True
+            parse_state = ParseState.NUMBER
 
         elif char == '"':
             acc.append(char)
-            parsing_string = True
+            parse_state = ParseState.STRING
+
+        elif char == '\n':
+            line += 1
+
+        elif char.isspace():
+            tokens.append(Token(TokenType.SPACE, ' ', line))
+            continue
 
         elif char.isalpha() or char == '_':
             if tokens and tokens[-1].token_type in keyword_types.values():
@@ -202,20 +220,15 @@ def tokenize(source):
                 keyword_trie.reset()
             keyword_trie.step(char)
             acc.append(char)
-            parsing_identifier = True
-
-        elif char == '\n':
-            line += 1
-
-        elif char.isspace():
-            tokens.append(Token(TokenType.SPACE, ' ', line))
-            continue
+            parse_state = ParseState.IDENTIFIER
 
         else:
             raise ClrCompileError("Unrecognized character '{}'".format(char))
 
     tokens = [token for token in tokens
             if token.token_type != TokenType.SPACE]
+
+    print(' '.join(map(lambda t: t.lexeme, tokens)))
 
     return tokens
 
