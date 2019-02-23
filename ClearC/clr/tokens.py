@@ -87,9 +87,66 @@ def tokenize(source):
 
     # Replace // followed by a string of non-newline characters with nothing
     source = re.sub(r'//.*', '', source)
+
     tokens = []
     line = 1
+
+    parsing_number = False
+    parsing_decimal = False
+    parsing_string = False
+    parsing_identifier = False
+    acc = []
+
+    def store_acc(token_type):
+        tokens.append(Token(token_type, ''.join(acc), line))
+        del acc[:]
+
     for char in source:
+        if parsing_number:
+            if char.isdigit():
+                acc.append(char)
+                continue
+
+            elif char == '.':
+                parsing_number = False
+                parsing_decimal = True
+                acc.append(char)
+                continue
+
+            else:
+                parsing_number = False
+                store_acc(TokenType.NUMBER)
+
+        elif parsing_decimal:
+            if char.isdigit():
+                acc.append(char)
+                continue
+
+            else:
+                parsing_decimal = False
+                store_acc(TokenType.NUMBER)
+
+        elif parsing_string:
+            if char == '"':
+                acc.append(char)
+                parsing_string = False
+                store_acc(TokenType.STRING)
+                continue
+
+            else:
+                acc.append(char)
+                continue
+
+        elif parsing_identifier:
+            if char.isalpha() or char.isdigit():
+                acc.append(char)
+                continue
+
+            else:
+                # TODO: Keywords using trie
+                parsing_identifier = False
+                store_acc(TokenType.IDENTIFIER)
+
         if char in simple_tokens:
             tokens.append(Token(simple_tokens[char], char, line))
 
@@ -105,10 +162,16 @@ def tokenize(source):
             tokens.append(Token(suffix_type.nonpresent, char, line))
 
         elif char.isdigit():
-            pass # TODO
+            parsing_number = True
+            acc.append(char)
+
+        elif char == '"':
+            parsing_string = True
+            acc.append(char)
 
         elif char.isalpha():
-            pass # TODO
+            parsing_identifier = True
+            acc.append(char)
 
         elif char == '\n':
             line += 1
