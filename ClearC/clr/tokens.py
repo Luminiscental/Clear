@@ -138,7 +138,7 @@ def tokenize(source):
                 continue
 
         elif parsing_identifier:
-            if char.isalpha() or char.isdigit():
+            if char.isalpha() or char.isdigit() or char == '_':
                 acc.append(char)
                 continue
 
@@ -169,7 +169,7 @@ def tokenize(source):
             parsing_string = True
             acc.append(char)
 
-        elif char.isalpha():
+        elif char.isalpha() or char == '_':
             parsing_identifier = True
             acc.append(char)
 
