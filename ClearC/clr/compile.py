@@ -84,7 +84,7 @@ class Program:
     def flush(self):
         return self.code_list
 
-def _assemble(code_list):
+def assemble(code_list):
 
     raw_bytes = bytearray()
     for code in code_list:
@@ -103,8 +103,7 @@ def parse_source(source):
 
     tokens = tokenize(source)
 
-    for token in tokens:
-        print(token)
+    print(' '.join(map(lambda token: token.lexeme, tokens)))
 
     constants = Constants()
     program = Program()
@@ -117,5 +116,5 @@ def parse_source(source):
     program.op_divide()
     program.op_print()
 
-    return _assemble(constants.flush() + program.flush())
+    return assemble(constants.flush() + program.flush())
 

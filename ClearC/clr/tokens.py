@@ -51,6 +51,51 @@ class TokenType(Enum):
     # special
     SPACE = 39
 
+keyword_types = {
+
+    'and' : TokenType.AND,
+    'class' : TokenType.CLASS,
+    'else' : TokenType.ELSE,
+    'false' : TokenType.FALSE,
+    'for' : TokenType.FOR,
+    'func' : TokenType.FUNC,
+    'if' : TokenType.IF,
+    'or' : TokenType.OR,
+    'print' : TokenType.PRINT,
+    'return' : TokenType.RETURN,
+    'super' : TokenType.SUPER,
+    'this' : TokenType.THIS,
+    'true' : TokenType.TRUE,
+    'var' : TokenType.VAR,
+    'val' : TokenType.VAL,
+    'while' : TokenType.WHILE
+}
+
+simple_tokens = {
+
+    '+' : TokenType.PLUS,
+    '-' : TokenType.MINUS,
+    '*' : TokenType.STAR,
+    '/' : TokenType.SLASH,
+    ';' : TokenType.SEMICOLON,
+    ',' : TokenType.COMMA,
+    '.' : TokenType.DOT,
+    '(' : TokenType.LEFT_PAREN,
+    ')' : TokenType.RIGHT_PAREN,
+    '{' : TokenType.LEFT_BRACE,
+    '}' : TokenType.RIGHT_BRACE
+}
+
+SuffixType = namedtuple('SuffixType', 'present nonpresent')
+
+equal_suffix_tokens = {
+
+    '!': SuffixType(TokenType.BANG_EQUAL, TokenType.BANG),
+    '=': SuffixType(TokenType.EQUAL_EQUAL, TokenType.EQUAL),
+    '<': SuffixType(TokenType.LESS_EQUAL, TokenType.LESS),
+    '>': SuffixType(TokenType.GREATER_EQUAL, TokenType.GREATER)
+}
+
 class Token:
 
     def __init__(self, token_type, lexeme, line):
@@ -62,173 +107,134 @@ class Token:
         return "Token({}, '{}', {})".format(
                 self.token_type, self.lexeme, self.line)
 
+class ParseState(Enum):
+
+    NUMBER = 0,
+    DECIMAL = 1,
+    STRING = 2,
+    IDENTIFIER = 3,
+    ANY = 4
+
+def store_acc(token_type, acc, line, tokens):
+
+    tokens.append(Token(token_type, ''.join(acc), line))
+    del acc[:]
+
+def parse_number(char, acc, line, keyword_trie, tokens):
+
+    if char.isdigit():
+        acc.append(char)
+        return True, None
+    elif char == '.':
+        acc.append(char)
+        return True, ParseState.DECIMAL
+    else:
+        store_acc(TokenType.NUMBER, acc, line, tokens)
+        return False, ParseState.ANY
+
+def parse_decimal(char, acc, line, keyword_trie, tokens):
+
+    if char.isdigit():
+        acc.append(char)
+        return True, None
+    else:
+        store_acc(TokenType.NUMBER, acc, line, tokens)
+        return False, ParseState.ANY
+
+def parse_string(char, acc, line, keyword_trie, tokens):
+
+    if char == '"':
+        acc.append(char)
+        store_acc(TokenType.STRING, acc, line, tokens)
+        return True, ParseState.ANY
+    else:
+        acc.append(char)
+        return True, None
+
+def parse_identifier(char, acc, line, keyword_trie, tokens):
+
+    if char.isalpha() or char.isdigit() or char == '_':
+        result, _ = keyword_trie.step(char)
+        acc.append(char)
+        if result == TrieResult.FINISH:
+            lexeme = ''.join(acc)
+            store_acc(keyword_types[lexeme], acc, line, tokens)
+            return True, ParseState.ANY
+        return True, None
+    else:
+        store_acc(TokenType.IDENTIFIER, acc, line, tokens)
+        return False, ParseState.ANY
+
+def parse_any(char, acc, line, keyword_trie, tokens):
+
+    if char in simple_tokens:
+        tokens.append(Token(simple_tokens[char], char, line))
+        return None
+    elif (char == '=' and tokens
+            and tokens[-1].lexeme in equal_suffix_tokens
+            and tokens[-1].token_type != TokenType.EQUAL_EQUAL):
+        suffix_type = equal_suffix_tokens[tokens[-1].lexeme]
+        tokens[-1] = Token(suffix_type.present,
+                           tokens[-1].lexeme + '=',
+                           line)
+        return None
+    elif char in equal_suffix_tokens:
+        suffix_type = equal_suffix_tokens[char]
+        tokens.append(Token(suffix_type.nonpresent, char, line))
+        return None
+    elif char.isdigit():
+        acc.append(char)
+        return ParseState.NUMBER
+    elif char == '"':
+        acc.append(char)
+        return ParseState.STRING
+    elif char == '\n':
+        line += 1
+        return None
+    elif char.isspace():
+        tokens.append(Token(TokenType.SPACE, ' ', line))
+        return None
+    elif char.isalpha() or char == '_':
+        if tokens and tokens[-1].token_type in keyword_types.values():
+            acc.extend(tokens[-1].lexeme)
+            del tokens[-1]
+        else:
+            keyword_trie.reset()
+        keyword_trie.step(char)
+        acc.append(char)
+        return ParseState.IDENTIFIER
+    else:
+        raise ClrCompileError("Unrecognized character '{}'".format(char))
+
 def tokenize(source):
-
-    simple_tokens = {
-        '+' : TokenType.PLUS,
-        '-' : TokenType.MINUS,
-        '*' : TokenType.STAR,
-        '/' : TokenType.SLASH,
-        ';' : TokenType.SEMICOLON,
-        ',' : TokenType.COMMA,
-        '.' : TokenType.DOT,
-        '(' : TokenType.LEFT_PAREN,
-        ')' : TokenType.RIGHT_PAREN,
-        '{' : TokenType.LEFT_BRACE,
-        '}' : TokenType.RIGHT_BRACE
-    }
-
-    SuffixType = namedtuple('SuffixType', 'present nonpresent')
-    equal_suffix_tokens = {
-        '!': SuffixType(TokenType.BANG_EQUAL, TokenType.BANG),
-        '=': SuffixType(TokenType.EQUAL_EQUAL, TokenType.EQUAL),
-        '<': SuffixType(TokenType.LESS_EQUAL, TokenType.LESS),
-        '>': SuffixType(TokenType.GREATER_EQUAL, TokenType.GREATER)
-    }
-
-    keyword_types = {
-        "and" : TokenType.AND,
-        "class" : TokenType.CLASS,
-        "else" : TokenType.ELSE,
-        "false" : TokenType.FALSE,
-        "for" : TokenType.FOR,
-        "func" : TokenType.FUNC,
-        "if" : TokenType.IF,
-        "or" : TokenType.OR,
-        "print" : TokenType.PRINT,
-        "return" : TokenType.RETURN,
-        "super" : TokenType.SUPER,
-        "this" : TokenType.THIS,
-        "true" : TokenType.TRUE,
-        "var" : TokenType.VAR,
-        "val" : TokenType.VAL,
-        "while" : TokenType.WHILE
-    }
-
-    keyword_trie = Trie(keyword_types)
 
     # Replace // followed by a string of non-newline characters with nothing
     source = re.sub(r'//.*', '', source)
 
+    keyword_trie = Trie(keyword_types)
+    parse_state = ParseState.ANY
     tokens = []
+    acc = []
     line = 1
 
-    class ParseState(Enum):
-        NUMBER = 0,
-        DECIMAL = 1,
-        STRING = 2,
-        IDENTIFIER = 3,
-        ANY = 4
-
-    parse_state = ParseState.ANY
-    acc = []
-
-    def store_acc(token_type):
-        tokens.append(Token(token_type, ''.join(acc), line))
-        del acc[:]
-
-    def parse_number(char):
-        if char.isdigit():
-            acc.append(char)
-            return True, None
-        elif char == '.':
-            acc.append(char)
-            return True, ParseState.DECIMAL
-        else:
-            store_acc(TokenType.NUMBER)
-            return False, ParseState.ANY
-
-    def parse_decimal(char):
-        if char.isdigit():
-            acc.append(char)
-            return True, None
-        else:
-            store_acc(TokenType.NUMBER)
-            return False, ParseState.ANY
-
-    def parse_string(char):
-        if char == '"':
-            acc.append(char)
-            store_acc(TokenType.STRING)
-            return True, ParseState.ANY
-        else:
-            acc.append(char)
-            return True, None
-
-    def parse_identifier(char):
-        if char.isalpha() or char.isdigit() or char == '_':
-            result, _ = keyword_trie.step(char)
-            acc.append(char)
-            if result == TrieResult.FINISH:
-                lexeme = ''.join(acc)
-                store_acc(keyword_types[lexeme])
-                return True, ParseState.ANY
-            return True, None
-        else:
-            store_acc(TokenType.IDENTIFIER)
-            return False, ParseState.ANY
-
-    state_parsers = {
-        ParseState.NUMBER : parse_number,
-        ParseState.DECIMAL : parse_decimal,
-        ParseState.STRING : parse_string,
-        ParseState.IDENTIFIER : parse_identifier
-    }
-
     for char in source:
-        if parse_state in state_parsers:
-            consumed, next_state = state_parsers[parse_state](char)
+        if parse_state != ParseState.ANY:
+            consumed, next_state = {
+                ParseState.NUMBER : parse_number,
+                ParseState.DECIMAL : parse_decimal,
+                ParseState.STRING : parse_string,
+                ParseState.IDENTIFIER : parse_identifier
+            }[parse_state](char, acc, line, keyword_trie, tokens)
             if next_state:
                 parse_state = next_state
             if consumed:
                 continue
-
-        if char in simple_tokens:
-            tokens.append(Token(simple_tokens[char], char, line))
-
-        elif (char == '=' and tokens[-1].lexeme in equal_suffix_tokens
-                          and tokens[-1].token_type != TokenType.EQUAL_EQUAL):
-            suffix_type = equal_suffix_tokens[tokens[-1].lexeme]
-            tokens[-1] = Token(suffix_type.present,
-                               tokens[-1].lexeme + '=',
-                               line)
-
-        elif char in equal_suffix_tokens:
-            suffix_type = equal_suffix_tokens[char]
-            tokens.append(Token(suffix_type.nonpresent, char, line))
-
-        elif char.isdigit():
-            acc.append(char)
-            parse_state = ParseState.NUMBER
-
-        elif char == '"':
-            acc.append(char)
-            parse_state = ParseState.STRING
-
-        elif char == '\n':
-            line += 1
-
-        elif char.isspace():
-            tokens.append(Token(TokenType.SPACE, ' ', line))
-            continue
-
-        elif char.isalpha() or char == '_':
-            if tokens and tokens[-1].token_type in keyword_types.values():
-                acc.extend(tokens[-1].lexeme)
-                del tokens[-1]
-            else:
-                keyword_trie.reset()
-            keyword_trie.step(char)
-            acc.append(char)
-            parse_state = ParseState.IDENTIFIER
-
-        else:
-            raise ClrCompileError("Unrecognized character '{}'".format(char))
+        next_state = parse_any(char, acc, line, keyword_trie, tokens)
+        if next_state:
+            parse_state = next_state
 
     tokens = [token for token in tokens
             if token.token_type != TokenType.SPACE]
-
-    print(' '.join(map(lambda t: t.lexeme, tokens)))
 
     return tokens
 
