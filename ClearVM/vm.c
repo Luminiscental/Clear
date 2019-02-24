@@ -2,6 +2,8 @@
 #include "vm.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -35,7 +37,7 @@ Value pop(VM *vm) {
 
         // TODO: Error handling
         printf("|| Stack underflow!\n");
-        return 0;
+        return makeNumber(0.0);
 
     } else {
 
@@ -62,7 +64,7 @@ uint8_t readByte(VM *vm) {
 
         // TODO: Error handling
         printf("|| Ran out of bytes!\n");
-        return -1;
+        return (uint8_t) -1;
 
     } else {
 
@@ -88,6 +90,28 @@ double readDouble(VM *vm) {
     }
 }
 
+char *readString(VM *vm) {
+
+    uint8_t size = readByte(vm);
+
+    if (size == (uint8_t) -1) {
+
+        char *buffer = (char*) malloc(1);
+        buffer[0] = '\0';
+        return buffer;
+    }
+
+    char *buffer = (char*) malloc(size + 1);
+    buffer[size] = '\0';
+
+    for (size_t i = 0; i < size; i++) {
+
+        buffer[i] = readByte(vm);
+    }
+
+    return buffer;
+}
+
 InterpretResult run(VM *vm) {
 
     while (true) {
@@ -111,6 +135,18 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
+            case OP_RETURN: {
+
+#ifdef DEBUG
+
+                printf("OP_RETURN\n");
+
+#endif
+
+                return INTERPRET_OK;
+
+            } break;
+
             case OP_PRINT: {
 
                 Value value = pop(vm);
@@ -121,8 +157,8 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                printf("|| print %f\n", value);
-                return INTERPRET_OK;
+                printf("|| print ");
+                printValue(value, true);
 
             } break;
 
@@ -159,7 +195,13 @@ InterpretResult run(VM *vm) {
 
                     case OP_NUMBER: {
 
-                        value = readDouble(vm);
+                        value = makeNumber(readDouble(vm));
+
+                    } break;
+
+                    case OP_STRING: {
+
+                        value = makeString(readString(vm));
 
                     } break;
 
@@ -190,9 +232,36 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                push(vm, -pop(vm));
+                Value top = pop(vm);
+
+                if (top.type != VAL_NUMBER) {
+
+                    printf("|| Expected number to negate!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value negated = makeNumber(-top.as.number);
+                push(vm, negated);
 
             } break;
+
+#define BINARY_OP(op)                                          \
+                                                               \
+    do {                                                       \
+                                                               \
+        Value b = pop(vm);                                     \
+        Value a = pop(vm);                                     \
+                                                               \
+        if (b.type != VAL_NUMBER || a.type != VAL_NUMBER) {    \
+                                                               \
+            printf("|| Expected number for operation!\n");     \
+            return INTERPRET_ERR;                              \
+        }                                                      \
+                                                               \
+        Value result = makeNumber(a.as.number op b.as.number); \
+        push(vm, result);                                      \
+                                                               \
+    } while(false)
 
             case OP_ADD: {
 
@@ -202,10 +271,7 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                double b = pop(vm);
-                double a = pop(vm);
-
-                push(vm, a + b);
+                BINARY_OP(+);
 
             } break;
 
@@ -217,10 +283,7 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                double b = pop(vm);
-                double a = pop(vm);
-
-                push(vm, a - b);
+                BINARY_OP(-);
 
             } break;
 
@@ -232,10 +295,7 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                double b = pop(vm);
-                double a = pop(vm);
-
-                push(vm, a * b);
+                BINARY_OP(*);
 
             } break;
 
@@ -247,10 +307,7 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                double b = pop(vm);
-                double a = pop(vm);
-
-                push(vm, a / b);
+                BINARY_OP(/);
 
             } break;
 

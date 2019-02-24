@@ -8,18 +8,26 @@ def disassemble_store(byte, remaining):
     code = OpCode(byte)
     print('{0:16}'.format(str(code)), end='')
 
-    def store_number():
-        value = struct.unpack('d', remaining[1:9])[0]
+    def store_number(data):
+        value = struct.unpack('d', data[0:8])[0]
         print('<num {}>'.format(value))
-        return 10
+        return 8
+
+    def store_string(data):
+        length = data[0]
+        byte_string = data[1:length + 1]
+        value = byte_string.decode()
+        print('<str "{}">'.format(value))
+        return 1 + length
 
     def store_err():
         raise ClrDisassembleError('Unrecognized constant type {}!'.format(
                 remaining[0]))
 
-    return {
-        OpCode.NUMBER.value : store_number
-    }.get(remaining[0], store_err)()
+    return 2 + {
+        OpCode.NUMBER.value : store_number,
+        OpCode.STRING.value : store_string
+    }.get(remaining[0], store_err)(remaining[1:])
 
 def disassemble_simple(byte, remaining):
 
@@ -50,7 +58,8 @@ def disassemble_byte(byte, offset, remaining):
         OpCode.ADD.value : disassemble_simple,
         OpCode.SUBTRACT.value : disassemble_simple,
         OpCode.MULTIPLY.value : disassemble_simple,
-        OpCode.DIVIDE.value : disassemble_simple
+        OpCode.DIVIDE.value : disassemble_simple,
+        OpCode.RETURN.value : disassemble_simple
     }.get(byte, disassembl_err)(byte, remaining)
 
 def disassemble(byte_code):

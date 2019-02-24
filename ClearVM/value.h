@@ -3,7 +3,28 @@
 
 #include "common.h"
 
-typedef double Value;
+typedef enum {
+
+    VAL_NUMBER,
+    VAL_STRING
+
+} ValueType;
+
+typedef struct {
+
+    ValueType type;
+
+    union {
+
+        double number;
+        char *string;
+
+    } as;
+
+} Value;
+
+Value makeNumber(double number);
+Value makeString(char *string);
 
 typedef struct {
 

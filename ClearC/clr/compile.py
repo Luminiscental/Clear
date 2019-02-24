@@ -8,13 +8,15 @@ class OpCode(Enum):
 
     STORE_CONST = 0
     NUMBER = 1
-    PRINT = 2
-    LOAD_CONST = 3
-    NEGATE = 4
-    ADD = 5
-    SUBTRACT = 6
-    MULTIPLY = 7
-    DIVIDE = 8
+    STRING = 2
+    PRINT = 3
+    LOAD_CONST = 4
+    NEGATE = 5
+    ADD = 6
+    SUBTRACT = 7
+    MULTIPLY = 8
+    DIVIDE = 9
+    RETURN = 10
 
     def __int__(self):
         return self.value
@@ -23,13 +25,15 @@ class OpCode(Enum):
         return {
             OpCode.STORE_CONST : 'OP_STORE_CONST',
             OpCode.NUMBER : 'OP_NUMBER',
+            OpCode.STRING : 'OP_STRING',
             OpCode.PRINT : 'OP_PRINT',
             OpCode.LOAD_CONST : 'OP_LOAD_CONST',
             OpCode.NEGATE : 'OP_NEGATE',
             OpCode.ADD : 'OP_ADD',
             OpCode.SUBTRACT : 'OP_SUBTRACT',
             OpCode.MULTIPLY : 'OP_MULTIPLY',
-            OpCode.DIVIDE : 'OP_DIVIDE'
+            OpCode.DIVIDE : 'OP_DIVIDE',
+            OpCode.RETURN : 'OP_RETURN'
         }.get(self, '<UNKNOWN OP>')
 
 class Constants:
@@ -49,9 +53,17 @@ class Constants:
     def flush(self):
         code_list = []
         for value in self.values:
-            code_list.append(OpCode.STORE_CONST)
-            code_list.append(OpCode.NUMBER)
-            code_list.append(value)
+            if isinstance(value, float):
+                code_list.append(OpCode.STORE_CONST)
+                code_list.append(OpCode.NUMBER)
+                code_list.append(value)
+            elif isinstance(value, str):
+                code_list.append(OpCode.STORE_CONST)
+                code_list.append(OpCode.STRING)
+                code_list.append(value)
+            else:
+                raise ClrCompileError('Unknown constant value type: {}'
+                        .format(value))
         return code_list
 
 class Program:
@@ -81,6 +93,9 @@ class Program:
     def op_divide(self):
         self.code_list.append(OpCode.DIVIDE)
 
+    def op_return(self):
+        self.code_list.append(OpCode.RETURN)
+
     def flush(self):
         return self.code_list
 
@@ -90,6 +105,12 @@ def assemble(code_list):
     for code in code_list:
         if isinstance(code, float):
             for byte in struct.pack('d', code):
+                raw_bytes.append(byte)
+        elif isinstance(code, str):
+            size = len(code)
+            byte_size = bytes([size])[0]
+            raw_bytes.append(byte_size)
+            for byte in code.encode():
                 raw_bytes.append(byte)
         elif isinstance(code, OpCode):
             byte = bytes([code.value])[0]
@@ -110,11 +131,15 @@ def parse_source(source):
 
     const_a = constants.add(13.2)
     const_b = constants.add(24.7)
+    const_c = constants.add("hello")
 
     program.load_constant(const_a)
     program.load_constant(const_b)
     program.op_divide()
     program.op_print()
+    program.load_constant(const_c)
+    program.op_print()
+    program.op_return()
 
     return assemble(constants.flush() + program.flush())
 
