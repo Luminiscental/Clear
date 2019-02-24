@@ -1,7 +1,7 @@
 
 import struct
 from enum import Enum
-from clr.tokens import tokenize
+from clr.tokens import tokenize, TokenType
 from clr.errors import ClrCompileError
 
 class OpCode(Enum):
@@ -120,26 +120,41 @@ def assemble(code_list):
             raw_bytes.append(byte)
     return raw_bytes
 
+class Cursor:
+
+    def __init__(self, tokens):
+        self.index = 0
+        self.tokens = tokens
+        self.constants = Constants()
+        self.program = Program()
+
+    def get_current(self):
+        return self.tokens[self.index]
+
+    def advance(self):
+        self.index += 1
+
+    def consume_expression(self):
+        pass
+
+    def consume(self, expected_type, message):
+        if self.get_current().token_type == expected_type:
+            self.advance()
+        else:
+            raise ClrCompileError(message)
+
+    def flush(self):
+        return self.constants.flush() + self.program.flush()
+
 def parse_source(source):
 
     tokens = tokenize(source)
 
     print(' '.join(map(lambda token: token.lexeme, tokens)))
 
-    constants = Constants()
-    program = Program()
+    cursor = Cursor(tokens)
+    cursor.consume_expression()
+    cursor.consume(TokenType.EOF, "Expect end of expression.")
 
-    const_a = constants.add(13.2)
-    const_b = constants.add(24.7)
-    const_c = constants.add("hello")
-
-    program.load_constant(const_a)
-    program.load_constant(const_b)
-    program.op_divide()
-    program.op_print()
-    program.load_constant(const_c)
-    program.op_print()
-    program.op_return()
-
-    return assemble(constants.flush() + program.flush())
+    return assemble(cursor.flush())
 

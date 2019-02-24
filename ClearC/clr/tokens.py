@@ -49,7 +49,8 @@ class TokenType(Enum):
     VAL = 36,
     WHILE = 38,
     # special
-    SPACE = 39
+    SPACE = 39,
+    EOF = 40
 
 keyword_types = {
 
@@ -235,6 +236,7 @@ def tokenize(source):
 
     tokens = [token for token in tokens
             if token.token_type != TokenType.SPACE]
+    tokens.append(Token(TokenType.EOF, "", line))
 
     return tokens
 
