@@ -22,19 +22,7 @@ class OpCode(Enum):
         return self.value
 
     def __str__(self):
-        return {
-            OpCode.STORE_CONST : 'OP_STORE_CONST',
-            OpCode.NUMBER : 'OP_NUMBER',
-            OpCode.STRING : 'OP_STRING',
-            OpCode.PRINT : 'OP_PRINT',
-            OpCode.LOAD_CONST : 'OP_LOAD_CONST',
-            OpCode.NEGATE : 'OP_NEGATE',
-            OpCode.ADD : 'OP_ADD',
-            OpCode.SUBTRACT : 'OP_SUBTRACT',
-            OpCode.MULTIPLY : 'OP_MULTIPLY',
-            OpCode.DIVIDE : 'OP_DIVIDE',
-            OpCode.RETURN : 'OP_RETURN'
-        }.get(self, '<UNKNOWN OP>')
+        return 'OP_' + self.name
 
 class Constants:
 
@@ -152,9 +140,29 @@ def parse_source(source):
 
     print(' '.join(map(lambda token: token.lexeme, tokens)))
 
+    """
+
     cursor = Cursor(tokens)
     cursor.consume_expression()
     cursor.consume(TokenType.EOF, "Expect end of expression.")
-
     return assemble(cursor.flush())
+
+    """
+
+    constants = Constants()
+    program = Program()
+
+    const_a = constants.add(13.2)
+    const_b = constants.add(24.7)
+    const_c = constants.add("Hello World!")
+
+    program.load_constant(const_a)
+    program.load_constant(const_b)
+    program.op_divide()
+    program.op_print()
+    program.load_constant(const_c)
+    program.op_print()
+    program.op_return()
+
+    return assemble(constants.flush() + program.flush())
 
