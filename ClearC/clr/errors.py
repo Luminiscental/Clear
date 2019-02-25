@@ -9,7 +9,7 @@ class ClrCompileError(Exception):
 
 def emit_error(message, dis=False):
 
-    def emission():
+    def emission(*a, **kw):
         if dis:
             raise ClrDisassembleError(message)
         else:
