@@ -61,8 +61,8 @@ class Constants:
             op_type = {
                 float: lambda: OpCode.NUMBER,
                 str: lambda: OpCode.STRING
-            }.get(value_type, emit_error('Unknown constant value type: {}'
-                        .format(value_type)))()
+            }.get(value_type, emit_error(
+                'Unknown constant value type: {}'.format(value_type)))()
 
             code_list.append(op_type)
             code_list.append(value)
@@ -125,8 +125,8 @@ def assemble(code_list):
 class ParseRule:
 
     def __init__(self, infix=None, prefix=None, precedence=None):
-        self.infix = infix if infix else emit_error('Expected expression')
-        self.prefix = prefix if prefix else emit_error('Expected expression')
+        self.infix = infix if infix else emit_error('Expected expression!')
+        self.prefix = prefix if prefix else emit_error('Expected expression!')
         self.precedence = precedence if precedence else Precedence.NONE
 
 class Cursor:
@@ -143,8 +143,32 @@ class Cursor:
     def get_last(self):
         return self.tokens[self.index - 1]
 
+    def current_info(self):
+        token = self.get_current()
+        result = '<line ' + str(token.line) + '> "' + token.lexeme + '"'
+        result += '\n\t(Last token: "' + self.get_last().lexeme + '")'
+        return result
+
     def advance(self):
         self.index += 1
+
+    def check(self, token_type):
+        return self.get_current().token_type == token_type
+
+    def match(self, expected_type):
+        if not self.check(expected_type):
+            return False
+        else:
+            self.advance()
+            return True
+
+    def consume(self, expected_type, message):
+        if not self.match(expected_type):
+            emit_error(message)()
+
+    def flush(self):
+        self.program.op_return()
+        return self.constants.flush() + self.program.flush()
 
     def get_rule(self, token):
         return {
@@ -186,34 +210,39 @@ class Cursor:
     def consume_number(self):
         token = self.get_last()
         if token.token_type != TokenType.NUMBER:
-            emit_error('Expected number token!')()
+            emit_error(
+                'Expected number token! {}'.format(self.current_info()))()
         const_index = self.constants.add(float(token.lexeme))
         self.program.load_constant(const_index)
 
     def consume_string(self):
         token = self.get_last()
         if token.token_type != TokenType.STRING:
-            emit_error('Expected string token!')()
+            emit_error(
+                'Expected string token! {}'.format(self.current_info()))()
         const_index = self.constants.add(token.lexeme[1:-1])
         self.program.load_constant(const_index)
 
     def consume_precedence(self, precedence):
         self.advance()
         self.get_rule(self.get_last()).prefix()
-        while precedence.value <= self.get_rule(self.get_current()).precedence.value:
+        while precedence.value <= self.get_rule(
+                self.get_current()).precedence.value:
             self.advance()
             self.get_rule(self.get_last()).infix()
 
     def finish_grouping(self):
         self.consume_expression()
-        self.consume(TokenType.RIGHT_PAREN, 'Expect ) after expression')
+        self.consume(TokenType.RIGHT_PAREN,
+            'Expect ) after expression! {}'.format(self.current_info()))
 
     def finish_unary(self):
         op_token = self.get_last()
         self.consume_precedence(Precedence.UNARY)
         {
             TokenType.MINUS : self.program.op_negate
-        }.get(op_token.token_type, emit_error('Expected unary operator'))()
+        }.get(op_token.token_type, emit_error(
+            'Expected unary operator! {}'.format(self.current_info())))()
 
     def finish_binary(self):
         op_token = self.get_last()
@@ -224,20 +253,32 @@ class Cursor:
             TokenType.MINUS : self.program.op_subtract,
             TokenType.STAR : self.program.op_multiply,
             TokenType.SLASH : self.program.op_divide
-        }.get(op_token.token_type, emit_error('Expected binary operator'))()
+        }.get(op_token.token_type, emit_error(
+            'Expected binary operator! {}'.format(self.current_info())))()
 
     def consume_expression(self):
         self.consume_precedence(Precedence.ASSIGNMENT)
 
-    def consume(self, expected_type, message):
-        if self.get_current().token_type == expected_type:
-            self.advance()
-        else:
-            emit_error(message)()
+    def consume_print_statement(self):
+        self.consume_expression()
+        self.consume(TokenType.SEMICOLON,
+            'Expect semicolon after print statement! {}'.format(
+                self.current_info()))
+        self.program.op_print()
 
-    def flush(self):
-        self.program.op_return()
-        return self.constants.flush() + self.program.flush()
+    def consume_expression_statement(self):
+        self.consume_expression()
+        self.consume(TokenType.SEMICOLON,
+            'Expected statement! {}'.format(self.current_info()))
+
+    def consume_statement(self):
+        if self.match(TokenType.PRINT):
+            self.consume_print_statement()
+        else:
+            self.consume_expression_statement()
+
+    def consume_declaration(self):
+        self.consume_statement()
 
 def parse_source(source):
 
@@ -246,8 +287,8 @@ def parse_source(source):
     print(' '.join(map(lambda token: token.lexeme, tokens)))
 
     cursor = Cursor(tokens)
-    cursor.consume_expression()
-    cursor.consume(TokenType.EOF, "Expect end of expression.")
+    while not cursor.match(TokenType.EOF):
+        cursor.consume_declaration()
 
     return assemble(cursor.flush())
 
