@@ -25,6 +25,7 @@ typedef struct {
 
 Value makeNumber(double number);
 Value makeString(char *string);
+Value concatStrings(char *first, char *second);
 
 typedef struct {
 

@@ -98,6 +98,7 @@ char *readString(VM *vm) {
 
         char *buffer = (char*) malloc(1);
         buffer[0] = '\0';
+        printf("|| Creating empty string\n");
         return buffer;
     }
 
@@ -271,7 +272,24 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                BINARY_OP(+);
+                Value b = pop(vm);
+                Value a = pop(vm);
+
+                if (b.type == VAL_NUMBER && a.type == VAL_NUMBER) {
+
+                    Value result = makeNumber(a.as.number + b.as.number);
+                    push(vm, result);
+
+                } else if (b.type == VAL_STRING && a.type == VAL_STRING) {
+
+                    Value result = concatStrings(a.as.string, b.as.string);
+                    push(vm, result);
+
+                } else {
+
+                    printf("|| Expected two numbers or two strings as operands for '+'!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 

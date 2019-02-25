@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "memory.h"
 
@@ -24,6 +25,22 @@ Value makeString(char *string) {
     result.as.string = string;
 
     return result;
+}
+
+Value concatStrings(char *first, char *second) {
+
+    size_t sizeFirst = strlen(first);
+    size_t sizeSecond = strlen(second);
+
+    char *result = (char*) malloc(sizeFirst + sizeSecond + 1);
+    result[sizeFirst] = '\0';
+    strcpy(result, first);
+    strcat(result, second);
+
+    free(first);
+    free(second);
+
+    return makeString(result);
 }
 
 void initValueArray(ValueArray *array) {
