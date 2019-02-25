@@ -1,6 +1,9 @@
 
 // Simple test program:
 
+1 + 2;
+"no way";
+
 print "Hello " + "World" + "!";
 
 print "1 = ";

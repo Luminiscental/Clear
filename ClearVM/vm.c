@@ -136,6 +136,18 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
+            case OP_POP: {
+
+#ifdef DEBUG
+
+                printf("OP_POP\n");
+
+#endif
+
+                pop(vm);
+
+            } break;
+
             case OP_RETURN: {
 
 #ifdef DEBUG

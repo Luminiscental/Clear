@@ -17,6 +17,7 @@ class OpCode(Enum):
     MULTIPLY = 8
     DIVIDE = 9
     RETURN = 10
+    POP = 11
 
     def __int__(self):
         return self.value
@@ -97,6 +98,9 @@ class Program:
 
     def op_return(self):
         self.code_list.append(OpCode.RETURN)
+
+    def op_pop(self):
+        self.code_list.append(OpCode.POP)
 
     def flush(self):
         return self.code_list
@@ -270,6 +274,7 @@ class Cursor:
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
             'Expected statement! {}'.format(self.current_info()))
+        self.program.op_pop()
 
     def consume_statement(self):
         if self.match(TokenType.PRINT):

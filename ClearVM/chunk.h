@@ -16,7 +16,8 @@ typedef enum {
     OP_SUBTRACT = 7,
     OP_MULTIPLY = 8,
     OP_DIVIDE = 9,
-    OP_RETURN = 10
+    OP_RETURN = 10,
+    OP_POP = 11
 
 } OpCode;
 
