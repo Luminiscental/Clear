@@ -2,13 +2,7 @@
 import struct
 from enum import Enum
 from clr.tokens import tokenize, TokenType
-from clr.errors import ClrCompileError
-
-def emit_error(message):
-
-    def emission():
-        raise ClrCompileError(message)
-    return emission
+from clr.errors import emit_error
 
 class OpCode(Enum):
 
@@ -178,6 +172,9 @@ class Cursor:
             TokenType.NUMBER : ParseRule(
                 prefix=self.consume_number
             ),
+            TokenType.STRING : ParseRule(
+                prefix=self.consume_string
+            ),
             TokenType.AND : ParseRule(
                 precedence=Precedence.AND
             ),
@@ -191,6 +188,13 @@ class Cursor:
         if token.token_type != TokenType.NUMBER:
             emit_error('Expected number token!')()
         const_index = self.constants.add(float(token.lexeme))
+        self.program.load_constant(const_index)
+
+    def consume_string(self):
+        token = self.get_last()
+        if token.token_type != TokenType.STRING:
+            emit_error('Expected string token!')()
+        const_index = self.constants.add(token.lexeme[1:-1])
         self.program.load_constant(const_index)
 
     def consume_precedence(self, precedence):

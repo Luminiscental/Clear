@@ -1,7 +1,7 @@
 
 import struct
 from clr.compile import OpCode
-from clr.errors import ClrDisassembleError
+from clr.errors import emit_error
 
 def disassemble_store(byte, remaining):
 
@@ -21,8 +21,8 @@ def disassemble_store(byte, remaining):
         return 1 + length
 
     def store_err():
-        raise ClrDisassembleError('Unrecognized constant type {}!'.format(
-                remaining[0]))
+        emit_error('Unrecognized constant type {}!'.format(
+                remaining[0]), dis=True)()
 
     return 2 + {
         OpCode.NUMBER.value : store_number,
@@ -45,7 +45,7 @@ def disassemble_constant(byte, remaining):
 
 def disassembl_err(byte, remaining):
 
-    raise ClrDisassembleError('Unrecognized op code {}!'.format(byte))
+    emit_error('Unrecognized op code {}!'.format(byte))()
 
 def disassemble_byte(byte, offset, remaining):
 

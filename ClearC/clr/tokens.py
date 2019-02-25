@@ -2,7 +2,7 @@
 from enum import Enum
 import re
 from collections import namedtuple
-from clr.errors import ClrCompileError
+from clr.errors import emit_error
 from clr.trie import Trie, TrieResult
 
 class TokenType(Enum):
@@ -205,7 +205,7 @@ def parse_any(char, acc, line, keyword_trie, tokens):
         acc.append(char)
         return ParseState.IDENTIFIER
     else:
-        raise ClrCompileError("Unrecognized character '{}'".format(char))
+        emit_error('Unrecognized character \'{}\''.format(char))()
 
 def tokenize(source):
 

@@ -1,8 +1,9 @@
 
 import struct
 import sys
-from clr.dis import disassemble, ClrDisassembleError
-from clr.compile import parse_source, ClrCompileError
+from clr.errors import ClrDisassembleError, ClrCompileError
+from clr.dis import disassemble
+from clr.compile import parse_source
 
 debug = True
 
