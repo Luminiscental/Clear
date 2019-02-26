@@ -163,7 +163,18 @@ InterpretResult run(VM *vm) {
                                                                     \
     } while(false)
 
-#define BINARY_OP(expected, op)                                      \
+#define BINARY_OP(op)                                                \
+    do {                                                             \
+                                                                     \
+        Value b = pop(vm);                                           \
+        Value a = pop(vm);                                           \
+                                                                     \
+        Value result = op;                                           \
+        push(vm, result);                                            \
+                                                                     \
+    } while(false)
+
+#define STRICT_BINARY_OP(expected, op)                               \
     do {                                                             \
                                                                      \
         Value b = pop(vm);                                           \
@@ -330,21 +341,21 @@ InterpretResult run(VM *vm) {
             case OP_SUBTRACT: {
 
                 PRINT(OP_SUBTRACT);
-                BINARY_OP(VAL_NUMBER, makeNumber(a.as.number - b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeNumber(a.as.number - b.as.number));
 
             } break;
 
             case OP_MULTIPLY: {
 
                 PRINT(OP_MULTIPLY);
-                BINARY_OP(VAL_NUMBER, makeNumber(a.as.number * b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeNumber(a.as.number * b.as.number));
 
             } break;
 
             case OP_DIVIDE: {
 
                 PRINT(OP_DIVIDE);
-                BINARY_OP(VAL_NUMBER, makeNumber(a.as.number / b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeNumber(a.as.number / b.as.number));
 
             } break;
 
@@ -360,7 +371,7 @@ InterpretResult run(VM *vm) {
 
                 PRINT(OP_EQUAL);
 
-                BINARY_OP(VAL_BOOL, makeBoolean(valuesEqual(a, b)));
+                BINARY_OP(makeBoolean(valuesEqual(a, b)));
             
             } break;
 
@@ -368,7 +379,7 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_NEQUAL);
 
-                BINARY_OP(VAL_BOOL, makeBoolean(!valuesEqual(a, b)));
+                BINARY_OP(makeBoolean(!valuesEqual(a, b)));
             
             } break;
 
@@ -376,7 +387,7 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_LESS);
 
-                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number < b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number < b.as.number));
             
             } break;
 
@@ -384,7 +395,7 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_NLESS);
 
-                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number >= b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number >= b.as.number));
             
             } break;
 
@@ -392,7 +403,7 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_GREATER);
 
-                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number > b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number > b.as.number));
             
             } break;
 
@@ -400,7 +411,7 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_NGREATER);
 
-                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number <= b.as.number));
+                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number <= b.as.number));
             
             } break;
 
@@ -419,6 +430,7 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+#undef STRICT_BINARY_OP
 #undef BINARY_OP
 #undef UNARY_OP
 #undef PRINT
