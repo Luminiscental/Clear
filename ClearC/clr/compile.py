@@ -39,6 +39,9 @@ class Precedence(Enum):
     CALL = 9
     PRIMARY = 10
 
+    def next(self):
+        return Precedence(self.value + 1)
+
 class Constants:
 
     def __init__(self):
@@ -209,7 +212,7 @@ class Cursor:
             TokenType.OR : ParseRule(
                 precedence=Precedence.OR
             )
-        }.get(token.token_type, ParseRule()) 
+        }.get(token.token_type, ParseRule())
 
     def consume_number(self):
         token = self.get_last()
@@ -251,7 +254,7 @@ class Cursor:
     def finish_binary(self):
         op_token = self.get_last()
         rule = self.get_rule(op_token)
-        self.consume_precedence(rule.precedence)
+        self.consume_precedence(rule.precedence.next())
         {
             TokenType.PLUS : self.program.op_add,
             TokenType.MINUS : self.program.op_subtract,
