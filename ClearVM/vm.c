@@ -72,6 +72,11 @@ uint8_t readByte(VM *vm) {
     }
 }
 
+bool readBoolean(VM *vm) {
+
+    return (bool) readByte(vm);
+}
+
 double readDouble(VM *vm) {
 
     if (8 + vm->ip - vm->chunk->code > vm->chunk->count) {
@@ -136,16 +141,71 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
-            case OP_DEFINE: {
-
-
 #ifdef DEBUG
-
-                printf("OP_DEFINE\n");
-
+#define PRINT(op) printf(#op "\n")
+#else
+#define PRINT(op)
 #endif
 
+#define UNARY_OP(expected, op)                                      \
+    do {                                                            \
+                                                                    \
+        Value a = pop(vm);                                          \
+                                                                    \
+        if (a.type != expected) {                                   \
+                                                                    \
+            printf("|| Expected "#expected" for unary operator!\n");\
+            return INTERPRET_ERR;                                   \
+        }                                                           \
+                                                                    \
+        Value result = op;                                          \
+        push(vm, result);                                           \
+                                                                    \
+    } while(false)
+
+#define BINARY_OP(expected, op)                                      \
+    do {                                                             \
+                                                                     \
+        Value b = pop(vm);                                           \
+        Value a = pop(vm);                                           \
+                                                                     \
+        if (a.type != expected || b.type != expected) {              \
+                                                                     \
+            printf("|| Expected "#expected" for binary operator!\n");\
+            return INTERPRET_ERR;                                    \
+        }                                                            \
+                                                                     \
+        Value result = op;                                           \
+        push(vm, result);                                            \
+                                                                     \
+    } while(false)
+
+            case OP_TRUE: {
+
+                PRINT(OP_TRUE);
+
+                Value val = makeBoolean(true);
+
+                push(vm, val);
+
+            } break;
+
+            case OP_FALSE: {
+
+                PRINT(OP_FALSE);
+
+                Value val = makeBoolean(false);
+
+                push(vm, val);
+
+            } break;
+
+            case OP_DEFINE: {
+
+                PRINT(OP_DEFINE);
+
                 Value name = makeString(readString(vm));
+
                 pop(vm);
                 printf("|| Defined \"%s\"\n", name.as.string);
                 // TODO: Add to table
@@ -155,11 +215,7 @@ InterpretResult run(VM *vm) {
 
             case OP_POP: {
 
-#ifdef DEBUG
-
-                printf("OP_POP\n");
-
-#endif
+                PRINT(OP_POP);
 
                 pop(vm);
 
@@ -167,11 +223,7 @@ InterpretResult run(VM *vm) {
 
             case OP_RETURN: {
 
-#ifdef DEBUG
-
-                printf("OP_RETURN\n");
-
-#endif
+                PRINT(OP_RETURN);
 
                 return INTERPRET_OK;
 
@@ -179,13 +231,9 @@ InterpretResult run(VM *vm) {
 
             case OP_PRINT: {
 
+                PRINT(OP_PRINT);
+
                 Value value = pop(vm);
-
-#ifdef DEBUG
-
-                printf("OP_PRINT\n");
-
-#endif
 
                 printf("|| print ");
                 printValue(value, true);
@@ -254,52 +302,9 @@ InterpretResult run(VM *vm) {
 
             } break;
 
-            case OP_NEGATE: {
-
-#ifdef DEBUG
-
-                printf("OP_NEGATE\n");
-
-#endif
-
-                Value top = pop(vm);
-
-                if (top.type != VAL_NUMBER) {
-
-                    printf("|| Expected number to negate!\n");
-                    return INTERPRET_ERR;
-                }
-
-                Value negated = makeNumber(-top.as.number);
-                push(vm, negated);
-
-            } break;
-
-#define BINARY_OP(op)                                          \
-                                                               \
-    do {                                                       \
-                                                               \
-        Value b = pop(vm);                                     \
-        Value a = pop(vm);                                     \
-                                                               \
-        if (b.type != VAL_NUMBER || a.type != VAL_NUMBER) {    \
-                                                               \
-            printf("|| Expected number for operation!\n");     \
-            return INTERPRET_ERR;                              \
-        }                                                      \
-                                                               \
-        Value result = makeNumber(a.as.number op b.as.number); \
-        push(vm, result);                                      \
-                                                               \
-    } while(false)
-
             case OP_ADD: {
 
-#ifdef DEBUG
-
-                printf("OP_ADD\n");
-
-#endif
+                PRINT(OP_ADD);
 
                 Value b = pop(vm);
                 Value a = pop(vm);
@@ -324,37 +329,86 @@ InterpretResult run(VM *vm) {
 
             case OP_SUBTRACT: {
 
-#ifdef DEBUG
-
-                printf("OP_SUBTRACT\n");
-
-#endif
-
-                BINARY_OP(-);
+                PRINT(OP_SUBTRACT);
+                BINARY_OP(VAL_NUMBER, makeNumber(a.as.number - b.as.number));
 
             } break;
 
             case OP_MULTIPLY: {
 
-#ifdef DEBUG
-
-                printf("OP_MULTIPLY\n");
-
-#endif
-
-                BINARY_OP(*);
+                PRINT(OP_MULTIPLY);
+                BINARY_OP(VAL_NUMBER, makeNumber(a.as.number * b.as.number));
 
             } break;
 
             case OP_DIVIDE: {
 
-#ifdef DEBUG
+                PRINT(OP_DIVIDE);
+                BINARY_OP(VAL_NUMBER, makeNumber(a.as.number / b.as.number));
 
-                printf("OP_DIVIDE\n");
+            } break;
 
-#endif
+            case OP_NEGATE: {
 
-                BINARY_OP(/);
+                PRINT(OP_NEGATE);
+
+                UNARY_OP(VAL_NUMBER, makeNumber(-a.as.number));
+
+            } break;
+
+            case OP_EQUAL: {
+
+                PRINT(OP_EQUAL);
+
+                BINARY_OP(VAL_BOOL, makeBoolean(valuesEqual(a, b)));
+            
+            } break;
+
+            case OP_NEQUAL: {
+            
+                PRINT(OP_NEQUAL);
+
+                BINARY_OP(VAL_BOOL, makeBoolean(!valuesEqual(a, b)));
+            
+            } break;
+
+            case OP_LESS: {
+            
+                PRINT(OP_LESS);
+
+                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number < b.as.number));
+            
+            } break;
+
+            case OP_NLESS: {
+            
+                PRINT(OP_NLESS);
+
+                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number >= b.as.number));
+            
+            } break;
+
+            case OP_GREATER: {
+            
+                PRINT(OP_GREATER);
+
+                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number > b.as.number));
+            
+            } break;
+
+            case OP_NGREATER: {
+            
+                PRINT(OP_NGREATER);
+
+                BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number <= b.as.number));
+            
+            } break;
+
+            case OP_NOT: {
+
+                PRINT(OP_NOT);
+
+                UNARY_OP(VAL_BOOL, makeBoolean(!a.as.boolean));
 
             } break;
 
@@ -364,6 +418,11 @@ InterpretResult run(VM *vm) {
                 return INTERPRET_ERR;
 
             } break;
+
+#undef BINARY_OP
+#undef UNARY_OP
+#undef PRINT
+
         }
     }
 }

@@ -7,6 +7,16 @@
 
 #include "memory.h"
 
+Value makeBoolean(bool boolean) {
+
+    Value result;
+
+    result.type = VAL_BOOL;
+    result.as.boolean = boolean;
+
+    return result;
+}
+
 Value makeNumber(double number) {
 
     Value result;
@@ -41,6 +51,26 @@ Value concatStrings(char *first, char *second) {
     free(second);
 
     return makeString(result);
+}
+
+bool valuesEqual(Value a, Value b) {
+
+    if (a.type != b.type) return false;
+
+    switch (a.type) {
+    
+        case VAL_BOOL:
+
+            return a.as.boolean == b.as.boolean;
+
+        case VAL_NUMBER:
+
+            return a.as.number == b.as.number;
+
+        case VAL_STRING:
+
+            return strcmp(a.as.string, b.as.string) == 0;
+    }
 }
 
 void initValueArray(ValueArray *array) {
@@ -92,6 +122,12 @@ void printValue(Value value, bool endLine) {
         case VAL_STRING: {
 
             printf("<str \"%s\">", value.as.string);
+
+        } break;
+
+        case VAL_BOOL: {
+
+            printf("<bool %s>", value.as.boolean ? "true" : "false");
 
         } break;
     }

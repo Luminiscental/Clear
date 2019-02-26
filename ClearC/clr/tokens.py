@@ -14,8 +14,7 @@ class Token:
         self.line = line
 
     def __repr__(self):
-        return "Token({}, '{}', {})".format(
-                self.token_type, self.lexeme, self.line)
+        return f'Token({self.token_type}, \'{self.lexeme}\', {self.line})'
 
 class ScanState(Enum):
 
@@ -118,7 +117,7 @@ def scan_any(char, acc, line, keyword_trie, tokens):
         acc.append(char)
         return ScanState.IDENTIFIER
     else:
-        emit_error('Unrecognized character \'{}\''.format(char))()
+        emit_error(f'Unrecognized character \'{char}\'')()
 
 def tokenize(source):
 
@@ -139,7 +138,7 @@ def tokenize(source):
                 ScanState.STRING : scan_string,
                 ScanState.IDENTIFIER : scan_identifier
             }.get(scan_state, emit_error(
-                'Unknown scanning state! {}'.format(scan_state)
+                f'Unknown scanning state! {scan_state}'
             ))(char, acc, line, keyword_trie, tokens)
             if next_state:
                 scan_state = next_state
@@ -151,7 +150,7 @@ def tokenize(source):
 
     tokens = [token for token in tokens
             if token.token_type != TokenType.SPACE]
-    tokens.append(Token(TokenType.EOF, "", line))
+    tokens.append(Token(TokenType.EOF, '', line))
 
     return tokens
 

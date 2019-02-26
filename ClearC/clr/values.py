@@ -17,6 +17,15 @@ class OpCode(Enum):
     RETURN = 10
     POP = 11
     DEFINE = 12
+    TRUE = 13
+    FALSE = 14
+    NOT = 15
+    LESS = 16
+    NLESS = 17
+    GREATER = 18
+    NGREATER = 19
+    EQUAL = 20
+    NEQUAL = 21
 
     def __int__(self):
         return self.value
@@ -37,6 +46,9 @@ class Precedence(Enum):
     UNARY = 8
     CALL = 9
     PRIMARY = 10
+
+    def next(self):
+        return Precedence(self.value + 1)
 
 class TokenType(Enum):
 
@@ -146,38 +158,71 @@ class ParseRule:
 def pratt_table(parser):
 
     return defaultdict(ParseRule, {
-        TokenType.LEFT_PAREN : ParseRule(
+        TokenType.LEFT_PAREN: ParseRule(
             prefix=parser.finish_grouping,
             precedence=Precedence.CALL
         ),
-        TokenType.MINUS : ParseRule(
+        TokenType.MINUS: ParseRule(
             prefix=parser.finish_unary,
             infix=parser.finish_binary,
             precedence=Precedence.TERM
         ),
-        TokenType.PLUS : ParseRule(
+        TokenType.PLUS: ParseRule(
             infix=parser.finish_binary,
             precedence=Precedence.TERM
         ),
-        TokenType.SLASH : ParseRule(
+        TokenType.SLASH: ParseRule(
             infix=parser.finish_binary,
             precedence=Precedence.FACTOR
         ),
-        TokenType.STAR : ParseRule(
+        TokenType.STAR: ParseRule(
             infix=parser.finish_binary,
             precedence=Precedence.FACTOR
         ),
-        TokenType.NUMBER : ParseRule(
-            prefix=parser.consume_number,
+        TokenType.NUMBER: ParseRule(
+            prefix=parser.consume_number
         ),
-        TokenType.STRING : ParseRule(
-            prefix=parser.consume_string,
+        TokenType.STRING: ParseRule(
+            prefix=parser.consume_string
         ),
-        TokenType.AND : ParseRule(
+        TokenType.TRUE: ParseRule(
+            prefix=parser.consume_literal
+        ),
+        TokenType.FALSE: ParseRule(
+            prefix=parser.consume_literal
+        ),
+        TokenType.AND: ParseRule(
             precedence=Precedence.AND
         ),
-        TokenType.OR : ParseRule(
+        TokenType.OR: ParseRule(
             precedence=Precedence.OR
-        )
+        ),
+        TokenType.BANG: ParseRule(
+            prefix=parser.finish_unary
+        ),
+        TokenType.EQUAL_EQUAL: ParseRule(
+            infix=parser.finish_binary,
+            precedence=Precedence.EQUALITY
+        ),
+        TokenType.BANG_EQUAL: ParseRule(
+            infix=parser.finish_binary,
+            precedence=Precedence.EQUALITY
+        ),
+        TokenType.LESS: ParseRule(
+            infix=parser.finish_binary,
+            precedence=Precedence.COMPARISON
+        ),
+        TokenType.GREATER_EQUAL: ParseRule(
+            infix=parser.finish_binary,
+            precedence=Precedence.COMPARISON
+        ),
+        TokenType.GREATER: ParseRule(
+            infix=parser.finish_binary,
+            precedence=Precedence.COMPARISON
+        ),
+        TokenType.LESS_EQUAL: ParseRule(
+            infix=parser.finish_binary,
+            precedence=Precedence.COMPARISON
+        ),
     })
 

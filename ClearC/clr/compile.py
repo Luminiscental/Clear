@@ -31,8 +31,8 @@ class Constants:
                 float: lambda: OpCode.NUMBER,
                 str: lambda: OpCode.STRING
             }.get(value_type, emit_error(
-                'Unknown constant value type: {}'.format(value_type))
-            )()
+                f'Unknown constant value type: {value_type}'
+            ))()
             self.store(op_type, value)
         return self.code_list
 
@@ -72,6 +72,33 @@ class Program:
     def op_define(self, name):
         self.code_list.append(OpCode.DEFINE)
         self.code_list.append(name)
+
+    def op_true(self):
+        self.code_list.append(OpCode.TRUE)
+
+    def op_false(self):
+        self.code_list.append(OpCode.FALSE)
+
+    def op_not(self):
+        self.code_list.append(OpCode.NOT)
+
+    def op_equal(self):
+        self.code_list.append(OpCode.EQUAL)
+
+    def op_nequal(self):
+        self.code_list.append(OpCode.NEQUAL)
+
+    def op_less(self):
+        self.code_list.append(OpCode.LESS)
+
+    def op_greater(self):
+        self.code_list.append(OpCode.GREATER)
+
+    def op_nless(self):
+        self.code_list.append(OpCode.NLESS)
+
+    def op_ngreater(self):
+        self.code_list.append(OpCode.NGREATER)
 
     def flush(self):
         return self.code_list
@@ -120,60 +147,75 @@ class Parser(Cursor):
         super().__init__(tokens, Constants(), Program())
 
     def get_rule(self, token):
-        err = emit_error('Expected expression! {}'.format(token_info(token)))
+        err = emit_error(f'Expected expression! {token_info(token)}')
         rule = pratt_table(self)[token.token_type]
         rule.fill(err)
         return rule
 
+    def current_precedence(self):
+        return self.get_rule(self.get_current()).precedence
+
+    def consume_literal(self):
+        token = self.get_prev()
+        err = emit_error(f'Expected boolean value! {self.current_info()}')
+        {
+            TokenType.TRUE: lambda: self.program.op_true(),
+            TokenType.FALSE: lambda: self.program.op_false()
+        }.get(token.token_type, err)()
+
     def consume_number(self):
         token = self.get_prev()
         if token.token_type != TokenType.NUMBER:
-            emit_error(
-                'Expected number token! {}'.format(self.current_info()))()
+            emit_error(f'Expected number token! {self.current_info()}')()
         const_index = self.constants.add(float(token.lexeme))
         self.program.load_constant(const_index)
 
     def consume_string(self):
         token = self.get_prev()
         if token.token_type != TokenType.STRING:
-            emit_error(
-                'Expected string token! {}'.format(self.current_info()))()
+            emit_error(f'Expected string token! {self.current_info()}')()
         const_index = self.constants.add(token.lexeme[1:-1])
         self.program.load_constant(const_index)
 
     def consume_precedence(self, precedence):
         self.advance()
         self.get_rule(self.get_prev()).prefix()
-        while precedence.value <= self.get_rule(
-                self.get_current()).precedence.value:
+        while precedence.value <= self.current_precedence().value:
             self.advance()
             self.get_rule(self.get_prev()).infix()
 
     def finish_grouping(self):
         self.consume_expression()
         self.consume(TokenType.RIGHT_PAREN,
-            'Expect ) after expression! {}'.format(self.current_info()))
+            f'Expect ) after expression! {self.current_info()}')
 
     def finish_unary(self):
         op_token = self.get_prev()
         self.consume_precedence(Precedence.UNARY)
         {
-            TokenType.MINUS : self.program.op_negate
+            TokenType.MINUS : self.program.op_negate,
+            TokenType.BANG : self.program.op_not
         }.get(op_token.token_type, emit_error(
-            'Expected unary operator! {}'.format(self.current_info())
+            f'Expected unary operator! {self.current_info()}'
         ))()
 
     def finish_binary(self):
         op_token = self.get_prev()
         rule = self.get_rule(op_token)
-        self.consume_precedence(rule.precedence)
+        self.consume_precedence(rule.precedence.next())
         {
             TokenType.PLUS : self.program.op_add,
             TokenType.MINUS : self.program.op_subtract,
             TokenType.STAR : self.program.op_multiply,
-            TokenType.SLASH : self.program.op_divide
+            TokenType.SLASH : self.program.op_divide,
+            TokenType.EQUAL_EQUAL: self.program.op_equal,
+            TokenType.BANG_EQUAL: self.program.op_nequal,
+            TokenType.LESS: self.program.op_less,
+            TokenType.GREATER_EQUAL: self.program.op_nless,
+            TokenType.GREATER: self.program.op_greater,
+            TokenType.LESS_EQUAL: self.program.op_ngreater
         }.get(op_token.token_type, emit_error(
-            'Expected binary operator! {}'.format(self.current_info())
+            f'Expected binary operator! {self.current_info()}'
         ))()
 
     def consume_expression(self):
@@ -182,14 +224,13 @@ class Parser(Cursor):
     def consume_print_statement(self):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-            'Expect semicolon after print statement! {}'.format(
-                self.current_info()))
+            f'Expect semicolon after print statement! {self.current_info()}')
         self.program.op_print()
 
     def consume_expression_statement(self):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-            'Expected statement! {}'.format(self.current_info()))
+            f'Expected statement! {self.current_info()}')
         self.program.op_pop()
 
     def consume_statement(self):
@@ -207,8 +248,7 @@ class Parser(Cursor):
         self.consume(TokenType.EQUAL, 'Expect variable initializer')
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-                'Expect semicolon to end statement! {}'.format(
-                    self.current_info()))
+            f'Expect semicolon to end statement! {self.current_info()}')
         self.program.op_define(name)
 
     def consume_declaration(self):
