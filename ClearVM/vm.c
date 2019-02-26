@@ -136,6 +136,23 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
+            case OP_DEFINE: {
+
+
+#ifdef DEBUG
+
+                printf("OP_DEFINE\n");
+
+#endif
+
+                Value name = makeString(readString(vm));
+                pop(vm);
+                printf("|| Defined \"%s\"\n", name.as.string);
+                // TODO: Add to table
+                free(name.as.string);
+
+            } break;
+
             case OP_POP: {
 
 #ifdef DEBUG

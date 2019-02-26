@@ -69,6 +69,10 @@ class Program:
     def op_pop(self):
         self.code_list.append(OpCode.POP)
 
+    def op_define(self, name):
+        self.code_list.append(OpCode.DEFINE)
+        self.code_list.append(name)
+
     def flush(self):
         return self.code_list
 
@@ -194,8 +198,24 @@ class Parser(Cursor):
         else:
             self.consume_expression_statement()
 
+    def consume_variable(self, message):
+        self.consume(TokenType.IDENTIFIER, message)
+        return self.get_prev().lexeme
+
+    def consume_variable_declaration(self):
+        name = self.consume_variable('Expect variable name')
+        self.consume(TokenType.EQUAL, 'Expect variable initializer')
+        self.consume_expression()
+        self.consume(TokenType.SEMICOLON,
+                'Expect semicolon to end statement! {}'.format(
+                    self.current_info()))
+        self.program.op_define(name)
+
     def consume_declaration(self):
-        self.consume_statement()
+        if self.match(TokenType.VAR) or self.match(TokenType.VAL):
+            self.consume_variable_declaration()
+        else:
+            self.consume_statement()
 
 def parse_source(source):
 

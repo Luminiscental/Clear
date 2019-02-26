@@ -16,6 +16,7 @@ class OpCode(Enum):
     DIVIDE = 9
     RETURN = 10
     POP = 11
+    DEFINE = 12
 
     def __int__(self):
         return self.value
