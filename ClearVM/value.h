@@ -6,6 +6,7 @@
 typedef enum {
 
     VAL_NUMBER,
+    VAL_BOOL,
     VAL_STRING
 
 } ValueType;
@@ -16,6 +17,7 @@ typedef struct {
 
     union {
 
+        bool boolean;
         double number;
         char *string;
 
@@ -23,9 +25,11 @@ typedef struct {
 
 } Value;
 
+Value makeBoolean(bool boolean);
 Value makeNumber(double number);
 Value makeString(char *string);
 Value concatStrings(char *first, char *second);
+bool valuesEqual(Value a, Value b);
 
 typedef struct {
 

@@ -1,52 +1,15 @@
 
-import struct
-from enum import Enum
-from clr.tokens import tokenize, TokenType
+from clr.tokens import tokenize, TokenType, token_info
 from clr.errors import emit_error
-
-class OpCode(Enum):
-
-    STORE_CONST = 0
-    NUMBER = 1
-    STRING = 2
-    PRINT = 3
-    LOAD_CONST = 4
-    NEGATE = 5
-    ADD = 6
-    SUBTRACT = 7
-    MULTIPLY = 8
-    DIVIDE = 9
-    RETURN = 10
-    POP = 11
-
-    def __int__(self):
-        return self.value
-
-    def __str__(self):
-        return 'OP_' + self.name
-
-class Precedence(Enum):
-
-    NONE = 0
-    ASSIGNMENT = 1
-    OR = 2
-    AND = 3
-    EQUALITY = 4
-    COMPARISON = 5
-    TERM = 6
-    FACTOR = 7
-    UNARY = 8
-    CALL = 9
-    PRIMARY = 10
-
-    def next(self):
-        return Precedence(self.value + 1)
+from clr.assemble import assemble
+from clr.values import OpCode, Precedence, pratt_table
 
 class Constants:
 
     def __init__(self):
         self.values = []
         self.count = 0
+        self.code_list = []
 
     def add(self, value):
         if value in self.values:
@@ -56,21 +19,22 @@ class Constants:
             self.count += 1
             return self.count - 1
 
-    def flush(self):
-        code_list = []
-        for value in self.values:
-            code_list.append(OpCode.STORE_CONST)
-            value_type = type(value)
+    def store(self, op_type, value):
+        self.code_list.append(OpCode.STORE_CONST)
+        self.code_list.append(op_type)
+        self.code_list.append(value)
 
+    def flush(self):
+        for value in self.values:
+            value_type = type(value)
             op_type = {
                 float: lambda: OpCode.NUMBER,
                 str: lambda: OpCode.STRING
             }.get(value_type, emit_error(
-                'Unknown constant value type: {}'.format(value_type)))()
-
-            code_list.append(op_type)
-            code_list.append(value)
-        return code_list
+                f'Unknown constant value type: {value_type}'
+            ))()
+            self.store(op_type, value)
+        return self.code_list
 
 class Program:
 
@@ -105,56 +69,56 @@ class Program:
     def op_pop(self):
         self.code_list.append(OpCode.POP)
 
+    def op_define(self, name):
+        self.code_list.append(OpCode.DEFINE)
+        self.code_list.append(name)
+
+    def op_true(self):
+        self.code_list.append(OpCode.TRUE)
+
+    def op_false(self):
+        self.code_list.append(OpCode.FALSE)
+
+    def op_not(self):
+        self.code_list.append(OpCode.NOT)
+
+    def op_equal(self):
+        self.code_list.append(OpCode.EQUAL)
+
+    def op_nequal(self):
+        self.code_list.append(OpCode.NEQUAL)
+
+    def op_less(self):
+        self.code_list.append(OpCode.LESS)
+
+    def op_greater(self):
+        self.code_list.append(OpCode.GREATER)
+
+    def op_nless(self):
+        self.code_list.append(OpCode.NLESS)
+
+    def op_ngreater(self):
+        self.code_list.append(OpCode.NGREATER)
+
     def flush(self):
         return self.code_list
 
-def assemble(code_list):
-
-    raw_bytes = bytearray()
-    for code in code_list:
-        if isinstance(code, float):
-            for byte in struct.pack('d', code):
-                raw_bytes.append(byte)
-        elif isinstance(code, str):
-            size = len(code)
-            byte_size = bytes([size])[0]
-            raw_bytes.append(byte_size)
-            for byte in code.encode():
-                raw_bytes.append(byte)
-        elif isinstance(code, OpCode):
-            byte = bytes([code.value])[0]
-            raw_bytes.append(byte)
-        else:
-            byte = bytes([code])[0]
-            raw_bytes.append(byte)
-    return raw_bytes
-
-class ParseRule:
-
-    def __init__(self, infix=None, prefix=None, precedence=None):
-        self.infix = infix if infix else emit_error('Expected expression!')
-        self.prefix = prefix if prefix else emit_error('Expected expression!')
-        self.precedence = precedence if precedence else Precedence.NONE
-
 class Cursor:
 
-    def __init__(self, tokens):
+    def __init__(self, tokens, constants, program):
         self.index = 0
         self.tokens = tokens
-        self.constants = Constants()
-        self.program = Program()
+        self.constants = constants
+        self.program = program
 
     def get_current(self):
         return self.tokens[self.index]
 
-    def get_last(self):
+    def get_prev(self):
         return self.tokens[self.index - 1]
 
     def current_info(self):
-        token = self.get_current()
-        result = '<line ' + str(token.line) + '> "' + token.lexeme + '"'
-        result += '\n\t(Last token: "' + self.get_last().lexeme + '")'
-        return result
+        return token_info(self.get_current())
 
     def advance(self):
         self.index += 1
@@ -177,91 +141,82 @@ class Cursor:
         self.program.op_return()
         return self.constants.flush() + self.program.flush()
 
+class Parser(Cursor):
+
+    def __init__(self, tokens):
+        super().__init__(tokens, Constants(), Program())
+
     def get_rule(self, token):
-        return {
-            TokenType.LEFT_PAREN : ParseRule(
-                prefix=self.finish_grouping,
-                precedence=Precedence.CALL
-            ),
-            TokenType.MINUS : ParseRule(
-                prefix=self.finish_unary,
-                infix=self.finish_binary,
-                precedence=Precedence.TERM
-            ),
-            TokenType.PLUS : ParseRule(
-                infix=self.finish_binary,
-                precedence=Precedence.TERM
-            ),
-            TokenType.SLASH : ParseRule(
-                infix=self.finish_binary,
-                precedence=Precedence.FACTOR
-            ),
-            TokenType.STAR : ParseRule(
-                infix=self.finish_binary,
-                precedence=Precedence.FACTOR
-            ),
-            TokenType.NUMBER : ParseRule(
-                prefix=self.consume_number
-            ),
-            TokenType.STRING : ParseRule(
-                prefix=self.consume_string
-            ),
-            TokenType.AND : ParseRule(
-                precedence=Precedence.AND
-            ),
-            TokenType.OR : ParseRule(
-                precedence=Precedence.OR
-            )
-        }.get(token.token_type, ParseRule())
+        err = emit_error(f'Expected expression! {token_info(token)}')
+        rule = pratt_table(self)[token.token_type]
+        rule.fill(err)
+        return rule
+
+    def current_precedence(self):
+        return self.get_rule(self.get_current()).precedence
+
+    def consume_literal(self):
+        token = self.get_prev()
+        err = emit_error(f'Expected boolean value! {self.current_info()}')
+        {
+            TokenType.TRUE: lambda: self.program.op_true(),
+            TokenType.FALSE: lambda: self.program.op_false()
+        }.get(token.token_type, err)()
 
     def consume_number(self):
-        token = self.get_last()
+        token = self.get_prev()
         if token.token_type != TokenType.NUMBER:
-            emit_error(
-                'Expected number token! {}'.format(self.current_info()))()
+            emit_error(f'Expected number token! {self.current_info()}')()
         const_index = self.constants.add(float(token.lexeme))
         self.program.load_constant(const_index)
 
     def consume_string(self):
-        token = self.get_last()
+        token = self.get_prev()
         if token.token_type != TokenType.STRING:
-            emit_error(
-                'Expected string token! {}'.format(self.current_info()))()
+            emit_error(f'Expected string token! {self.current_info()}')()
         const_index = self.constants.add(token.lexeme[1:-1])
         self.program.load_constant(const_index)
 
     def consume_precedence(self, precedence):
         self.advance()
-        self.get_rule(self.get_last()).prefix()
-        while precedence.value <= self.get_rule(
-                self.get_current()).precedence.value:
+        self.get_rule(self.get_prev()).prefix()
+        while precedence.value <= self.current_precedence().value:
             self.advance()
-            self.get_rule(self.get_last()).infix()
+            self.get_rule(self.get_prev()).infix()
 
     def finish_grouping(self):
         self.consume_expression()
         self.consume(TokenType.RIGHT_PAREN,
-            'Expect ) after expression! {}'.format(self.current_info()))
+            f'Expect ) after expression! {self.current_info()}')
 
     def finish_unary(self):
-        op_token = self.get_last()
+        op_token = self.get_prev()
         self.consume_precedence(Precedence.UNARY)
         {
-            TokenType.MINUS : self.program.op_negate
+            TokenType.MINUS : self.program.op_negate,
+            TokenType.BANG : self.program.op_not
         }.get(op_token.token_type, emit_error(
-            'Expected unary operator! {}'.format(self.current_info())))()
+            f'Expected unary operator! {self.current_info()}'
+        ))()
 
     def finish_binary(self):
-        op_token = self.get_last()
+        op_token = self.get_prev()
         rule = self.get_rule(op_token)
         self.consume_precedence(rule.precedence.next())
         {
             TokenType.PLUS : self.program.op_add,
             TokenType.MINUS : self.program.op_subtract,
             TokenType.STAR : self.program.op_multiply,
-            TokenType.SLASH : self.program.op_divide
+            TokenType.SLASH : self.program.op_divide,
+            TokenType.EQUAL_EQUAL: self.program.op_equal,
+            TokenType.BANG_EQUAL: self.program.op_nequal,
+            TokenType.LESS: self.program.op_less,
+            TokenType.GREATER_EQUAL: self.program.op_nless,
+            TokenType.GREATER: self.program.op_greater,
+            TokenType.LESS_EQUAL: self.program.op_ngreater
         }.get(op_token.token_type, emit_error(
-            'Expected binary operator! {}'.format(self.current_info())))()
+            f'Expected binary operator! {self.current_info()}'
+        ))()
 
     def consume_expression(self):
         self.consume_precedence(Precedence.ASSIGNMENT)
@@ -269,14 +224,13 @@ class Cursor:
     def consume_print_statement(self):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-            'Expect semicolon after print statement! {}'.format(
-                self.current_info()))
+            f'Expect semicolon after print statement! {self.current_info()}')
         self.program.op_print()
 
     def consume_expression_statement(self):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-            'Expected statement! {}'.format(self.current_info()))
+            f'Expected statement! {self.current_info()}')
         self.program.op_pop()
 
     def consume_statement(self):
@@ -285,8 +239,23 @@ class Cursor:
         else:
             self.consume_expression_statement()
 
+    def consume_variable(self, message):
+        self.consume(TokenType.IDENTIFIER, message)
+        return self.get_prev().lexeme
+
+    def consume_variable_declaration(self):
+        name = self.consume_variable('Expect variable name')
+        self.consume(TokenType.EQUAL, 'Expect variable initializer')
+        self.consume_expression()
+        self.consume(TokenType.SEMICOLON,
+            f'Expect semicolon to end statement! {self.current_info()}')
+        self.program.op_define(name)
+
     def consume_declaration(self):
-        self.consume_statement()
+        if self.match(TokenType.VAR) or self.match(TokenType.VAL):
+            self.consume_variable_declaration()
+        else:
+            self.consume_statement()
 
 def parse_source(source):
 
@@ -294,9 +263,9 @@ def parse_source(source):
 
     print(' '.join(map(lambda token: token.lexeme, tokens)))
 
-    cursor = Cursor(tokens)
-    while not cursor.match(TokenType.EOF):
-        cursor.consume_declaration()
+    parser = Parser(tokens)
+    while not parser.match(TokenType.EOF):
+        parser.consume_declaration()
 
-    return assemble(cursor.flush())
+    return assemble(parser.flush())
 

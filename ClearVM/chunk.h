@@ -17,7 +17,17 @@ typedef enum {
     OP_MULTIPLY = 8,
     OP_DIVIDE = 9,
     OP_RETURN = 10,
-    OP_POP = 11
+    OP_POP = 11,
+    OP_DEFINE = 12,
+    OP_TRUE = 13,
+    OP_FALSE = 14,
+    OP_NOT = 15,
+    OP_LESS = 16,
+    OP_NLESS = 17,
+    OP_GREATER = 18,
+    OP_NGREATER = 19,
+    OP_EQUAL = 20,
+    OP_NEQUAL = 21
 
 } OpCode;
 
