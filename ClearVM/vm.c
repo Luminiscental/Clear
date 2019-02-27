@@ -134,9 +134,9 @@ Value readString(VM *vm) {
 }
 
 #ifdef DEBUG
-#define PRINT(op) printf(#op "\n")
+#define DEBUG_OP(op) printf(#op "\n")
 #else
-#define PRINT(op)
+#define DEBUG_OP(op)
 #endif
 
 #define STRICT_UNARY_OP(name, predicate, op)   \
@@ -265,7 +265,7 @@ InterpretResult run(VM *vm) {
 
             case OP_TRUE: {
 
-                PRINT(OP_TRUE);
+                DEBUG_OP(OP_TRUE);
 
                 Value val = makeBoolean(true);
 
@@ -275,7 +275,7 @@ InterpretResult run(VM *vm) {
 
             case OP_FALSE: {
 
-                PRINT(OP_FALSE);
+                DEBUG_OP(OP_FALSE);
 
                 Value val = makeBoolean(false);
 
@@ -285,7 +285,7 @@ InterpretResult run(VM *vm) {
 
             case OP_DEFINE: {
 
-                PRINT(OP_DEFINE);
+                DEBUG_OP(OP_DEFINE);
 
                 Value name = readString(vm);
                 ObjString *nameStr = (ObjString*) name.as.obj;
@@ -303,7 +303,7 @@ InterpretResult run(VM *vm) {
 
             case OP_POP: {
 
-                PRINT(OP_POP);
+                DEBUG_OP(OP_POP);
 
                 pop(vm);
 
@@ -311,7 +311,7 @@ InterpretResult run(VM *vm) {
 
             case OP_RETURN: {
 
-                PRINT(OP_RETURN);
+                DEBUG_OP(OP_RETURN);
 
                 return INTERPRET_OK;
 
@@ -319,7 +319,7 @@ InterpretResult run(VM *vm) {
 
             case OP_PRINT: {
 
-                PRINT(OP_PRINT);
+                DEBUG_OP(OP_PRINT);
 
                 Value value = pop(vm);
 
@@ -392,7 +392,7 @@ InterpretResult run(VM *vm) {
 
             case OP_ADD: {
 
-                PRINT(OP_ADD);
+                DEBUG_OP(OP_ADD);
 
                 if (strictBinaryAddNumbersOrStrings(vm) != INTERPRET_OK) {
 
@@ -404,7 +404,7 @@ InterpretResult run(VM *vm) {
 
             case OP_SUBTRACT: {
 
-                PRINT(OP_SUBTRACT);
+                DEBUG_OP(OP_SUBTRACT);
 
                 if (strictBinarySubtractNumbers(vm) != INTERPRET_OK) {
 
@@ -416,7 +416,7 @@ InterpretResult run(VM *vm) {
 
             case OP_MULTIPLY: {
 
-                PRINT(OP_MULTIPLY);
+                DEBUG_OP(OP_MULTIPLY);
 
                 if (strictBinaryMultiplyNumbers(vm) != INTERPRET_OK) {
 
@@ -428,7 +428,7 @@ InterpretResult run(VM *vm) {
 
             case OP_DIVIDE: {
 
-                PRINT(OP_DIVIDE);
+                DEBUG_OP(OP_DIVIDE);
 
                 if (strictBinaryDivideNumbers(vm) != INTERPRET_OK) {
 
@@ -440,7 +440,7 @@ InterpretResult run(VM *vm) {
 
             case OP_NEGATE: {
 
-                PRINT(OP_NEGATE);
+                DEBUG_OP(OP_NEGATE);
 
                 if (strictUnaryNegateNumber(vm) != INTERPRET_OK) {
 
@@ -452,7 +452,7 @@ InterpretResult run(VM *vm) {
 
             case OP_EQUAL: {
 
-                PRINT(OP_EQUAL);
+                DEBUG_OP(OP_EQUAL);
 
                 binaryEqualValues(vm);
             
@@ -460,7 +460,7 @@ InterpretResult run(VM *vm) {
 
             case OP_NEQUAL: {
             
-                PRINT(OP_NEQUAL);
+                DEBUG_OP(OP_NEQUAL);
 
                 binaryNEqualValues(vm);
             
@@ -468,7 +468,7 @@ InterpretResult run(VM *vm) {
 
             case OP_LESS: {
             
-                PRINT(OP_LESS);
+                DEBUG_OP(OP_LESS);
 
                 if (strictBinaryLessNumbers(vm) != INTERPRET_OK) {
 
@@ -480,7 +480,7 @@ InterpretResult run(VM *vm) {
 
             case OP_NLESS: {
             
-                PRINT(OP_NLESS);
+                DEBUG_OP(OP_NLESS);
 
                 if (strictBinaryNLessNumbers(vm) != INTERPRET_OK) {
 
@@ -492,7 +492,7 @@ InterpretResult run(VM *vm) {
 
             case OP_GREATER: {
             
-                PRINT(OP_GREATER);
+                DEBUG_OP(OP_GREATER);
 
                 if (strictBinaryGreaterNumbers(vm) != INTERPRET_OK) {
 
@@ -504,7 +504,7 @@ InterpretResult run(VM *vm) {
 
             case OP_NGREATER: {
             
-                PRINT(OP_NGREATER);
+                DEBUG_OP(OP_NGREATER);
 
                 if (strictBinaryNGreaterNumbers(vm) != INTERPRET_OK) {
 
@@ -516,7 +516,7 @@ InterpretResult run(VM *vm) {
 
             case OP_NOT: {
 
-                PRINT(OP_NOT);
+                DEBUG_OP(OP_NOT);
 
                 if (strictUnaryNegateBoolean(vm) != INTERPRET_OK) {
 
@@ -539,5 +539,5 @@ InterpretResult run(VM *vm) {
 #undef STRICT_BINARY_OP
 #undef BINARY_OP
 #undef UNARY_OP
-#undef PRINT
+#undef DEBUG_OP
 
