@@ -5,6 +5,7 @@
 #include "common.h"
 #include "chunk.h"
 #include "vm.h"
+#include "memory.h"
 
 typedef struct {
 
@@ -39,7 +40,7 @@ FileBuffer readFile(const char *fileName) {
         return result;
     }
 
-    char *buffer = (char*) malloc(fileLength);
+    char *buffer = ALLOCATE(char, fileLength);
 
     fread(buffer, 1, fileLength, inFile);
 
@@ -78,7 +79,7 @@ int main(int argc, char **argv) {
         writeChunk(&chunk, byteCode.buffer[i]);
     }
 
-    free(byteCode.buffer);
+    FREE_ARRAY(char, byteCode.buffer, byteCode.length);
 
     interpret(&vm, &chunk);
 

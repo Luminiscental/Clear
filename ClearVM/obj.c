@@ -7,6 +7,31 @@
 
 #include "vm.h"
 #include "table.h"
+#include "memory.h"
+
+#define ALLOCATE_OBJ(vm, type, objType) \
+    (type*) allocateObject(vm, sizeof(type), objType)
+
+static Obj *allocateObject(VM *vm, size_t size, ObjType type) {
+
+    Obj *obj = (Obj*) reallocate(NULL, 0, size);
+
+    obj->type = type;
+    obj->next = vm->objects;
+    vm->objects = obj;
+
+    return obj;
+}
+
+static ObjString *allocateString(VM *vm, size_t length, char *string) {
+
+    ObjString *objStr = ALLOCATE_OBJ(vm, ObjString, OBJ_STRING);
+
+    objStr->chars = string;
+    objStr->length = length;
+
+    return objStr;
+}
 
 static uint32_t hashChars(size_t length, char *chars) {
 
@@ -59,18 +84,18 @@ Value makeString(VM *vm, size_t length, char *string) {
 
     if (interned != NULL) {
 
+        FREE_ARRAY(char, string, length + 1);
         return interned->key;
     } 
 
     Value result;
 
-    ObjString *stringObj = (ObjString*) malloc(sizeof(ObjString));
+    ObjString *stringObj = allocateString(vm, length, string);
 
     result.type = VAL_OBJ;
     result.hash = hashChars(length, string);
 
     result.as.obj = (Obj*) stringObj;
-    result.as.obj->type = OBJ_STRING;
 
     stringObj->chars = string;
     stringObj->length = length;
@@ -84,7 +109,7 @@ Value concatStrings(VM *vm, ObjString *first, ObjString *second) {
 
     size_t newLength = first->length + second->length;
 
-    char *result = (char*) malloc(newLength + 1);
+    char *result = ALLOCATE(char, newLength + 1);
     result[newLength] = '\0';
 
     strcpy(result, first->chars);

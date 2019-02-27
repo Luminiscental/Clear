@@ -12,7 +12,8 @@ void *reallocate(void *previous, size_t oldSize, size_t newSize) {
 
     static size_t memoryUsage = 0;
 
-    memoryUsage += newSize - oldSize;
+    memoryUsage += newSize;
+    memoryUsage -= oldSize;
 
     printf("\t\t\t\t\t\t\t\tmemory: %zuB\n", memoryUsage);
 
@@ -25,4 +26,32 @@ void *reallocate(void *previous, size_t oldSize, size_t newSize) {
     }
 
     return realloc(previous, newSize);
+}
+
+static void freeObject(Obj *object) {
+
+    switch (object->type) {
+
+        case OBJ_STRING: {
+        
+            ObjString *objStr = (ObjString*) object;
+            FREE_ARRAY(char, objStr->chars, objStr->length + 1);
+            FREE(ObjString, objStr);
+        
+        } break;
+    }
+}
+
+void freeObjects(VM *vm) {
+
+    Obj *object = vm->objects;
+
+    while (object != NULL) {
+
+        Obj *next = object->next;
+
+        freeObject(object);
+
+        object = next;
+    }
 }

@@ -7,10 +7,12 @@
 
 #include "common.h"
 #include "obj.h"
+#include "memory.h"
 
 void initVM(VM *vm) {
 
     resetStack(vm);
+    vm->objects = NULL;
     initTable(&vm->strings);
 }
 
@@ -50,19 +52,7 @@ Value pop(VM *vm) {
 
 void freeVM(VM *vm) {
 
-    for (size_t i = 0; i < vm->strings.count; i++) {
-
-        Entry *entry = vm->strings.entries + i;
-
-        if (entry->state == ENTRY_FULL) {
-
-            ObjString *entryStr = (ObjString*) entry->key.as.obj;
-
-            free(entryStr->chars);
-            free(entryStr);
-        }
-    }
-
+    freeObjects(vm);
     freeTable(&vm->strings);
 }
 
@@ -117,12 +107,12 @@ Value readString(VM *vm) {
 
     if (size == (uint8_t) -1) {
 
-        char *buffer = (char*) malloc(1);
+        char *buffer = ALLOCATE(char, 1);
         buffer[0] = '\0';
         printf("|| Creating empty string\n");
     }
 
-    char *buffer = (char*) malloc(size + 1);
+    char *buffer = ALLOCATE(char, size + 1);
     buffer[size] = '\0';
 
     for (size_t i = 0; i < size; i++) {
@@ -296,8 +286,8 @@ InterpretResult run(VM *vm) {
                 printf("\n");
 
                 // TODO: Add to table
-                free(nameStr->chars);
-                free(nameStr);
+                FREE_ARRAY(char, nameStr->chars, nameStr->length + 1);
+                FREE(ObjString, nameStr);
 
             } break;
 

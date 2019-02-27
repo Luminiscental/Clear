@@ -15,6 +15,7 @@ typedef enum eObjType {
 typedef struct sObj {
 
     ObjType type;
+    struct sObj *next;
 
 } Obj;
 

@@ -85,25 +85,6 @@ void writeValueArray(ValueArray *array, Value value) {
 
 void freeValueArray(ValueArray *array) {
 
-    for (size_t i = 0; i < array->count; i++) {
-
-        Value value = array->values[i];
-
-        if (value.type == VAL_OBJ) {
-
-            switch (value.as.obj->type) {
-            
-                case OBJ_STRING: {
-            
-                    ObjString *strObj = (ObjString*) value.as.obj;
-                    free(strObj->chars);
-                    free(strObj);
-            
-                } break;
-            }
-        }
-    }
-
     FREE_ARRAY(Value, array->values, array->capacity);
     initValueArray(array);
 }
