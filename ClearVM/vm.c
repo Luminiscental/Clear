@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "common.h"
+#include "obj.h"
 
 void initVM(VM *vm) {
 
@@ -72,18 +73,18 @@ uint8_t readByte(VM *vm) {
     }
 }
 
-bool readBoolean(VM *vm) {
+Value readBoolean(VM *vm) {
 
-    return (bool) readByte(vm);
+    return makeBoolean((bool) readByte(vm));
 }
 
-double readDouble(VM *vm) {
+Value readDouble(VM *vm) {
 
     if (8 + vm->ip - vm->chunk->code > vm->chunk->count) {
 
         // TODO: Error handling
         printf("|| Ran out of bytes!\n");
-        return 0.0;
+        return makeNumber(0.0);
 
     } else {
 
@@ -91,11 +92,11 @@ double readDouble(VM *vm) {
 
         vm->ip += 8;
 
-        return *read;
+        return makeNumber(*read);
     }
 }
 
-char *readString(VM *vm) {
+Value readString(VM *vm) {
 
     uint8_t size = readByte(vm);
 
@@ -104,7 +105,6 @@ char *readString(VM *vm) {
         char *buffer = (char*) malloc(1);
         buffer[0] = '\0';
         printf("|| Creating empty string\n");
-        return buffer;
     }
 
     char *buffer = (char*) malloc(size + 1);
@@ -115,7 +115,7 @@ char *readString(VM *vm) {
         buffer[i] = readByte(vm);
     }
 
-    return buffer;
+    return makeString(size, buffer);
 }
 
 InterpretResult run(VM *vm) {
@@ -215,12 +215,17 @@ InterpretResult run(VM *vm) {
 
                 PRINT(OP_DEFINE);
 
-                Value name = makeString(readString(vm));
+                Value name = readString(vm);
+                ObjString *nameStr = (ObjString*) name.as.obj;
 
                 pop(vm);
-                printf("|| Defined \"%s\"\n", name.as.string);
+                printf("|| Defined \"");
+                printValue(name, false);
+                printf("\n");
+
                 // TODO: Add to table
-                free(name.as.string);
+                free(nameStr->chars);
+                free(nameStr);
 
             } break;
 
@@ -284,13 +289,13 @@ InterpretResult run(VM *vm) {
 
                     case OP_NUMBER: {
 
-                        value = makeNumber(readDouble(vm));
+                        value = readDouble(vm);
 
                     } break;
 
                     case OP_STRING: {
 
-                        value = makeString(readString(vm));
+                        value = readString(vm);
 
                     } break;
 
@@ -325,9 +330,11 @@ InterpretResult run(VM *vm) {
                     Value result = makeNumber(a.as.number + b.as.number);
                     push(vm, result);
 
-                } else if (b.type == VAL_STRING && a.type == VAL_STRING) {
+                } else if (isObjType(b, OBJ_STRING) && isObjType(a, OBJ_STRING)) {
 
-                    Value result = concatStrings(a.as.string, b.as.string);
+                    ObjString *aStr = (ObjString*) a.as.obj;
+                    ObjString *bStr = (ObjString*) b.as.obj;
+                    Value result = concatStrings(aStr, bStr);
                     push(vm, result);
 
                 } else {

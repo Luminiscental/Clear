@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "memory.h"
+#include "obj.h"
 
 Value makeBoolean(bool boolean) {
 
@@ -27,30 +28,20 @@ Value makeNumber(double number) {
     return result;
 }
 
-Value makeString(char *string) {
+Value makeString(size_t length, char *string) {
 
     Value result;
 
-    result.type = VAL_STRING;
-    result.as.string = string;
+    ObjString *stringObj = (ObjString*) malloc(sizeof(ObjString));
+
+    result.type = VAL_OBJ;
+    result.as.obj = (Obj*) stringObj;
+    result.as.obj->type = OBJ_STRING;
+
+    stringObj->chars = string;
+    stringObj->length = length;
 
     return result;
-}
-
-Value concatStrings(char *first, char *second) {
-
-    size_t sizeFirst = strlen(first);
-    size_t sizeSecond = strlen(second);
-
-    char *result = (char*) malloc(sizeFirst + sizeSecond + 1);
-    result[sizeFirst] = '\0';
-    strcpy(result, first);
-    strcat(result, second);
-
-    free(first);
-    free(second);
-
-    return makeString(result);
 }
 
 bool valuesEqual(Value a, Value b) {
@@ -67,9 +58,23 @@ bool valuesEqual(Value a, Value b) {
 
             return a.as.number == b.as.number;
 
-        case VAL_STRING:
+        case VAL_OBJ: {
 
-            return strcmp(a.as.string, b.as.string) == 0;
+            if (a.as.obj->type != b.as.obj->type) return false;
+
+            switch (a.as.obj->type) {
+            
+                case OBJ_STRING: {
+            
+                    ObjString *aStr = (ObjString*) a.as.obj;
+                    ObjString *bStr = (ObjString*) b.as.obj;
+
+                    return stringsEqual(aStr, bStr);
+            
+                } break;
+            }
+
+        } break;
     }
 }
 
@@ -99,9 +104,18 @@ void freeValueArray(ValueArray *array) {
 
         Value value = array->values[i];
 
-        if (value.type == VAL_STRING) {
+        if (value.type == VAL_OBJ) {
 
-            free(value.as.string);
+            switch (value.as.obj->type) {
+            
+                case OBJ_STRING: {
+            
+                    ObjString *strObj = (ObjString*) value.as.obj;
+                    free(strObj->chars);
+                    free(strObj);
+            
+                } break;
+            }
         }
     }
 
@@ -119,16 +133,24 @@ void printValue(Value value, bool endLine) {
 
         } break;
 
-        case VAL_STRING: {
-
-            printf("<str \"%s\">", value.as.string);
-
-        } break;
-
         case VAL_BOOL: {
 
             printf("<bool %s>", value.as.boolean ? "true" : "false");
 
+        } break;
+
+        case VAL_OBJ: {
+        
+            switch (value.as.obj->type) {
+            
+                case OBJ_STRING: {
+            
+                    ObjString *strObj = (ObjString*) value.as.obj;
+                    printf("<str \"%s\">", strObj->chars);
+            
+                } break;
+            }
+        
         } break;
     }
 

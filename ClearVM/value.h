@@ -3,11 +3,15 @@
 
 #include "common.h"
 
+typedef enum eObjType ObjType;
+typedef struct sObj Obj;
+typedef struct sObjString ObjString;
+
 typedef enum {
 
     VAL_NUMBER,
     VAL_BOOL,
-    VAL_STRING
+    VAL_OBJ
 
 } ValueType;
 
@@ -19,7 +23,7 @@ typedef struct {
 
         bool boolean;
         double number;
-        char *string;
+        Obj *obj;
 
     } as;
 
@@ -27,8 +31,7 @@ typedef struct {
 
 Value makeBoolean(bool boolean);
 Value makeNumber(double number);
-Value makeString(char *string);
-Value concatStrings(char *first, char *second);
+Value makeString(size_t length, char *string);
 bool valuesEqual(Value a, Value b);
 
 typedef struct {
