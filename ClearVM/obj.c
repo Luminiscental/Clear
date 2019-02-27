@@ -6,17 +6,21 @@
 
 Value concatStrings(ObjString *first, ObjString *second) {
 
-    char *result = (char*) malloc(first->length + second->length + 1);
-    result[first->length + second->length] = '\0';
+    size_t newLength = first->length + second->length;
+
+    char *result = (char*) malloc(newLength + 1);
+    result[newLength] = '\0';
+
     strcpy(result, first->chars);
     strcat(result, second->chars);
 
     free(first->chars);
     free(second->chars);
+
     free(first);
     free(second);
 
-    return makeString(first->length + second->length, result);
+    return makeString(newLength, result);
 }
 
 bool stringsEqual(ObjString *a, ObjString *b) {

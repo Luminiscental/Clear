@@ -6,10 +6,6 @@ def first_byte(value):
 
     return bytes([value])[0]
 
-def assemble_bool(value, accum):
-
-    accum.append(first_byte(value))
-
 def assemble_number(value, accum):
 
     for byte in struct.pack('d', value):
@@ -38,7 +34,6 @@ def assemble(code_list):
         {
             float: assemble_number,
             str: assemble_string,
-            bool: assemble_bool,
             OpCode: assemble_op
         }.get(type(code),
             assemble_any

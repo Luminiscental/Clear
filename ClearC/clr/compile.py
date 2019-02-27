@@ -19,21 +19,20 @@ class Constants:
             self.count += 1
             return self.count - 1
 
-    def store(self, op_type, value):
+    def store(self, value):
         self.code_list.append(OpCode.STORE_CONST)
+        op_type = {
+            float: lambda: OpCode.NUMBER,
+            str: lambda: OpCode.STRING
+        }.get(type(value), emit_error(
+            f'Unknown constant value type: {type(value)}'
+        ))()
         self.code_list.append(op_type)
         self.code_list.append(value)
 
     def flush(self):
         for value in self.values:
-            value_type = type(value)
-            op_type = {
-                float: lambda: OpCode.NUMBER,
-                str: lambda: OpCode.STRING
-            }.get(value_type, emit_error(
-                f'Unknown constant value type: {value_type}'
-            ))()
-            self.store(op_type, value)
+            self.store(value)
         return self.code_list
 
 class Program:
@@ -69,7 +68,7 @@ class Program:
     def op_pop(self):
         self.code_list.append(OpCode.POP)
 
-    def op_define(self, name):
+    def define_name(self, name):
         self.code_list.append(OpCode.DEFINE)
         self.code_list.append(name)
 
@@ -155,12 +154,12 @@ class Parser(Cursor):
     def current_precedence(self):
         return self.get_rule(self.get_current()).precedence
 
-    def consume_literal(self):
+    def consume_boolean(self):
         token = self.get_prev()
-        err = emit_error(f'Expected boolean value! {self.current_info()}')
+        err = emit_error(f'Expected boolean token! {self.current_info()}')
         {
-            TokenType.TRUE: lambda: self.program.op_true(),
-            TokenType.FALSE: lambda: self.program.op_false()
+            TokenType.TRUE: self.program.op_true,
+            TokenType.FALSE: self.program.op_false
         }.get(token.token_type, err)()
 
     def consume_number(self):
@@ -180,14 +179,14 @@ class Parser(Cursor):
     def consume_precedence(self, precedence):
         self.advance()
         self.get_rule(self.get_prev()).prefix()
-        while precedence.value <= self.current_precedence().value:
+        while precedence <= self.current_precedence():
             self.advance()
             self.get_rule(self.get_prev()).infix()
 
     def finish_grouping(self):
         self.consume_expression()
         self.consume(TokenType.RIGHT_PAREN,
-            f'Expect ) after expression! {self.current_info()}')
+            f'Expected \')\' after expression! {self.current_info()}')
 
     def finish_unary(self):
         op_token = self.get_prev()
@@ -224,7 +223,7 @@ class Parser(Cursor):
     def consume_print_statement(self):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-            f'Expect semicolon after print statement! {self.current_info()}')
+            f'Expected semicolon after statement! {self.current_info()}')
         self.program.op_print()
 
     def consume_expression_statement(self):
@@ -244,12 +243,14 @@ class Parser(Cursor):
         return self.get_prev().lexeme
 
     def consume_variable_declaration(self):
-        name = self.consume_variable('Expect variable name')
-        self.consume(TokenType.EQUAL, 'Expect variable initializer')
+        name = self.consume_variable(
+            f'Expected variable name! {self.current_info()}')
+        self.consume(TokenType.EQUAL,
+            f'Expected variable initializer! {self.current_info()}')
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
-            f'Expect semicolon to end statement! {self.current_info()}')
-        self.program.op_define(name)
+            f'Expected semicolon after statement! {self.current_info()}')
+        self.program.define_name(name)
 
     def consume_declaration(self):
         if self.match(TokenType.VAR) or self.match(TokenType.VAL):

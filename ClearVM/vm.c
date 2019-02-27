@@ -118,6 +118,113 @@ Value readString(VM *vm) {
     return makeString(size, buffer);
 }
 
+#ifdef DEBUG
+#define PRINT(op) printf(#op "\n")
+#else
+#define PRINT(op)
+#endif
+
+#define STRICT_UNARY_OP(name, predicate, op)   \
+                                               \
+    InterpretResult strictUnary##name(VM *vm) {\
+                                               \
+        Value a = pop(vm);                     \
+                                               \
+        if (!(predicate)) {                    \
+                                               \
+            return INTERPRET_ERR;              \
+        }                                      \
+                                               \
+        Value result = op;                     \
+        push(vm, result);                      \
+        return INTERPRET_OK;                   \
+    }
+
+#define BINARY_OP(name, op)               \
+                                          \
+    InterpretResult binary##name(VM *vm) {\
+                                          \
+        Value b = pop(vm);                \
+        Value a = pop(vm);                \
+                                          \
+        Value result = op;                \
+        push(vm, result);                 \
+        return INTERPRET_OK;              \
+    }
+
+#define STRICT_BINARY_OP(name, predicate, op)   \
+                                                \
+    InterpretResult strictBinary##name(VM *vm) {\
+                                                \
+        Value b = pop(vm);                      \
+        Value a = pop(vm);                      \
+                                                \
+        if (!(predicate)) {                     \
+                                                \
+            return INTERPRET_ERR;               \
+        }                                       \
+                                                \
+        Value result = op;                      \
+        push(vm, result);                       \
+        return INTERPRET_OK;                    \
+    }
+
+#define PRED_NUMBER(x) ((x).type == VAL_NUMBER)
+#define PRED_BOOL(x) ((x).type == VAL_BOOL)
+#define PRED_STRING(x) (isObjType(x, OBJ_STRING))
+
+#define PRED_BOTH(predicate) predicate(a) && predicate(b)
+
+STRICT_BINARY_OP(AddNumbersOrStrings,
+    PRED_BOTH(PRED_NUMBER) || PRED_BOTH(PRED_STRING),
+    (a.type == VAL_NUMBER) ? makeNumber(a.as.number + b.as.number) : concatStrings((ObjString*) a.as.obj, (ObjString*) b.as.obj))
+
+STRICT_BINARY_OP(SubtractNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeNumber(a.as.number - b.as.number))
+
+STRICT_BINARY_OP(MultiplyNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeNumber(a.as.number * b.as.number))
+
+STRICT_BINARY_OP(DivideNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeNumber(a.as.number / b.as.number))
+
+STRICT_UNARY_OP(NegateNumber,
+    a.type == VAL_NUMBER,
+    makeNumber(-a.as.number))
+
+STRICT_UNARY_OP(NegateBoolean,
+    a.type == VAL_BOOL,
+    makeBoolean(!a.as.boolean))
+
+STRICT_BINARY_OP(LessNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeBoolean(a.as.number < b.as.number))
+
+STRICT_BINARY_OP(NLessNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeBoolean(a.as.number >= b.as.number))
+
+STRICT_BINARY_OP(GreaterNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeBoolean(a.as.number > b.as.number))
+
+STRICT_BINARY_OP(NGreaterNumbers,
+    PRED_BOTH(PRED_NUMBER),
+    makeBoolean(a.as.number <= b.as.number))
+
+STRICT_BINARY_OP(AddStrings,
+    PRED_BOTH(PRED_STRING),
+    concatStrings((ObjString*) a.as.obj, (ObjString*) b.as.obj))
+
+BINARY_OP(EqualValues,
+    makeBoolean(valuesEqual(a, b)))
+
+BINARY_OP(NEqualValues,
+    makeBoolean(!valuesEqual(a, b)))
+
 InterpretResult run(VM *vm) {
 
     while (true) {
@@ -140,56 +247,6 @@ InterpretResult run(VM *vm) {
 #endif
 
         switch (instruction) {
-
-#ifdef DEBUG
-#define PRINT(op) printf(#op "\n")
-#else
-#define PRINT(op)
-#endif
-
-#define UNARY_OP(expected, op)                                      \
-    do {                                                            \
-                                                                    \
-        Value a = pop(vm);                                          \
-                                                                    \
-        if (a.type != expected) {                                   \
-                                                                    \
-            printf("|| Expected "#expected" for unary operator!\n");\
-            return INTERPRET_ERR;                                   \
-        }                                                           \
-                                                                    \
-        Value result = op;                                          \
-        push(vm, result);                                           \
-                                                                    \
-    } while(false)
-
-#define BINARY_OP(op)                                                \
-    do {                                                             \
-                                                                     \
-        Value b = pop(vm);                                           \
-        Value a = pop(vm);                                           \
-                                                                     \
-        Value result = op;                                           \
-        push(vm, result);                                            \
-                                                                     \
-    } while(false)
-
-#define STRICT_BINARY_OP(expected, op)                               \
-    do {                                                             \
-                                                                     \
-        Value b = pop(vm);                                           \
-        Value a = pop(vm);                                           \
-                                                                     \
-        if (a.type != expected || b.type != expected) {              \
-                                                                     \
-            printf("|| Expected "#expected" for binary operator!\n");\
-            return INTERPRET_ERR;                                    \
-        }                                                            \
-                                                                     \
-        Value result = op;                                           \
-        push(vm, result);                                            \
-                                                                     \
-    } while(false)
 
             case OP_TRUE: {
 
@@ -322,24 +379,9 @@ InterpretResult run(VM *vm) {
 
                 PRINT(OP_ADD);
 
-                Value b = pop(vm);
-                Value a = pop(vm);
+                if (strictBinaryAddNumbersOrStrings(vm) != INTERPRET_OK) {
 
-                if (b.type == VAL_NUMBER && a.type == VAL_NUMBER) {
-
-                    Value result = makeNumber(a.as.number + b.as.number);
-                    push(vm, result);
-
-                } else if (isObjType(b, OBJ_STRING) && isObjType(a, OBJ_STRING)) {
-
-                    ObjString *aStr = (ObjString*) a.as.obj;
-                    ObjString *bStr = (ObjString*) b.as.obj;
-                    Value result = concatStrings(aStr, bStr);
-                    push(vm, result);
-
-                } else {
-
-                    printf("|| Expected two numbers or two strings as operands for '+'!\n");
+                    printf("|| Expected numbers or strings to add!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -348,21 +390,36 @@ InterpretResult run(VM *vm) {
             case OP_SUBTRACT: {
 
                 PRINT(OP_SUBTRACT);
-                STRICT_BINARY_OP(VAL_NUMBER, makeNumber(a.as.number - b.as.number));
+
+                if (strictBinarySubtractNumbers(vm) != INTERPRET_OK) {
+
+                    printf("Expected numbers to subtract!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
             case OP_MULTIPLY: {
 
                 PRINT(OP_MULTIPLY);
-                STRICT_BINARY_OP(VAL_NUMBER, makeNumber(a.as.number * b.as.number));
+
+                if (strictBinaryMultiplyNumbers(vm) != INTERPRET_OK) {
+
+                    printf("Expected numbers to multiply!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
             case OP_DIVIDE: {
 
                 PRINT(OP_DIVIDE);
-                STRICT_BINARY_OP(VAL_NUMBER, makeNumber(a.as.number / b.as.number));
+
+                if (strictBinaryDivideNumbers(vm) != INTERPRET_OK) {
+
+                    printf("|| Expected numbers to divide!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
@@ -370,7 +427,11 @@ InterpretResult run(VM *vm) {
 
                 PRINT(OP_NEGATE);
 
-                UNARY_OP(VAL_NUMBER, makeNumber(-a.as.number));
+                if (strictUnaryNegateNumber(vm) != INTERPRET_OK) {
+
+                    printf("|| Expected number to negate!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
@@ -378,7 +439,7 @@ InterpretResult run(VM *vm) {
 
                 PRINT(OP_EQUAL);
 
-                BINARY_OP(makeBoolean(valuesEqual(a, b)));
+                binaryEqualValues(vm);
             
             } break;
 
@@ -386,7 +447,7 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_NEQUAL);
 
-                BINARY_OP(makeBoolean(!valuesEqual(a, b)));
+                binaryNEqualValues(vm);
             
             } break;
 
@@ -394,7 +455,11 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_LESS);
 
-                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number < b.as.number));
+                if (strictBinaryLessNumbers(vm) != INTERPRET_OK) {
+
+                    printf("Expected numbers to compare!\n");
+                    return INTERPRET_ERR;
+                }
             
             } break;
 
@@ -402,15 +467,23 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_NLESS);
 
-                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number >= b.as.number));
-            
+                if (strictBinaryNLessNumbers(vm) != INTERPRET_OK) {
+
+                    printf("Expected numbers to compare!\n");
+                    return INTERPRET_ERR;
+                }
+
             } break;
 
             case OP_GREATER: {
             
                 PRINT(OP_GREATER);
 
-                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number > b.as.number));
+                if (strictBinaryGreaterNumbers(vm) != INTERPRET_OK) {
+
+                    printf("Expected numbers to compare!\n");
+                    return INTERPRET_ERR;
+                }
             
             } break;
 
@@ -418,7 +491,11 @@ InterpretResult run(VM *vm) {
             
                 PRINT(OP_NGREATER);
 
-                STRICT_BINARY_OP(VAL_NUMBER, makeBoolean(a.as.number <= b.as.number));
+                if (strictBinaryNGreaterNumbers(vm) != INTERPRET_OK) {
+
+                    printf("Expected numbers to compare!\n");
+                    return INTERPRET_ERR;
+                }
             
             } break;
 
@@ -426,7 +503,11 @@ InterpretResult run(VM *vm) {
 
                 PRINT(OP_NOT);
 
-                UNARY_OP(VAL_BOOL, makeBoolean(!a.as.boolean));
+                if (strictUnaryNegateBoolean(vm) != INTERPRET_OK) {
+
+                    printf("Expected boolean to negate!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
@@ -436,13 +517,12 @@ InterpretResult run(VM *vm) {
                 return INTERPRET_ERR;
 
             } break;
+        }
+    }
+}
 
 #undef STRICT_BINARY_OP
 #undef BINARY_OP
 #undef UNARY_OP
 #undef PRINT
-
-        }
-    }
-}
 

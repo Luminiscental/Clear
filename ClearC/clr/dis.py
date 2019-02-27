@@ -3,12 +3,6 @@ import struct
 from clr.values import OpCode
 from clr.errors import emit_error
 
-def disassemble_bool(data):
-
-    value = bool(data[0])
-    print(f'<bool {value}>')
-    return 1
-
 def disassemble_number(data):
 
     value = struct.unpack('d', data[0:8])[0]

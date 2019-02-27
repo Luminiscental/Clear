@@ -26,7 +26,7 @@ class ScanState(Enum):
 
 def token_info(token):
 
-    return '<line ' + str(token.line) + '> "' + token.lexeme + '"'
+    return f'<line {str(token.line)}> "{token.lexeme}"'
 
 def store_acc(token_type, acc, line, tokens):
 

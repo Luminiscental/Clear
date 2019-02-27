@@ -47,6 +47,26 @@ class Precedence(Enum):
     CALL = 9
     PRIMARY = 10
 
+    def __lt__(self, other):
+        return self.__cmp__(other) < 0
+
+    def __le__(self, other):
+        return self.__cmp__(other) <= 0
+
+    def __gt__(self, other):
+        return self.__cmp__(other) > 0
+
+    def __ge__(self, other):
+        return self.__cmp__(other) >= 0
+
+    def __cmp__(self, other):
+        if self.value == other.value:
+            return 0
+        elif self.value < other.value:
+            return -1
+        else:
+            return 1
+
     def next(self):
         return Precedence(self.value + 1)
 
@@ -186,10 +206,10 @@ def pratt_table(parser):
             prefix=parser.consume_string
         ),
         TokenType.TRUE: ParseRule(
-            prefix=parser.consume_literal
+            prefix=parser.consume_boolean
         ),
         TokenType.FALSE: ParseRule(
-            prefix=parser.consume_literal
+            prefix=parser.consume_boolean
         ),
         TokenType.AND: ParseRule(
             precedence=Precedence.AND
