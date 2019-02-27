@@ -11,6 +11,7 @@
 void initVM(VM *vm) {
 
     resetStack(vm);
+    initTable(&vm->strings);
 }
 
 void resetStack(VM *vm) {
@@ -49,6 +50,20 @@ Value pop(VM *vm) {
 
 void freeVM(VM *vm) {
 
+    for (size_t i = 0; i < vm->strings.count; i++) {
+
+        Entry *entry = vm->strings.entries + i;
+
+        if (entry->state == ENTRY_FULL) {
+
+            ObjString *entryStr = (ObjString*) entry->key.as.obj;
+
+            free(entryStr->chars);
+            free(entryStr);
+        }
+    }
+
+    freeTable(&vm->strings);
 }
 
 InterpretResult interpret(VM *vm, Chunk *chunk) {
@@ -115,7 +130,7 @@ Value readString(VM *vm) {
         buffer[i] = readByte(vm);
     }
 
-    return makeString(size, buffer);
+    return makeString(vm, size, buffer);
 }
 
 #ifdef DEBUG
@@ -177,7 +192,7 @@ Value readString(VM *vm) {
 
 STRICT_BINARY_OP(AddNumbersOrStrings,
     PRED_BOTH(PRED_NUMBER) || PRED_BOTH(PRED_STRING),
-    (a.type == VAL_NUMBER) ? makeNumber(a.as.number + b.as.number) : concatStrings((ObjString*) a.as.obj, (ObjString*) b.as.obj))
+    (a.type == VAL_NUMBER) ? makeNumber(a.as.number + b.as.number) : concatStrings(vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj))
 
 STRICT_BINARY_OP(SubtractNumbers,
     PRED_BOTH(PRED_NUMBER),
@@ -217,7 +232,7 @@ STRICT_BINARY_OP(NGreaterNumbers,
 
 STRICT_BINARY_OP(AddStrings,
     PRED_BOTH(PRED_STRING),
-    concatStrings((ObjString*) a.as.obj, (ObjString*) b.as.obj))
+    concatStrings(vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj))
 
 BINARY_OP(EqualValues,
     makeBoolean(valuesEqual(a, b)))

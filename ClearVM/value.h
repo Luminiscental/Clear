@@ -18,6 +18,7 @@ typedef enum {
 typedef struct {
 
     ValueType type;
+    uint32_t hash;
 
     union {
 
@@ -31,7 +32,6 @@ typedef struct {
 
 Value makeBoolean(bool boolean);
 Value makeNumber(double number);
-Value makeString(size_t length, char *string);
 bool valuesEqual(Value a, Value b);
 
 typedef struct {

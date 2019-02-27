@@ -13,6 +13,7 @@ Value makeBoolean(bool boolean) {
     Value result;
 
     result.type = VAL_BOOL;
+    result.hash = boolean ? 1 : 0;
     result.as.boolean = boolean;
 
     return result;
@@ -23,23 +24,9 @@ Value makeNumber(double number) {
     Value result;
 
     result.type = VAL_NUMBER;
+    // TODO: Split into int / float so stuff like 1 + 1 == 2 isn't unreliable
+    result.hash = *((uint32_t*) &number);
     result.as.number = number;
-
-    return result;
-}
-
-Value makeString(size_t length, char *string) {
-
-    Value result;
-
-    ObjString *stringObj = (ObjString*) malloc(sizeof(ObjString));
-
-    result.type = VAL_OBJ;
-    result.as.obj = (Obj*) stringObj;
-    result.as.obj->type = OBJ_STRING;
-
-    stringObj->chars = string;
-    stringObj->length = length;
 
     return result;
 }
@@ -47,6 +34,7 @@ Value makeString(size_t length, char *string) {
 bool valuesEqual(Value a, Value b) {
 
     if (a.type != b.type) return false;
+    if (a.hash != b.hash) return false;
 
     switch (a.type) {
     
@@ -66,10 +54,7 @@ bool valuesEqual(Value a, Value b) {
             
                 case OBJ_STRING: {
             
-                    ObjString *aStr = (ObjString*) a.as.obj;
-                    ObjString *bStr = (ObjString*) b.as.obj;
-
-                    return stringsEqual(aStr, bStr);
+                    return a.as.obj == b.as.obj;
             
                 } break;
             }

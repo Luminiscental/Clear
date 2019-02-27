@@ -4,26 +4,30 @@
 #include "common.h"
 #include "value.h"
 
-enum eObjType {
+typedef struct sVM VM;
+
+typedef enum eObjType {
 
     OBJ_STRING
 
-};
+} ObjType;
 
-struct sObj {
+typedef struct sObj {
 
     ObjType type;
-};
 
-struct sObjString {
+} Obj;
+
+typedef struct sObjString {
 
     Obj obj;
     size_t length;
     char *chars;
-};
 
-Value concatStrings(ObjString *first, ObjString *second);
+} ObjString;
+
+Value makeString(VM *vm, size_t length, char *string);
+Value concatStrings(VM *vm, ObjString *first, ObjString *second);
 bool isObjType(Value a, ObjType type);
-bool stringsEqual(ObjString *a, ObjString *b);
 
 #endif

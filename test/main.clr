@@ -1,13 +1,9 @@
 
 // Simple test program:
 
-1 + 2;
-"no way";
-
-print "Hello " + "World" + "!";
 print "a" + "b" == "ab";
-print (1 + 2) * 3 - 4 + 5 * 6;
-print (2 + 3 * 7) <= (2 - 4 + 8 * 6);
-print 2 == 7;
-print 5 > -2;
+print "a" + "b" + "c" == "ab" + "c";
+
+print "a" + "lslsl" == "lslsl";
+print "abc" == "ab" + "c";
 
