@@ -30,6 +30,7 @@ class OpCode(Enum):
     NEQUAL = 21
     LOAD_GLOBAL = 22
     PRINT_BLANK = 23
+    TYPE = 24
 
     def __int__(self):
         return self.value
@@ -116,9 +117,10 @@ class TokenType(Enum):
     TRUE = 34,
     VAL = 36,
     WHILE = 38,
+    TYPE = 39
     # special
-    SPACE = 39,
-    EOF = 40
+    SPACE = 40,
+    EOF = 41
 
 keyword_types = {
 
@@ -136,7 +138,8 @@ keyword_types = {
     'this' : TokenType.THIS,
     'true' : TokenType.TRUE,
     'val' : TokenType.VAL,
-    'while' : TokenType.WHILE
+    'while' : TokenType.WHILE,
+    'type' : TokenType.TYPE
 }
 
 simple_tokens = {
@@ -248,6 +251,10 @@ def pratt_table(parser):
         ),
         TokenType.IDENTIFIER: ParseRule(
             prefix=parser.consume_variable_reference
+        ),
+        TokenType.TYPE: ParseRule(
+            prefix=parser.consume_type,
+            precedence=Precedence.CALL
         )
     })
 

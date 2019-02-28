@@ -131,6 +131,9 @@ class Program:
     def op_ngreater(self):
         self.code_list.append(OpCode.NGREATER)
 
+    def op_type(self):
+        self.code_list.append(OpCode.TYPE)
+
     def flush(self):
         return self.code_list
 
@@ -185,6 +188,12 @@ class Parser(Cursor):
 
     def current_precedence(self):
         return self.get_rule(self.get_current()).precedence
+
+    def consume_type(self):
+        self.consume(TokenType.LEFT_PAREN,
+            f'Expected parameter to type()! {self.current_info()}')
+        self.finish_grouping()
+        self.program.op_type()
 
     def consume_boolean(self):
         token = self.get_prev()

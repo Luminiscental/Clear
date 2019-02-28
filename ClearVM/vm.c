@@ -260,6 +260,46 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
+            case OP_TYPE: {
+
+                Value val = pop(vm);
+
+                switch (val.type) {
+ 
+                    case VAL_INTEGER: {
+                    
+                        push(vm, makeStringFromLiteral(vm, "integer"));
+                    
+                    } break;
+               
+                    case VAL_BOOL: {
+                
+                        push(vm, makeStringFromLiteral(vm, "bool"));
+                
+                    } break;
+
+                    case VAL_NUMBER: {
+                    
+                        push(vm, makeStringFromLiteral(vm, "number"));
+                    
+                    } break;
+
+                    case VAL_OBJ: {
+                    
+                        push(vm, makeStringFromLiteral(vm, "object"));
+                    
+                    } break;
+
+                    default: {
+                    
+                        printf("|| Unknown type for value!\n");
+                        return INTERPRET_ERR;
+                    
+                    } break;
+                }
+
+            } break;
+
             case OP_TRUE: {
 
                 Value val = makeBoolean(true);

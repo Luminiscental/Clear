@@ -33,7 +33,7 @@ static ObjString *allocateString(VM *vm, size_t length, char *string) {
     return objStr;
 }
 
-static uint32_t hashChars(size_t length, char *chars) {
+static uint32_t hashChars(size_t length, const char *chars) {
 
     uint32_t hash = 2166136261u;
 
@@ -46,7 +46,7 @@ static uint32_t hashChars(size_t length, char *chars) {
     return hash;
 }
 
-static Entry *tableFindString(Table *table, char *string, size_t length) {
+static Entry *tableFindString(Table *table, const char *string, size_t length) {
 
     if (table->entries == NULL) return NULL;
 
@@ -76,6 +76,36 @@ static Entry *tableFindString(Table *table, char *string, size_t length) {
 
         index = (index + 1) % table->capacity;
     }
+}
+
+Value makeStringFromLiteral(VM *vm, const char *string) {
+
+    size_t length = strlen(string);
+    Entry *interned = tableFindString(&vm->strings, string, length);
+
+    if (interned != NULL) {
+
+        return interned->key;
+    }
+
+    Value result;
+
+    char *copyStr = ALLOCATE(char, length + 1);
+    strcpy(copyStr, string);
+
+    ObjString *stringObj = allocateString(vm, length, copyStr);
+
+    result.type = VAL_OBJ;
+    result.hash = hashChars(length, string);
+
+    result.as.obj = (Obj*) stringObj;
+
+    stringObj->chars = copyStr;
+    stringObj->length = length;
+
+    tableSet(&vm->strings, result, makeBoolean(true));
+
+    return result;
 }
 
 Value makeString(VM *vm, size_t length, char *string) {
