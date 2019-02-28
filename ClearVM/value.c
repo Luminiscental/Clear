@@ -42,6 +42,36 @@ Value makeNumber(double number) {
     return result;
 }
 
+Value typeString(VM *vm, Value a) {
+
+    switch (a.type) {
+
+        case VAL_INTEGER: {
+        
+            return makeStringFromLiteral(vm, "integer");
+        
+        } break;
+   
+        case VAL_BOOL: {
+    
+            return makeStringFromLiteral(vm, "bool");
+    
+        } break;
+
+        case VAL_NUMBER: {
+        
+            return makeStringFromLiteral(vm, "number");
+        
+        } break;
+
+        case VAL_OBJ: {
+        
+            return makeStringFromLiteral(vm, "object");
+        
+        } break;
+    }
+}
+
 bool valuesEqual(Value a, Value b) {
 
     if (a.type != b.type) return false;

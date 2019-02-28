@@ -61,7 +61,7 @@ void freeVM(VM *vm) {
 InterpretResult interpret(VM *vm, Chunk *chunk) {
 
     vm->chunk = chunk;
-    vm->ip = vm->chunk->code;
+    vm->ip = vm->chunk->code + vm->chunk->start;
 
     return run(vm);
 }
@@ -125,106 +125,33 @@ Value readStringRaw(VM *vm) {
     return makeString(vm, size, buffer);
 }
 
-#define STRICT_UNARY_OP(name, predicate, op)   \
-                                               \
-    InterpretResult strictUnary##name(VM *vm) {\
-                                               \
-        Value a = pop(vm);                     \
-                                               \
-        if (!(predicate)) {                    \
-                                               \
-            return INTERPRET_ERR;              \
-        }                                      \
-                                               \
-        Value result = op;                     \
-        push(vm, result);                      \
-        return INTERPRET_OK;                   \
+#define UNARY_OP \
+    Value a = pop(vm);
+
+#define ANY_UNARY(op) \
+    push(vm, op);
+
+#define TYPED_UNARY(expected, op) \
+    if (a.type == expected) { \
+        ANY_UNARY(op) \
     }
 
-#define BINARY_OP(name, op)               \
-                                          \
-    InterpretResult binary##name(VM *vm) {\
-                                          \
-        Value b = pop(vm);                \
-        Value a = pop(vm);                \
-                                          \
-        Value result = op;                \
-        push(vm, result);                 \
-        return INTERPRET_OK;              \
+#define BINARY_OP \
+    Value b = pop(vm); \
+    Value a = pop(vm);
+
+#define ANY_BINARY(op) \
+    push(vm, op);
+
+#define TYPED_BINARY(expected, op) \
+    if (a.type == expected && b.type == expected) { \
+        ANY_BINARY(op) \
     }
 
-#define STRICT_BINARY_OP(name, predicate, op)   \
-                                                \
-    InterpretResult strictBinary##name(VM *vm) {\
-                                                \
-        Value b = pop(vm);                      \
-        Value a = pop(vm);                      \
-                                                \
-        if (!(predicate)) {                     \
-                                                \
-            return INTERPRET_ERR;               \
-        }                                       \
-                                                \
-        Value result = op;                      \
-        push(vm, result);                       \
-        return INTERPRET_OK;                    \
+#define OBJ_TYPED_BINARY(expected, op) \
+    if (isObjType(a, expected) && isObjType(b, expected)) { \
+        ANY_BINARY(op) \
     }
-
-#define PRED_NUMBER(x) ((x).type == VAL_NUMBER)
-#define PRED_BOOL(x) ((x).type == VAL_BOOL)
-#define PRED_STRING(x) (isObjType(x, OBJ_STRING))
-
-#define PRED_BOTH(predicate) predicate(a) && predicate(b)
-
-STRICT_BINARY_OP(AddNumbersOrStrings,
-    PRED_BOTH(PRED_NUMBER) || PRED_BOTH(PRED_STRING),
-    (a.type == VAL_NUMBER) ? makeNumber(a.as.number + b.as.number) : concatStrings(vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj))
-
-STRICT_BINARY_OP(SubtractNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeNumber(a.as.number - b.as.number))
-
-STRICT_BINARY_OP(MultiplyNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeNumber(a.as.number * b.as.number))
-
-STRICT_BINARY_OP(DivideNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeNumber(a.as.number / b.as.number))
-
-STRICT_UNARY_OP(NegateNumber,
-    a.type == VAL_NUMBER,
-    makeNumber(-a.as.number))
-
-STRICT_UNARY_OP(NegateBoolean,
-    a.type == VAL_BOOL,
-    makeBoolean(!a.as.boolean))
-
-STRICT_BINARY_OP(LessNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeBoolean(a.as.number < b.as.number))
-
-STRICT_BINARY_OP(NLessNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeBoolean(a.as.number >= b.as.number))
-
-STRICT_BINARY_OP(GreaterNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeBoolean(a.as.number > b.as.number))
-
-STRICT_BINARY_OP(NGreaterNumbers,
-    PRED_BOTH(PRED_NUMBER),
-    makeBoolean(a.as.number <= b.as.number))
-
-STRICT_BINARY_OP(AddStrings,
-    PRED_BOTH(PRED_STRING),
-    concatStrings(vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj))
-
-BINARY_OP(EqualValues,
-    makeBoolean(valuesEqual(a, b)))
-
-BINARY_OP(NEqualValues,
-    makeBoolean(!valuesEqual(a, b)))
 
 static void printStack(VM *vm) {
 
@@ -262,42 +189,10 @@ InterpretResult run(VM *vm) {
 
             case OP_TYPE: {
 
-                Value val = pop(vm);
+                UNARY_OP
 
-                switch (val.type) {
- 
-                    case VAL_INTEGER: {
-                    
-                        push(vm, makeStringFromLiteral(vm, "integer"));
-                    
-                    } break;
-               
-                    case VAL_BOOL: {
+                    ANY_UNARY(typeString(vm, a))
                 
-                        push(vm, makeStringFromLiteral(vm, "bool"));
-                
-                    } break;
-
-                    case VAL_NUMBER: {
-                    
-                        push(vm, makeStringFromLiteral(vm, "number"));
-                    
-                    } break;
-
-                    case VAL_OBJ: {
-                    
-                        push(vm, makeStringFromLiteral(vm, "object"));
-                    
-                    } break;
-
-                    default: {
-                    
-                        printf("|| Unknown type for value!\n");
-                        return INTERPRET_ERR;
-                    
-                    } break;
-                }
-
             } break;
 
             case OP_TRUE: {
@@ -381,40 +276,17 @@ InterpretResult run(VM *vm) {
 
             } break;
                 
-            case OP_STORE_CONST: {
-
-                uint8_t type = readByte(vm);
-                Value value;
-
-                switch(type) {
-
-                    case OP_NUMBER: {
-
-                        value = readDouble(vm);
-
-                    } break;
-
-                    case OP_STRING: {
-
-                        value = readStringRaw(vm);
-
-                    } break;
-
-                    default: {
-
-                        printf("|| Invalid constant type!\n");
-                        return INTERPRET_ERR;
-
-                    } break;
-                }
-
-                int index = addConstant(vm->chunk, value);
-
-            } break;
-
             case OP_ADD: {
 
-                if (strictBinaryAddNumbersOrStrings(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeNumber(a.as.number + b.as.number))
+
+                else
+
+                    OBJ_TYPED_BINARY(OBJ_STRING, concatStrings(vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj))
+
+                else {
 
                     printf("|| Expected numbers or strings to add!\n");
                     return INTERPRET_ERR;
@@ -424,7 +296,11 @@ InterpretResult run(VM *vm) {
 
             case OP_SUBTRACT: {
 
-                if (strictBinarySubtractNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeNumber(a.as.number - b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to subtract!\n");
                     return INTERPRET_ERR;
@@ -434,7 +310,11 @@ InterpretResult run(VM *vm) {
 
             case OP_MULTIPLY: {
 
-                if (strictBinaryMultiplyNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeNumber(a.as.number * b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to multiply!\n");
                     return INTERPRET_ERR;
@@ -444,7 +324,11 @@ InterpretResult run(VM *vm) {
 
             case OP_DIVIDE: {
 
-                if (strictBinaryDivideNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeNumber(a.as.number / b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to divide!\n");
                     return INTERPRET_ERR;
@@ -454,7 +338,11 @@ InterpretResult run(VM *vm) {
 
             case OP_NEGATE: {
 
-                if (strictUnaryNegateNumber(vm) != INTERPRET_OK) {
+                UNARY_OP
+
+                    TYPED_UNARY(VAL_NUMBER, makeNumber(-a.as.number))
+
+                else {
 
                     printf("|| Expected number to negate!\n");
                     return INTERPRET_ERR;
@@ -464,19 +352,27 @@ InterpretResult run(VM *vm) {
 
             case OP_EQUAL: {
 
-                binaryEqualValues(vm);
+                BINARY_OP
+
+                    ANY_BINARY(makeBoolean(valuesEqual(a, b)))
             
             } break;
 
             case OP_NEQUAL: {
             
-                binaryNEqualValues(vm);
+                BINARY_OP
+
+                    ANY_BINARY(makeBoolean(!valuesEqual(a, b)))
             
             } break;
 
             case OP_LESS: {
             
-                if (strictBinaryLessNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number < b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
@@ -486,7 +382,11 @@ InterpretResult run(VM *vm) {
 
             case OP_NLESS: {
             
-                if (strictBinaryNLessNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number >= b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
@@ -496,7 +396,11 @@ InterpretResult run(VM *vm) {
 
             case OP_GREATER: {
             
-                if (strictBinaryGreaterNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number > b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
@@ -506,7 +410,11 @@ InterpretResult run(VM *vm) {
 
             case OP_NGREATER: {
             
-                if (strictBinaryNGreaterNumbers(vm) != INTERPRET_OK) {
+                BINARY_OP
+
+                    TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number <= b.as.number))
+
+                else {
 
                     printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
@@ -516,7 +424,11 @@ InterpretResult run(VM *vm) {
 
             case OP_NOT: {
 
-                if (strictUnaryNegateBoolean(vm) != INTERPRET_OK) {
+                UNARY_OP
+
+                    TYPED_UNARY(VAL_BOOL, makeBoolean(!a.as.boolean))
+
+                else {
 
                     printf("|| Expected boolean to negate!\n");
                     return INTERPRET_ERR;
@@ -534,7 +446,11 @@ InterpretResult run(VM *vm) {
     }
 }
 
-#undef STRICT_BINARY_OP
+#undef OBJ_TYPED_BINARY
+#undef TYPED_BINARY
+#undef ANY_BINARY
 #undef BINARY_OP
+#undef TYPED_UNARY
+#undef ANY_UNARY
 #undef UNARY_OP
 

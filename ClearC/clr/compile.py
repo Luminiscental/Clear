@@ -214,7 +214,13 @@ class Parser(Cursor):
         token = self.get_prev()
         if token.token_type != TokenType.STRING:
             emit_error(f'Expected string token! {self.current_info()}')()
-        const_index = self.constants.add(token.lexeme[1:-1])
+
+        total = [token]
+        while self.match(TokenType.STRING):
+            total.append(self.get_prev())
+
+        string = '"'.join(map(lambda t: t.lexeme[1:-1], total))
+        const_index = self.constants.add(string)
         self.program.load_constant(const_index)
 
     def consume_precedence(self, precedence):

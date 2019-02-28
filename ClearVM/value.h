@@ -3,6 +3,7 @@
 
 #include "common.h"
 
+typedef struct sVM VM;
 typedef enum eObjType ObjType;
 typedef struct sObj Obj;
 typedef struct sObjString ObjString;
@@ -36,6 +37,8 @@ Value makeInteger(int32_t integer);
 Value makeBoolean(bool boolean);
 Value makeNumber(double number);
 bool valuesEqual(Value a, Value b);
+
+Value typeString(VM *vm, Value a);
 
 typedef struct {
 
