@@ -1,0 +1,18 @@
+
+val top = "-";
+
+val top = top + top;
+val top = top + top;
+val top = top + top;
+val top = top + top;
+
+val side = "|
+";
+
+val side = side + side;
+val side = side + side;
+val side = side + side;
+val side = side + side;
+
+print "|" + top;
+print side;

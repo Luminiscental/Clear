@@ -3,7 +3,7 @@
 echo ""
 echo "-- Compiling test source --"
 
-python ClearC/clrc.py test/main.clr
+python ClearC/clrc.py test/main
 
 echo ""
 echo "-- Compiling VM --"
@@ -19,7 +19,7 @@ make
 echo ""
 echo "-- Running bytecode --"
 
-./clr ../../test/main.clr.b
+./clr ../../test/main
 
 echo ""
 echo ""

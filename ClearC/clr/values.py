@@ -2,6 +2,8 @@
 from collections import namedtuple, defaultdict
 from enum import Enum
 
+debug = False
+
 class OpCode(Enum):
 
     STORE_CONST = 0
@@ -27,6 +29,7 @@ class OpCode(Enum):
     EQUAL = 20
     NEQUAL = 21
     LOAD_GLOBAL = 22
+    PRINT_BLANK = 23
 
     def __int__(self):
         return self.value

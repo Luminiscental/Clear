@@ -311,6 +311,12 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+            case OP_PRINT_BLANK: {
+
+                printf("\n");
+
+            } break;
+
             case OP_PRINT: {
 
                 Value value = pop(vm);

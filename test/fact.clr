@@ -1,0 +1,30 @@
+
+val fac = 1;
+
+print "1! =";
+print fac;
+
+val fac = 2 * fac;
+
+print "2! =";
+print fac;
+
+val fac = 3 * fac;
+
+print "3! =";
+print fac;
+
+val fac = 4 * fac;
+
+print "4! =";
+print fac;
+
+val fac = 5 * fac;
+
+print "5! =";
+print fac;
+
+val fac = 6 * fac;
+
+print "6! =";
+print fac;

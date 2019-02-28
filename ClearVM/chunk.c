@@ -145,6 +145,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         
         } break;
 
+        case OP_PRINT_BLANK: {
+
+            return simpleInstruction("OP_PRINT_BLANK", offset);
+
+        } break;
+
         case OP_LOAD_CONST: {
         
             return constantInstruction("OP_LOAD_CONST", chunk, offset);

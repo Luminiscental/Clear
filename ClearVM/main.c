@@ -1,6 +1,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "common.h"
 #include "chunk.h"
@@ -14,9 +15,25 @@ typedef struct {
 
 } FileBuffer;
 
-FileBuffer readFile(const char *fileName) {
+FileBuffer readFile(const char *name) {
+
+    size_t nameLength = strlen(name);
+    size_t fileNameLength = nameLength + 6;
+
+    char *fileName = ALLOCATE(char, fileNameLength + 1);
+    fileName[fileNameLength] = '\0';
+    strcpy(fileName, name);
+    strcat(fileName, ".clr.b");
+
+#ifdef DEBUG_FILE
+
+    printf("File: %s\n", fileName);
+
+#endif
 
     FILE *inFile = fopen(fileName, "rb");
+
+    FREE_ARRAY(char, fileName, fileNameLength + 1);
 
     FileBuffer result = { .buffer = NULL, .length = 0 };
 
@@ -32,7 +49,12 @@ FileBuffer readFile(const char *fileName) {
     }
 
     size_t fileLength = ftell(inFile);
+
+#ifdef DEBUG_FILE
+
     printf("File has length %zu\n\n", fileLength);
+
+#endif
 
     if (fseek(inFile, 0, SEEK_SET)) {
 
@@ -85,15 +107,15 @@ int main(int argc, char **argv) {
 
 #ifdef DEBUG_DIS
 
-    printf("Disassembling:\n");
+    printf("\nDisassembling:\n```\n");
     disassembleChunk(&chunk, "main");
-    printf("\n");
+    printf("```\n");
 
 #endif
 
-    printf("Running:\n");
+    printf("\nRunning:\n```\n");
     interpret(&vm, &chunk);
-    printf("\n");
+    printf("```\n");
 
     freeVM(&vm);
     freeChunk(&chunk);

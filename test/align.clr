@@ -1,0 +1,21 @@
+
+val box = "
+|----------------------------|
+|                            |
+|  Hello World ! (In a box)  |
+|                            |
+|----------------------------|
+";
+
+val arrow = "
+        *
+       ***
+      *****
+     *******
+";
+
+print box;
+print;
+
+print arrow + arrow + arrow;
+print;

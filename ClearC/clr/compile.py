@@ -2,7 +2,7 @@
 from clr.tokens import tokenize, TokenType, token_info
 from clr.errors import emit_error
 from clr.assemble import assemble
-from clr.values import OpCode, Precedence, pratt_table
+from clr.values import OpCode, Precedence, pratt_table, debug
 
 class Constants:
 
@@ -15,10 +15,11 @@ class Constants:
         if value in self.values:
             return self.values.index(value)
         else:
-            if isinstance(value, str):
-                print(f'Adding constant {self.count}:"{value}"')
-            else:
-                print(f'Adding constant {self.count}:{value}')
+            if debug:
+                if isinstance(value, str):
+                    print(f'Adding constant {self.count}:"{value}"')
+                else:
+                    print(f'Adding constant {self.count}:{value}')
             self.values.append(value)
             self.count += 1
             return self.count - 1
@@ -49,7 +50,8 @@ class Globals:
         if name in self.indices:
             return self.indices[name]
         else:
-            print(f'Adding global {self.index}:{name}')
+            if debug:
+                print(f'Adding global {self.index}:{name}')
             self.indices[name] = self.index
             self.index += 1
             return self.index - 1
@@ -65,7 +67,11 @@ class Program:
         self.code_list.append(constant)
 
     def op_print(self):
+        # TODO: Specify end?
         self.code_list.append(OpCode.PRINT)
+
+    def op_print_blank(self):
+        self.code_list.append(OpCode.PRINT_BLANK)
 
     def op_negate(self):
         self.code_list.append(OpCode.NEGATE)
@@ -247,10 +253,13 @@ class Parser(Cursor):
         self.consume_precedence(Precedence.ASSIGNMENT)
 
     def consume_print_statement(self):
-        self.consume_expression()
-        self.consume(TokenType.SEMICOLON,
-            f'Expected semicolon after statement! {self.current_info()}')
-        self.program.op_print()
+        if self.match(TokenType.SEMICOLON): # Blank print statement
+            self.program.op_print_blank()
+        else:
+            self.consume_expression()
+            self.consume(TokenType.SEMICOLON,
+                f'Expected semicolon after statement! {self.current_info()}')
+            self.program.op_print()
 
     def consume_expression_statement(self):
         self.consume_expression()
@@ -294,7 +303,9 @@ def parse_source(source):
 
     tokens = tokenize(source)
 
-    print(' '.join(map(lambda token: token.lexeme, tokens)))
+    if debug:
+        print('Tokens:')
+        print(' '.join(map(lambda token: token.lexeme, tokens)))
 
     parser = Parser(tokens)
     while not parser.match(TokenType.EOF):

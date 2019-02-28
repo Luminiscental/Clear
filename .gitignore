@@ -213,3 +213,4 @@ dmypy.json
 .ycm_extra_conf.py
 test/main.clr.b
 tags
+*.clr.b

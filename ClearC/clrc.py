@@ -3,8 +3,7 @@ import struct
 import sys
 from clr.errors import ClrCompileError
 from clr.compile import parse_source
-
-debug = True
+from clr.values import debug
 
 def main():
 
@@ -12,24 +11,28 @@ def main():
         print('Please provide a file to compile')
         sys.exit(1)
 
-    source_file_name = sys.argv[1]
+    source_file_name = sys.argv[1] + '.clr'
     dest_file_name = source_file_name + '.b'
+
+    if debug:
+        print('src:', source_file_name)
+        print('dest:', dest_file_name)
 
     with open(source_file_name, 'r') as source_file:
         source = source_file.read()
 
     try:
-        print('Source code:')
-        print(source)
-        print()
-        print('Compiling:')
+        if debug:
+            print('Source code:')
+            print(source)
+            print()
+            print('Compiling:')
         byte_code = parse_source(source)
     except ClrCompileError as e:
         print('Could not compile:')
         print(e)
     else:
-        print()
-        print(dest_file_name)
+        print('Compiled successfully')
         with open(dest_file_name, 'wb') as dest_file:
             dest_file.write(byte_code)
 

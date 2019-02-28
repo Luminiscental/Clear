@@ -1,12 +1,22 @@
 
 // Simple test program:
 
-val x = 3.2;
-val x = x * -3.7;
+val x = 4;
+val x = x * (x - 1) * (x - 2);
 
 val y = "Hello";
 val y = y + " World!";
 
+print "x =";
 print x;
+
+print;
+
+print "y =";
 print y;
+
+print;
+
+print "y == 'Hello World!' =";
+print y == "Hello World!";
 

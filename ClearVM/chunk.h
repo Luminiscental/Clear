@@ -30,7 +30,8 @@ typedef enum {
     OP_NGREATER = 19,
     OP_EQUAL = 20,
     OP_NEQUAL = 21,
-    OP_LOAD_GLOBAL = 22
+    OP_LOAD_GLOBAL = 22,
+    OP_PRINT_BLANK = 23
 
 } OpCode;
 
