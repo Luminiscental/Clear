@@ -36,25 +36,29 @@ class Node:
         return None
 
 class Trie:
-    
+
     def __init__(self, words=[]):
-        self.pointer = None
         self.roots = []
+        self.reset()
         for word in words:
             self.add_word(word)
 
     def step(self, char):
-        if not self.pointer:
+        if self.broken:
+            return TrieResult.BREAK, None
+        elif not self.pointer:
             for root in self.roots:
                 if root.char == char:
                     self.pointer = root
                     break
             else:
+                self.broken = True
                 return TrieResult.BREAK, None
         else:
             find = self.pointer.get(char)
             if find is None:
-                return TrieResult.BREAK, None 
+                self.broken = True
+                return TrieResult.BREAK, None
             else:
                 self.pointer = find
 
@@ -64,6 +68,7 @@ class Trie:
 
     def reset(self):
         self.pointer = None
+        self.broken = False
 
     def add_word(self, word):
         if word:
