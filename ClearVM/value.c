@@ -8,6 +8,17 @@
 #include "memory.h"
 #include "obj.h"
 
+Value makeInteger(int32_t integer) {
+
+    Value result;
+    
+    result.type = VAL_INTEGER;
+    result.hash = integer;
+    result.as.integer = integer;
+
+    return result;
+}
+
 Value makeBoolean(bool boolean) {
 
     Value result;
@@ -37,14 +48,24 @@ bool valuesEqual(Value a, Value b) {
     if (a.hash != b.hash) return false;
 
     switch (a.type) {
+
+        case VAL_INTEGER: {
+
+            return a.as.integer == b.as.integer;
+
+        } break;
     
-        case VAL_BOOL:
+        case VAL_BOOL: {
 
             return a.as.boolean == b.as.boolean;
 
-        case VAL_NUMBER:
+        } break;
+
+        case VAL_NUMBER: {
 
             return a.as.number == b.as.number;
+
+        } break;
 
         case VAL_OBJ: {
 
@@ -93,15 +114,21 @@ void printValue(Value value, bool endLine) {
 
     switch (value.type) {
 
+        case VAL_INTEGER: {
+
+            printf("%d", value.as.integer);
+
+        } break;
+
         case VAL_NUMBER: {
 
-            printf("<num %g>", value.as.number);
+            printf("%g", value.as.number);
 
         } break;
 
         case VAL_BOOL: {
 
-            printf("<bool %s>", value.as.boolean ? "true" : "false");
+            printf("%s", value.as.boolean ? "true" : "false");
 
         } break;
 
@@ -112,7 +139,7 @@ void printValue(Value value, bool endLine) {
                 case OBJ_STRING: {
             
                     ObjString *strObj = (ObjString*) value.as.obj;
-                    printf("<str \"%s\">", strObj->chars);
+                    printf("%s", strObj->chars);
             
                 } break;
             }

@@ -10,6 +10,7 @@ typedef struct sObjString ObjString;
 typedef enum {
 
     VAL_NUMBER,
+    VAL_INTEGER,
     VAL_BOOL,
     VAL_OBJ
 
@@ -23,6 +24,7 @@ typedef struct {
     union {
 
         bool boolean;
+        int32_t integer;
         double number;
         Obj *obj;
 
@@ -30,6 +32,7 @@ typedef struct {
 
 } Value;
 
+Value makeInteger(int32_t integer);
 Value makeBoolean(bool boolean);
 Value makeNumber(double number);
 bool valuesEqual(Value a, Value b);

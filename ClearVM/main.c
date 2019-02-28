@@ -81,6 +81,8 @@ int main(int argc, char **argv) {
 
     FREE_ARRAY(char, byteCode.buffer, byteCode.length);
 
+    loadConstants(&vm, &chunk);
+
 #ifdef DEBUG_DIS
 
     printf("Disassembling:\n");

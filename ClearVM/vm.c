@@ -280,21 +280,7 @@ InterpretResult run(VM *vm) {
 
                 uint8_t index = readByte(vm);
 
-                if (index >= vm->chunk->constants.count) {
-
-                    printf("|| Constant out of index!\n");
-                    return INTERPRET_ERR;
-                }
-
-                Value name = vm->chunk->constants.values[index];
-
-                if (!isObjType(name, OBJ_STRING)) {
-
-                    printf("|| Expected string to define variable!\n");
-                    return INTERPRET_ERR;
-                }
-
-                tableSet(&vm->globals, name, pop(vm));
+                tableSet(&vm->globals, makeInteger(index), pop(vm));
 
             } break;
 
@@ -302,22 +288,8 @@ InterpretResult run(VM *vm) {
             
                 uint8_t index = readByte(vm);
 
-                if (index >= vm->chunk->constants.count) {
-
-                    printf("|| Constant out of index!\n");
-                    return INTERPRET_ERR;
-                }
-
-                Value name = vm->chunk->constants.values[index];
-
-                if (!isObjType(name, OBJ_STRING)) {
-
-                    printf("|| Expected string to reference variable!\n");
-                    return INTERPRET_ERR;
-                }
-
                 Value value;
-                if (!tableGet(&vm->globals, name, &value)) {
+                if (!tableGet(&vm->globals, makeInteger(index), &value)) {
 
                     printf("|| Undefined identifier!\n");
                     return INTERPRET_ERR;
@@ -343,7 +315,6 @@ InterpretResult run(VM *vm) {
 
                 Value value = pop(vm);
 
-                printf("|| print ");
                 printValue(value, true);
 
             } break;
@@ -359,14 +330,6 @@ InterpretResult run(VM *vm) {
                 }
 
                 Value constant = vm->chunk->constants.values[index];
-
-#ifdef DEBUG
-
-                printf("%-16s %4d '", "OP_LOAD_CONST", index);
-                printValue(constant, false);
-                printf("'\n");
-
-#endif
 
                 push(vm, constant);
 
@@ -417,7 +380,7 @@ InterpretResult run(VM *vm) {
 
                 if (strictBinarySubtractNumbers(vm) != INTERPRET_OK) {
 
-                    printf("Expected numbers to subtract!\n");
+                    printf("|| Expected numbers to subtract!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -427,7 +390,7 @@ InterpretResult run(VM *vm) {
 
                 if (strictBinaryMultiplyNumbers(vm) != INTERPRET_OK) {
 
-                    printf("Expected numbers to multiply!\n");
+                    printf("|| Expected numbers to multiply!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -469,7 +432,7 @@ InterpretResult run(VM *vm) {
             
                 if (strictBinaryLessNumbers(vm) != INTERPRET_OK) {
 
-                    printf("Expected numbers to compare!\n");
+                    printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
                 }
             
@@ -479,7 +442,7 @@ InterpretResult run(VM *vm) {
             
                 if (strictBinaryNLessNumbers(vm) != INTERPRET_OK) {
 
-                    printf("Expected numbers to compare!\n");
+                    printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -489,7 +452,7 @@ InterpretResult run(VM *vm) {
             
                 if (strictBinaryGreaterNumbers(vm) != INTERPRET_OK) {
 
-                    printf("Expected numbers to compare!\n");
+                    printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
                 }
             
@@ -499,7 +462,7 @@ InterpretResult run(VM *vm) {
             
                 if (strictBinaryNGreaterNumbers(vm) != INTERPRET_OK) {
 
-                    printf("Expected numbers to compare!\n");
+                    printf("|| Expected numbers to compare!\n");
                     return INTERPRET_ERR;
                 }
             
@@ -509,7 +472,7 @@ InterpretResult run(VM *vm) {
 
                 if (strictUnaryNegateBoolean(vm) != INTERPRET_OK) {
 
-                    printf("Expected boolean to negate!\n");
+                    printf("|| Expected boolean to negate!\n");
                     return INTERPRET_ERR;
                 }
 

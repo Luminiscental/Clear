@@ -35,6 +35,61 @@ int addConstant(Chunk *chunk, Value value) {
     return chunk->constants.count - 1;
 }
 
+static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
+
+    uint8_t type = chunk->code[offset + 1];
+
+    uint32_t result = offset + 2;
+
+    switch (type) {
+    
+        case OP_NUMBER: {
+    
+            double *value = (double*)(chunk->code + offset + 2);
+            addConstant(chunk, makeNumber(*value));
+            return result + 8;
+    
+        } break;
+
+        case OP_STRING: {
+        
+            uint8_t size = chunk->code[offset + 2];
+
+            char *string = ALLOCATE(char, size + 1);
+            string[size] = '\0';
+            memcpy(string, chunk->code + offset + 3, size);
+
+            addConstant(chunk, makeString(vm, size, string));
+
+            return result + 1 + size;
+        
+        } break;
+
+        default: {
+
+            printf("Unrecognized constant type %d\n", type);
+            return result;
+
+        } break;
+    }
+}
+
+void loadConstants(VM *vm, Chunk *chunk) {
+
+    for (uint32_t offset = 0; offset < chunk->count;) {
+
+        uint8_t instruction = chunk->code[offset];
+
+        if (instruction != OP_STORE_CONST) {
+
+            chunk->start = offset;
+            return;
+        }
+
+        offset = storeConstant(vm, chunk, offset);
+    }
+}
+
 void freeChunk(Chunk *chunk) {
 
     freeValueArray(&chunk->constants);
@@ -46,7 +101,7 @@ void disassembleChunk(Chunk *chunk, const char *name) {
 
     printf("== %s ==\n", name);
 
-    for (uint32_t offset = 0; offset < chunk->count;) {
+    for (uint32_t offset = chunk->start; offset < chunk->count;) {
 
         offset = disassembleInstruction(chunk, offset);
     }
@@ -62,51 +117,18 @@ static uint32_t constantInstruction(const char *name, Chunk *chunk, uint32_t off
 
     uint8_t constant = chunk->code[offset + 1];
 
-    // TODO: Load constants for chunk before runtime
-    printf("%-16s %4d\n", name, constant);
+    printf("%-16s %4d '", name, constant);
+    printValue(chunk->constants.values[constant], false);
+    printf("'\n");
     return offset + 2;
 }
 
-static uint32_t storeInstruction(const char *name, Chunk *chunk, uint32_t offset) {
+static uint32_t indexInstruction(const char *name, Chunk *chunk, uint32_t offset) {
 
-    printf("%-19s ", name);
-    uint8_t type = chunk->code[offset + 1];
+    uint8_t index = chunk->code[offset + 1];
 
-    uint32_t result = offset + 2;
-
-    switch (type) {
-    
-        case OP_NUMBER: {
-    
-            double *value = (double*)(chunk->code + offset + 2);
-            printf("<num %g>\n", *value);
-            return result + 8;
-    
-        } break;
-
-        case OP_STRING: {
-        
-            uint8_t size = chunk->code[offset + 2];
-
-            char *string = ALLOCATE(char, size + 1);
-            string[size] = '\0';
-            memcpy(string, chunk->code + offset + 3, size);
-
-            printf("<str \"%s\">\n", string);
-
-            FREE_ARRAY(char, string, size + 1);
-
-            return result + 1 + size;
-        
-        } break;
-
-        default: {
-
-            printf("\nUnrecognized constant type %d\n", type);
-            return result;
-
-        } break;
-    }
+    printf("%-16s %4d\n", name, index);
+    return offset + 2;
 }
 
 uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
@@ -116,12 +138,6 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
     uint8_t instruction = *(chunk->code + offset);
 
     switch (instruction) {
-
-        case OP_STORE_CONST: {
-
-            return storeInstruction("OP_STORE_CONST", chunk, offset);
-
-        } break;
 
         case OP_PRINT: {
         
@@ -179,7 +195,7 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         case OP_DEFINE_GLOBAL: {
         
-            return constantInstruction("OP_DEFINE_GLOBAL", chunk, offset);
+            return indexInstruction("OP_DEFINE_GLOBAL", chunk, offset);
         
         } break;
 
@@ -239,7 +255,7 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         case OP_LOAD_GLOBAL: {
         
-            return constantInstruction("OP_EQUAL", chunk, offset);
+            return indexInstruction("OP_LOAD_GLOBAL", chunk, offset);
         
         } break;
 

@@ -4,6 +4,8 @@
 #include "common.h"
 #include "value.h"
 
+typedef struct sVM VM;
+
 typedef enum {
 
     OP_STORE_CONST = 0,
@@ -34,8 +36,9 @@ typedef enum {
 
 typedef struct {
 
-    int count;
-    int capacity;
+    uint32_t count;
+    uint32_t capacity;
+    uint32_t start;
     uint8_t *code;
     ValueArray constants;
 
@@ -46,6 +49,7 @@ void writeChunk(Chunk *chunk, uint8_t byte);
 int addConstant(Chunk *chunk, Value value);
 void freeChunk(Chunk *chunk);
 
+void loadConstants(VM *vm, Chunk *chunk);
 void disassembleChunk(Chunk *chunk, const char *name);
 uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset);
 

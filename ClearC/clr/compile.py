@@ -15,6 +15,10 @@ class Constants:
         if value in self.values:
             return self.values.index(value)
         else:
+            if isinstance(value, str):
+                print(f'Adding constant {self.count}:"{value}"')
+            else:
+                print(f'Adding constant {self.count}:{value}')
             self.values.append(value)
             self.count += 1
             return self.count - 1
@@ -35,10 +39,26 @@ class Constants:
             self.store(value)
         return self.code_list
 
+class Globals:
+
+    def __init__(self):
+        self.indices = {}
+        self.index = 0
+
+    def add_name(self, name):
+        if name in self.indices:
+            return self.indices[name]
+        else:
+            print(f'Adding global {self.index}:{name}')
+            self.indices[name] = self.index
+            self.index += 1
+            return self.index - 1
+
 class Program:
 
     def __init__(self):
         self.code_list = []
+        self.globals = Globals()
 
     def load_constant(self, constant):
         self.code_list.append(OpCode.LOAD_CONST)
@@ -70,11 +90,13 @@ class Program:
 
     def define_name(self, name):
         self.code_list.append(OpCode.DEFINE_GLOBAL)
-        self.code_list.append(name)
+        index = self.globals.add_name(name)
+        self.code_list.append(index)
 
     def load_name(self, name):
         self.code_list.append(OpCode.LOAD_GLOBAL)
-        self.code_list.append(name)
+        index = self.globals.add_name(name)
+        self.code_list.append(index)
 
     def op_true(self):
         self.code_list.append(OpCode.TRUE)
@@ -108,11 +130,11 @@ class Program:
 
 class Cursor:
 
-    def __init__(self, tokens, constants, program):
+    def __init__(self, tokens):
         self.index = 0
         self.tokens = tokens
-        self.constants = constants
-        self.program = program
+        self.constants = Constants()
+        self.program = Program()
 
     def get_current(self):
         return self.tokens[self.index]
@@ -147,7 +169,7 @@ class Cursor:
 class Parser(Cursor):
 
     def __init__(self, tokens):
-        super().__init__(tokens, Constants(), Program())
+        super().__init__(tokens)
 
     def get_rule(self, token):
         err = emit_error(f'Expected expression! {token_info(token)}')
@@ -254,18 +276,16 @@ class Parser(Cursor):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
             f'Expected semicolon after statement! {self.current_info()}')
-        name_index = self.constants.add(name)
-        self.program.define_name(name_index)
+        self.program.define_name(name)
 
     def consume_variable_reference(self):
         token = self.get_prev()
         if token.token_type != TokenType.IDENTIFIER:
             emit_error(f'Expected variable! {self.current_info()}')()
-        name_id = self.constants.add(token.lexeme)
-        self.program.load_name(name_id)
+        self.program.load_name(token.lexeme)
 
     def consume_declaration(self):
-        if self.match(TokenType.VAR) or self.match(TokenType.VAL):
+        if self.match(TokenType.VAL):
             self.consume_variable_declaration()
         else:
             self.consume_statement()

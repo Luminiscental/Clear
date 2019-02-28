@@ -111,7 +111,6 @@ class TokenType(Enum):
     SUPER = 32,
     THIS = 33,
     TRUE = 34,
-    VAR = 35,
     VAL = 36,
     WHILE = 38,
     # special
@@ -133,7 +132,6 @@ keyword_types = {
     'super' : TokenType.SUPER,
     'this' : TokenType.THIS,
     'true' : TokenType.TRUE,
-    'var' : TokenType.VAR,
     'val' : TokenType.VAL,
     'while' : TokenType.WHILE
 }

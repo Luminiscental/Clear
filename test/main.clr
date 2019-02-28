@@ -2,6 +2,11 @@
 // Simple test program:
 
 val x = 3.2;
-var x = x + 2;
+val x = x * -3.7;
+
+val y = "Hello";
+val y = y + " World!";
+
 print x;
+print y;
 

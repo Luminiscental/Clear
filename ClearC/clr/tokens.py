@@ -96,6 +96,7 @@ def scan_any(char, acc, line, keyword_trie, tokens):
         tokens.append(Token(suffix_type.nonpresent, char, line))
         return None
     elif char.isdigit():
+        # TODO: Negative number literals
         acc.append(char)
         return ScanState.NUMBER
     elif char == '"':
