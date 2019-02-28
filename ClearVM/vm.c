@@ -14,6 +14,7 @@ void initVM(VM *vm) {
     resetStack(vm);
     vm->objects = NULL;
     initTable(&vm->strings);
+    initTable(&vm->globals);
 }
 
 void resetStack(VM *vm) {
@@ -52,8 +53,9 @@ Value pop(VM *vm) {
 
 void freeVM(VM *vm) {
 
-    freeObjects(vm);
     freeTable(&vm->strings);
+    freeTable(&vm->globals);
+    freeObjects(vm);
 }
 
 InterpretResult interpret(VM *vm, Chunk *chunk) {
@@ -101,7 +103,7 @@ Value readDouble(VM *vm) {
     }
 }
 
-Value readString(VM *vm) {
+Value readStringRaw(VM *vm) {
 
     uint8_t size = readByte(vm);
 
@@ -277,18 +279,53 @@ InterpretResult run(VM *vm) {
 
                 DEBUG_OP(OP_DEFINE);
 
-                Value name = readString(vm);
-                ObjString *nameStr = (ObjString*) name.as.obj;
+                uint8_t index = readByte(vm);
 
-                pop(vm);
-                printf("|| Defined \"");
-                printValue(name, false);
-                printf("\n");
+                if (index >= vm->chunk->constants.count) {
 
-                // TODO: Add to table
-                FREE_ARRAY(char, nameStr->chars, nameStr->length + 1);
-                FREE(ObjString, nameStr);
+                    printf("|| Constant out of index!\n");
+                    return INTERPRET_ERR;
+                }
 
+                Value name = vm->chunk->constants.values[index];
+
+                if (!isObjType(name, OBJ_STRING)) {
+
+                    printf("|| Expected string to define variable!\n");
+                    return INTERPRET_ERR;
+                }
+
+                tableSet(&vm->globals, name, pop(vm));
+
+            } break;
+
+            case OP_LOAD: {
+            
+                uint8_t index = readByte(vm);
+
+                if (index >= vm->chunk->constants.count) {
+
+                    printf("|| Constant out of index!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value name = vm->chunk->constants.values[index];
+
+                if (!isObjType(name, OBJ_STRING)) {
+
+                    printf("|| Expected string to reference variable!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value value;
+                if (!tableGet(&vm->globals, name, &value)) {
+
+                    printf("|| Undefined identifier!\n");
+                    return INTERPRET_ERR;
+                }
+
+                push(vm, value);
+            
             } break;
 
             case OP_POP: {
@@ -357,7 +394,7 @@ InterpretResult run(VM *vm) {
 
                     case OP_STRING: {
 
-                        value = readString(vm);
+                        value = readStringRaw(vm);
 
                     } break;
 

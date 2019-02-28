@@ -72,6 +72,10 @@ class Program:
         self.code_list.append(OpCode.DEFINE)
         self.code_list.append(name)
 
+    def load_name(self, name):
+        self.code_list.append(OpCode.LOAD)
+        self.code_list.append(name)
+
     def op_true(self):
         self.code_list.append(OpCode.TRUE)
 
@@ -250,7 +254,15 @@ class Parser(Cursor):
         self.consume_expression()
         self.consume(TokenType.SEMICOLON,
             f'Expected semicolon after statement! {self.current_info()}')
-        self.program.define_name(name)
+        name_index = self.constants.add(name)
+        self.program.define_name(name_index)
+
+    def consume_variable_reference(self):
+        token = self.get_prev()
+        if token.token_type != TokenType.IDENTIFIER:
+            emit_error(f'Expected variable! {self.current_info()}')()
+        name_id = self.constants.add(token.lexeme)
+        self.program.load_name(name_id)
 
     def consume_declaration(self):
         if self.match(TokenType.VAR) or self.match(TokenType.VAL):

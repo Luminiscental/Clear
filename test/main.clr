@@ -1,11 +1,7 @@
 
 // Simple test program:
 
-print "Hello" + " " + "World!";
-print "a" + "b" == "ab";
-print "something" == "something" + "";
-
-print (2 + 3) * 4;
-print 25 / 7;
-print (2 + 3) * 4 <= 25 / 7;
+val x = 3.2;
+var x = x + 2;
+print x;
 

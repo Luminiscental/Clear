@@ -43,12 +43,6 @@ def disassemble_constant(byte, remaining):
     print(f'{value_index}')
     return 2
 
-def disassemble_define(byte, remaining):
-
-    code = OpCode(byte)
-    print(f'{str(code):16}', end='')
-    return 1 + disassemble_string(remaining)
-
 def disassemble_byte(byte, offset, remaining):
 
     print(f'{offset:04} ', end='')
@@ -63,7 +57,7 @@ def disassemble_byte(byte, offset, remaining):
         OpCode.DIVIDE.value: disassemble_simple,
         OpCode.RETURN.value: disassemble_simple,
         OpCode.POP.value: disassemble_simple,
-        OpCode.DEFINE.value: disassemble_define,
+        OpCode.DEFINE.value: disassemble_constant,
         OpCode.TRUE.value: disassemble_simple,
         OpCode.FALSE.value: disassemble_simple,
         OpCode.NOT.value: disassemble_simple,
@@ -72,7 +66,8 @@ def disassemble_byte(byte, offset, remaining):
         OpCode.LESS.value: disassemble_simple,
         OpCode.NLESS.value: disassemble_simple,
         OpCode.GREATER.value: disassemble_simple,
-        OpCode.NGREATER.value: disassemble_simple
+        OpCode.NGREATER.value: disassemble_simple,
+        OpCode.LOAD.value: disassemble_constant
     }.get(byte, emit_error(
         f'Unrecognized op code {byte}!', dis=True
     ))(byte, remaining)

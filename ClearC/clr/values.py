@@ -26,6 +26,7 @@ class OpCode(Enum):
     NGREATER = 19
     EQUAL = 20
     NEQUAL = 21
+    LOAD = 22
 
     def __int__(self):
         return self.value
@@ -244,5 +245,8 @@ def pratt_table(parser):
             infix=parser.finish_binary,
             precedence=Precedence.COMPARISON
         ),
+        TokenType.IDENTIFIER: ParseRule(
+            prefix=parser.consume_variable_reference
+        )
     })
 
