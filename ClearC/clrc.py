@@ -1,8 +1,7 @@
 
 import struct
 import sys
-from clr.errors import ClrDisassembleError, ClrCompileError
-from clr.dis import disassemble
+from clr.errors import ClrCompileError
 from clr.compile import parse_source
 
 debug = True
@@ -25,12 +24,6 @@ def main():
         print()
         print('Compiling:')
         byte_code = parse_source(source)
-        if debug:
-            try:
-                disassemble(byte_code)
-            except ClrDisassembleError as e:
-                print('Could not disassemble:')
-                print(e)
     except ClrCompileError as e:
         print('Could not compile:')
         print(e)

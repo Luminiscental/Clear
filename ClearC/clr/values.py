@@ -16,7 +16,7 @@ class OpCode(Enum):
     DIVIDE = 9
     RETURN = 10
     POP = 11
-    DEFINE = 12
+    DEFINE_GLOBAL = 12
     TRUE = 13
     FALSE = 14
     NOT = 15
@@ -26,7 +26,7 @@ class OpCode(Enum):
     NGREATER = 19
     EQUAL = 20
     NEQUAL = 21
-    LOAD = 22
+    LOAD_GLOBAL = 22
 
     def __int__(self):
         return self.value

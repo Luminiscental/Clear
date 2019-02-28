@@ -125,12 +125,6 @@ Value readStringRaw(VM *vm) {
     return makeString(vm, size, buffer);
 }
 
-#ifdef DEBUG
-#define DEBUG_OP(op) printf(#op "\n")
-#else
-#define DEBUG_OP(op)
-#endif
-
 #define STRICT_UNARY_OP(name, predicate, op)   \
                                                \
     InterpretResult strictUnary##name(VM *vm) {\
@@ -232,32 +226,41 @@ BINARY_OP(EqualValues,
 BINARY_OP(NEqualValues,
     makeBoolean(!valuesEqual(a, b)))
 
+static void printStack(VM *vm) {
+
+    printf("          ");
+
+    for (Value *slot = vm->stack; slot < vm->stackTop; slot++) {
+
+        printf("[ ");
+        printValue(*slot, false);
+        printf(" ]");
+    }
+
+    printf("\n");
+}
+
 InterpretResult run(VM *vm) {
 
     while (true) {
 
-        uint8_t instruction = readByte(vm);
+#ifdef DEBUG_STACK
 
-#ifdef DEBUG
-
-        printf("          ");
-
-        for (Value *slot = vm->stack; slot < vm->stackTop; slot++) {
-
-            printf("[ ");
-            printValue(*slot, false);
-            printf(" ]");
-        }
-
-        printf("\n");
+        printStack(vm);
 
 #endif
+
+#ifdef DEBUG_DIS
+
+        disassembleInstruction(vm->chunk, vm->ip - vm->chunk->code);
+
+#endif
+
+        uint8_t instruction = readByte(vm);
 
         switch (instruction) {
 
             case OP_TRUE: {
-
-                DEBUG_OP(OP_TRUE);
 
                 Value val = makeBoolean(true);
 
@@ -267,17 +270,13 @@ InterpretResult run(VM *vm) {
 
             case OP_FALSE: {
 
-                DEBUG_OP(OP_FALSE);
-
                 Value val = makeBoolean(false);
 
                 push(vm, val);
 
             } break;
 
-            case OP_DEFINE: {
-
-                DEBUG_OP(OP_DEFINE);
+            case OP_DEFINE_GLOBAL: {
 
                 uint8_t index = readByte(vm);
 
@@ -299,7 +298,7 @@ InterpretResult run(VM *vm) {
 
             } break;
 
-            case OP_LOAD: {
+            case OP_LOAD_GLOBAL: {
             
                 uint8_t index = readByte(vm);
 
@@ -330,23 +329,17 @@ InterpretResult run(VM *vm) {
 
             case OP_POP: {
 
-                DEBUG_OP(OP_POP);
-
                 pop(vm);
 
             } break;
 
             case OP_RETURN: {
 
-                DEBUG_OP(OP_RETURN);
-
                 return INTERPRET_OK;
 
             } break;
 
             case OP_PRINT: {
-
-                DEBUG_OP(OP_PRINT);
 
                 Value value = pop(vm);
 
@@ -406,20 +399,11 @@ InterpretResult run(VM *vm) {
                     } break;
                 }
 
-#ifdef DEBUG
-
-                printf("%-19s ", "OP_STORE_CONST");
-                printValue(value, true);
-
-#endif
-
                 int index = addConstant(vm->chunk, value);
 
             } break;
 
             case OP_ADD: {
-
-                DEBUG_OP(OP_ADD);
 
                 if (strictBinaryAddNumbersOrStrings(vm) != INTERPRET_OK) {
 
@@ -431,8 +415,6 @@ InterpretResult run(VM *vm) {
 
             case OP_SUBTRACT: {
 
-                DEBUG_OP(OP_SUBTRACT);
-
                 if (strictBinarySubtractNumbers(vm) != INTERPRET_OK) {
 
                     printf("Expected numbers to subtract!\n");
@@ -442,8 +424,6 @@ InterpretResult run(VM *vm) {
             } break;
 
             case OP_MULTIPLY: {
-
-                DEBUG_OP(OP_MULTIPLY);
 
                 if (strictBinaryMultiplyNumbers(vm) != INTERPRET_OK) {
 
@@ -455,8 +435,6 @@ InterpretResult run(VM *vm) {
 
             case OP_DIVIDE: {
 
-                DEBUG_OP(OP_DIVIDE);
-
                 if (strictBinaryDivideNumbers(vm) != INTERPRET_OK) {
 
                     printf("|| Expected numbers to divide!\n");
@@ -466,8 +444,6 @@ InterpretResult run(VM *vm) {
             } break;
 
             case OP_NEGATE: {
-
-                DEBUG_OP(OP_NEGATE);
 
                 if (strictUnaryNegateNumber(vm) != INTERPRET_OK) {
 
@@ -479,24 +455,18 @@ InterpretResult run(VM *vm) {
 
             case OP_EQUAL: {
 
-                DEBUG_OP(OP_EQUAL);
-
                 binaryEqualValues(vm);
             
             } break;
 
             case OP_NEQUAL: {
             
-                DEBUG_OP(OP_NEQUAL);
-
                 binaryNEqualValues(vm);
             
             } break;
 
             case OP_LESS: {
             
-                DEBUG_OP(OP_LESS);
-
                 if (strictBinaryLessNumbers(vm) != INTERPRET_OK) {
 
                     printf("Expected numbers to compare!\n");
@@ -507,8 +477,6 @@ InterpretResult run(VM *vm) {
 
             case OP_NLESS: {
             
-                DEBUG_OP(OP_NLESS);
-
                 if (strictBinaryNLessNumbers(vm) != INTERPRET_OK) {
 
                     printf("Expected numbers to compare!\n");
@@ -519,8 +487,6 @@ InterpretResult run(VM *vm) {
 
             case OP_GREATER: {
             
-                DEBUG_OP(OP_GREATER);
-
                 if (strictBinaryGreaterNumbers(vm) != INTERPRET_OK) {
 
                     printf("Expected numbers to compare!\n");
@@ -531,8 +497,6 @@ InterpretResult run(VM *vm) {
 
             case OP_NGREATER: {
             
-                DEBUG_OP(OP_NGREATER);
-
                 if (strictBinaryNGreaterNumbers(vm) != INTERPRET_OK) {
 
                     printf("Expected numbers to compare!\n");
@@ -542,8 +506,6 @@ InterpretResult run(VM *vm) {
             } break;
 
             case OP_NOT: {
-
-                DEBUG_OP(OP_NOT);
 
                 if (strictUnaryNegateBoolean(vm) != INTERPRET_OK) {
 
@@ -566,5 +528,4 @@ InterpretResult run(VM *vm) {
 #undef STRICT_BINARY_OP
 #undef BINARY_OP
 #undef UNARY_OP
-#undef DEBUG_OP
 

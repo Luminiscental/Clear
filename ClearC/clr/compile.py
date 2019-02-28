@@ -69,11 +69,11 @@ class Program:
         self.code_list.append(OpCode.POP)
 
     def define_name(self, name):
-        self.code_list.append(OpCode.DEFINE)
+        self.code_list.append(OpCode.DEFINE_GLOBAL)
         self.code_list.append(name)
 
     def load_name(self, name):
-        self.code_list.append(OpCode.LOAD)
+        self.code_list.append(OpCode.LOAD_GLOBAL)
         self.code_list.append(name)
 
     def op_true(self):

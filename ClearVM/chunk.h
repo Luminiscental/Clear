@@ -18,7 +18,7 @@ typedef enum {
     OP_DIVIDE = 9,
     OP_RETURN = 10,
     OP_POP = 11,
-    OP_DEFINE = 12,
+    OP_DEFINE_GLOBAL = 12,
     OP_TRUE = 13,
     OP_FALSE = 14,
     OP_NOT = 15,
@@ -28,7 +28,7 @@ typedef enum {
     OP_NGREATER = 19,
     OP_EQUAL = 20,
     OP_NEQUAL = 21,
-    OP_LOAD = 22
+    OP_LOAD_GLOBAL = 22
 
 } OpCode;
 
@@ -45,5 +45,8 @@ void initChunk(Chunk *chunk);
 void writeChunk(Chunk *chunk, uint8_t byte);
 int addConstant(Chunk *chunk, Value value);
 void freeChunk(Chunk *chunk);
+
+void disassembleChunk(Chunk *chunk, const char *name);
+uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset);
 
 #endif
