@@ -81,7 +81,17 @@ int main(int argc, char **argv) {
 
     FREE_ARRAY(char, byteCode.buffer, byteCode.length);
 
+#ifdef DEBUG_DIS
+
+    printf("Disassembling:\n");
+    disassembleChunk(&chunk, "main");
+    printf("\n");
+
+#endif
+
+    printf("Running:\n");
     interpret(&vm, &chunk);
+    printf("\n");
 
     freeVM(&vm);
     freeChunk(&chunk);

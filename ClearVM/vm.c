@@ -250,7 +250,7 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-#ifdef DEBUG_DIS
+#ifdef DEBUG_TRACE
 
         disassembleInstruction(vm->chunk, vm->ip - vm->chunk->code);
 
