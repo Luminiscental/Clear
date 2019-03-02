@@ -66,7 +66,14 @@ Value typeString(VM *vm, Value a) {
 
         case VAL_OBJ: {
         
-            return makeStringFromLiteral(vm, "object");
+            switch (a.as.obj->type) {
+            
+                case OBJ_STRING: {
+            
+                    return makeStringFromLiteral(vm, "string (obj)");
+            
+                } break;
+            }
         
         } break;
     }
