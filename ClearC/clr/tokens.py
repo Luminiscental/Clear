@@ -44,6 +44,8 @@ def scan_number(char, acc, line, keyword_trie, tokens):
     elif char == 'i':
         store_acc(TokenType.NUMBER, acc, line, tokens)
         tokens.append(Token(TokenType.INTEGER_SUFFIX, 'i', line))
+        num_token = tokens[-2]
+        suff_token = tokens[-1]
         return True, ScanState.ANY, line
     else:
         store_acc(TokenType.NUMBER, acc, line, tokens)

@@ -38,6 +38,7 @@ Value makeBoolean(bool boolean);
 Value makeNumber(double number);
 bool valuesEqual(Value a, Value b);
 
+const char *typeStringLiteral(Value a);
 Value typeString(VM *vm, Value a);
 
 typedef struct {

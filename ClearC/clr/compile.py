@@ -1,45 +1,9 @@
 
 from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import emit_error
-from clr.assemble import Index, assemble
+from clr.assemble import assemble
+from clr.constants import Constants, ClrNum, ClrInt, ClrStr, Index
 from clr.values import OpCode, Precedence, pratt_table, debug
-
-class Constants:
-
-    def __init__(self):
-        self.values = []
-        self.count = 0
-        self.code_list = []
-
-    def add(self, value):
-        if value in self.values:
-            return self.values.index(value)
-        else:
-            if debug:
-                if isinstance(value, str):
-                    print(f'Adding constant {self.count}:"{value}"')
-                else:
-                    print(f'Adding constant {self.count}:{value}')
-            self.values.append(value)
-            self.count += 1
-            return self.count - 1
-
-    def store(self, value):
-        self.code_list.append(OpCode.STORE_CONST)
-        op_type = {
-            float: lambda: OpCode.NUMBER,
-            str: lambda: OpCode.STRING,
-            int: lambda: OpCode.INTEGER
-        }.get(type(value), emit_error(
-            f'Unknown constant value type: {type(value)}'
-        ))()
-        self.code_list.append(op_type)
-        self.code_list.append(value)
-
-    def flush(self):
-        for value in self.values:
-            self.store(value)
-        return self.code_list
 
 class Globals:
 
@@ -65,7 +29,7 @@ class Program:
 
     def load_constant(self, constant):
         self.code_list.append(OpCode.LOAD_CONST)
-        self.code_list.append(Index(constant))
+        self.code_list.append(constant)
 
     def op_print(self):
         # TODO: Specify end?
@@ -210,14 +174,14 @@ class Parser(Cursor):
             emit_error(f'Expected number token! {self.current_info()}')()
         if self.match(TokenType.INTEGER_SUFFIX):
             try:
-                value = int(token.lexeme)
+                value = ClrInt(token.lexeme)
             except ValueError:
                 emit_error(
                     f'Int literal must be an integer! {self.current_info()}'
                 )()
         else:
             try:
-                value = float(token.lexeme)
+                value = ClrNum(token.lexeme)
             except ValueError:
                 emit_error(
                     f'Number literal must be a number! {self.current_info()}'
@@ -234,7 +198,7 @@ class Parser(Cursor):
         while self.match(TokenType.STRING):
             total.append(self.get_prev())
 
-        string = '"'.join(map(lambda t: t.lexeme[1:-1], total))
+        string = ClrStr('"'.join(map(lambda t: t.lexeme[1:-1], total)))
         const_index = self.constants.add(string)
         self.program.load_constant(const_index)
 

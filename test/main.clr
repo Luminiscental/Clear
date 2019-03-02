@@ -7,7 +7,7 @@ val x = x * (x - 1) * (x - 2);
 val y = "Hello";
 val y = y + " World!";
 
-val z = 12i;
+val z = 2i;
 
 print "x =";
 print x;

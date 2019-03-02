@@ -35,32 +35,31 @@ Value makeNumber(double number) {
     Value result;
 
     result.type = VAL_NUMBER;
-    // TODO: Split into int / float so stuff like 1 + 1 == 2 isn't unreliable
     result.hash = *((uint32_t*) &number);
     result.as.number = number;
 
     return result;
 }
 
-Value typeString(VM *vm, Value a) {
+const char *typeStringLiteral(Value a) {
 
     switch (a.type) {
 
         case VAL_INTEGER: {
         
-            return makeStringFromLiteral(vm, "integer");
+            return "integer";
         
         } break;
    
         case VAL_BOOL: {
     
-            return makeStringFromLiteral(vm, "bool");
+            return "bool";
     
         } break;
 
         case VAL_NUMBER: {
         
-            return makeStringFromLiteral(vm, "number");
+            return "number";
         
         } break;
 
@@ -70,13 +69,19 @@ Value typeString(VM *vm, Value a) {
             
                 case OBJ_STRING: {
             
-                    return makeStringFromLiteral(vm, "string (obj)");
+                    return "string (obj)";
             
                 } break;
             }
         
         } break;
     }
+
+}
+
+Value typeString(VM *vm, Value a) {
+
+    return makeStringFromLiteral(vm, typeStringLiteral(a));
 }
 
 bool valuesEqual(Value a, Value b) {

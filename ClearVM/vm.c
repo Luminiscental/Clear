@@ -8,6 +8,7 @@
 #include "common.h"
 #include "obj.h"
 #include "memory.h"
+#include "value.h"
 
 void initVM(VM *vm) {
 
@@ -363,7 +364,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers or strings to add!\n");
+                    printf("|| Cannot add values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or strings)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -377,7 +379,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to subtract!\n");
+                    printf("|| Cannot subtract values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must be both numbers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -391,7 +394,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to multiply!\n");
+                    printf("|| Cannot multiply values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must be both numbers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -405,7 +409,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to divide!\n");
+                    printf("|| Cannot divide values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must be both numbers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -419,7 +424,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected number to negate!\n");
+                    printf("|| Cannot negate a vale of type '%s'!\n", typeStringLiteral(a));
+                    printf("|| (Value must be a number)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -449,7 +455,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to compare!\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must both be numbers)\n");
                     return INTERPRET_ERR;
                 }
             
@@ -463,7 +470,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to compare!\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must both be numbers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -477,7 +485,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to compare!\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must both be numbers)\n");
                     return INTERPRET_ERR;
                 }
             
@@ -491,7 +500,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected numbers to compare!\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Values must both be numbers)\n");
                     return INTERPRET_ERR;
                 }
             
@@ -505,7 +515,8 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Expected boolean to negate!\n");
+                    printf("|| Cannot apply ! to a value of type '%s'!\n", typeStringLiteral(a));
+                    printf("|| (Value must be a boolean)\n");
                     return INTERPRET_ERR;
                 }
 
