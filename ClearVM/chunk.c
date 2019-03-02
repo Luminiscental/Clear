@@ -37,6 +37,12 @@ int addConstant(Chunk *chunk, Value value) {
 
 static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
+#ifdef DEBUG_DIS
+
+    printf("%04d %-16s ", offset, "OP_STORE_CONST");
+
+#endif
+
     uint32_t result = offset + 2;
 
     if (result > chunk->count) {
@@ -50,7 +56,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
     switch (type) {
 
          case OP_INTEGER: {
-    
+
             int32_t *value = (int32_t*)(chunk->code + result);
 
             if (result + sizeof(int32_t) > chunk->count) {
@@ -58,6 +64,8 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
                 printf("|| EOF reached during constant value!\n");
                 return chunk->count;
             }
+
+            printf("OP_INTEGER '%d'\n", *value);
 
             addConstant(chunk, makeInteger(*value));
             return result + sizeof(int32_t);
@@ -73,6 +81,8 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
                 printf("|| EOF reached during constant value!\n");
                 return chunk->count;
             }
+
+            printf("OP_NUMBER '%g'\n", *value);
 
             addConstant(chunk, makeNumber(*value));
             return result + sizeof(double);
@@ -99,15 +109,16 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
             string[size] = '\0';
             memcpy(string, chunk->code + result + 1, size);
 
-            addConstant(chunk, makeString(vm, size, string));
+            printf("OP_STRING '%s'\n", string);
 
+            addConstant(chunk, makeString(vm, size, string));
             return result + 1 + size;
         
         } break;
 
         default: {
 
-            printf("Unrecognized constant type %d\n", type);
+            printf("|| Unrecognized constant type %d\n", type);
             return result;
 
         } break;
