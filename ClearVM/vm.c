@@ -360,12 +360,16 @@ InterpretResult run(VM *vm) {
 
                 else
 
+                    TYPED_BINARY(VAL_INTEGER, makeInteger(a.as.integer + b.as.integer))
+
+                else
+
                     OBJ_TYPED_BINARY(OBJ_STRING, concatStrings(vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj))
 
                 else {
 
                     printf("|| Cannot add values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or strings)\n");
+                    printf("|| (Types must be the same, and either numbers, integers or strings)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -377,10 +381,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeNumber(a.as.number - b.as.number))
 
+                else
+
+                    TYPED_BINARY(VAL_INTEGER, makeInteger(a.as.integer - b.as.integer))
+
                 else {
 
                     printf("|| Cannot subtract values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must be both numbers)\n");
+                    printf("|| (Types must be the same, and either numbers or integers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -392,10 +400,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeNumber(a.as.number * b.as.number))
 
+                else
+
+                    TYPED_BINARY(VAL_INTEGER, makeInteger(a.as.integer * b.as.integer))
+
                 else {
 
                     printf("|| Cannot multiply values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must be both numbers)\n");
+                    printf("|| (Types must be the same, and either numbers or integers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -422,10 +434,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_UNARY(VAL_NUMBER, makeNumber(-a.as.number))
 
+                else
+
+                    TYPED_UNARY(VAL_INTEGER, makeInteger(-a.as.integer))
+
                 else {
 
-                    printf("|| Cannot negate a vale of type '%s'!\n", typeStringLiteral(a));
-                    printf("|| (Value must be a number)\n");
+                    printf("|| Cannot negate a value of type '%s'!\n", typeStringLiteral(a));
+                    printf("|| (Value must be either a number or an integer)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -453,10 +469,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number < b.as.number))
 
+                else
+
+                    TYPED_BINARY(VAL_INTEGER, makeBoolean(a.as.integer < b.as.integer))
+
                 else {
 
                     printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must both be numbers)\n");
+                    printf("|| (Types must be the same, and either numbers or integers)\n");
                     return INTERPRET_ERR;
                 }
             
@@ -468,10 +488,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number >= b.as.number))
 
+                else
+
+                    TYPED_BINARY(VAL_INTEGER, makeBoolean(a.as.integer >= b.as.integer))
+
                 else {
 
                     printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must both be numbers)\n");
+                    printf("|| (Types must be the same, and either numbers or integers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -483,10 +507,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number > b.as.number))
 
+                else
+
+                    TYPED_BINARY(VAL_INTEGER, makeBoolean(a.as.integer > b.as.integer))
+
                 else {
 
                     printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must both be numbers)\n");
+                    printf("|| (Types must be the same, and either numbers or integers)\n");
                     return INTERPRET_ERR;
                 }
             
@@ -498,10 +526,14 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(a.as.number <= b.as.number))
 
+                else
+
+                    TYPED_BINARY(VAL_INTEGER, makeBoolean(a.as.integer <= b.as.integer))
+
                 else {
 
                     printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must both be numbers)\n");
+                    printf("|| (Types must be the same, and either numbers or integers)\n");
                     return INTERPRET_ERR;
                 }
             

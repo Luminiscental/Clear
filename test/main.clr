@@ -1,13 +1,40 @@
 
 // Simple test program:
 
+val a = 2i;
+val a = a * 3i - 2i;
+
+val b = -12i;
+val b = b + 3i;
+
+val c = a > b;
+
 val x = 4;
 val x = x * (x - 1) * (x - 2);
 
 val y = "Hello";
 val y = y + " World!";
 
-val z = 2i;
+val z = false;
+val z = !z;
+
+print "a =";
+print a;
+print type(a);
+
+print;
+
+print "b =";
+print b;
+print type(b);
+
+print;
+
+print "c =";
+print c;
+print type(c);
+
+print;
 
 print "x =";
 print x;
@@ -18,12 +45,6 @@ print;
 print "y =";
 print y;
 print type(y);
-
-print;
-
-print "y == ""Hello World!"" =";
-print y == "Hello World!";
-print type(y == "Hello World!");
 
 print;
 
