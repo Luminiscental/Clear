@@ -525,7 +525,7 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(
 
-                        a.as.number < b.as.number
+                        a.as.number < b.as.number - NUMBER_PRECISION
 
                     ))
 
@@ -552,7 +552,7 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(
 
-                        a.as.number >= b.as.number
+                        a.as.number > b.as.number - NUMBER_PRECISION
 
                     ))
 
@@ -579,7 +579,7 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(
 
-                        a.as.number > b.as.number
+                        a.as.number > b.as.number + NUMBER_PRECISION
 
                     ))
 
@@ -606,7 +606,7 @@ InterpretResult run(VM *vm) {
 
                     TYPED_BINARY(VAL_NUMBER, makeBoolean(
 
-                        a.as.number <= b.as.number
+                        a.as.number < b.as.number + NUMBER_PRECISION
 
                     ))
 

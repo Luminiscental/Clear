@@ -8,6 +8,9 @@ typedef enum eObjType ObjType;
 typedef struct sObj Obj;
 typedef struct sObjString ObjString;
 
+#define NUMBER_PRECISION 0.0000001
+#define NUMBER_PLACES 7
+
 typedef enum {
 
     VAL_NUMBER,

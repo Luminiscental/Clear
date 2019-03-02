@@ -4,24 +4,54 @@
 val i = 2i;
 print "i = " + str(i);
 
+print;
+
 val x = 3.7;
 print "x = " + str(x);
+
+print;
 
 val j = -293502935i;
 print "j = " + str(j);
 
+print;
+
 val y = 348.524 - 9204924.282326;
 print "y = " + str(y);
+
+print;
+
+val tasty = true;
+val notTasty = false;
+
+print "tasty = " + str(tasty);
+print "notTasty = " + str(notTasty);
+print "tasty == !notTasty = " + str(tasty == !notTasty);
+
+print;
 
 val combined = num(i) + x + num(j) + y;
 print "combined = " + str(combined);
 print "which is " + str(bool(combined));
 
+print;
+
 val something = 0;
 print str(something) + " is " + str(bool(something));
+
+print;
 
 val empty = "";
 print """" + empty + """ is " + str(bool(empty));
 
+print;
+
 val notEmpty = "hello";
 print """" + notEmpty + """ is " + str(bool(notEmpty));
+
+print;
+
+print "2.3 < 2.4 = " + str(2.3 < 2.4);
+print "2.3 == 1.2 + 1.1 = " + str(2.3 == 1.2 + 1.1);
+print "-1.7 <= -1.5 - 0.2 = " + str(-1.7 <= -1.5 - 0.2);
+

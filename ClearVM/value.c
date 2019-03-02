@@ -105,7 +105,9 @@ bool valuesEqual(Value a, Value b) {
 
         case VAL_NUMBER: {
 
-            return a.as.number == b.as.number;
+            double diff = a.as.number - b.as.number;
+            if (diff < 0) diff = -diff;
+            return diff < NUMBER_PRECISION;
 
         } break;
 

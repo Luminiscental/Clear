@@ -136,10 +136,6 @@ Value makeStringFromInteger(VM *vm, int32_t integer) {
     return makeString(vm, digits, buffer);
 }
 
-// TODO: Lift this out to value and use it in comparison operators
-#define NUMBER_PRECISION 0.0000001
-#define NUMBER_PLACES 7
-
 Value makeStringFromNumber(VM *vm, double number) {
 
     size_t minusSignLength = (number < 0) ? 1 : 0;
