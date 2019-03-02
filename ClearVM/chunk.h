@@ -32,7 +32,8 @@ typedef enum {
     OP_NEQUAL = 21,
     OP_LOAD_GLOBAL = 22,
     OP_PRINT_BLANK = 23,
-    OP_TYPE = 24
+    OP_TYPE = 24,
+    OP_INTEGER = 25
 
 } OpCode;
 

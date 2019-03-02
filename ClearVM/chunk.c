@@ -48,19 +48,34 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
     uint8_t type = chunk->code[offset + 1];
 
     switch (type) {
+
+         case OP_INTEGER: {
     
+            int32_t *value = (int32_t*)(chunk->code + result);
+
+            if (result + sizeof(int32_t) > chunk->count) {
+
+                printf("|| EOF reached during constant value!\n");
+                return chunk->count;
+            }
+
+            addConstant(chunk, makeInteger(*value));
+            return result + sizeof(int32_t);
+    
+        } break;
+   
         case OP_NUMBER: {
     
             double *value = (double*)(chunk->code + result);
 
-            if (result + 8 > chunk->count) {
+            if (result + sizeof(double) > chunk->count) {
 
                 printf("|| EOF reached during constant value!\n");
                 return chunk->count;
             }
 
             addConstant(chunk, makeNumber(*value));
-            return result + 8;
+            return result + sizeof(double);
     
         } break;
 

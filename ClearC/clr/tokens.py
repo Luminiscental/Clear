@@ -41,6 +41,10 @@ def scan_number(char, acc, line, keyword_trie, tokens):
     elif char == '.':
         acc.append(char)
         return True, ScanState.DECIMAL, line
+    elif char == 'i':
+        store_acc(TokenType.NUMBER, acc, line, tokens)
+        tokens.append(Token(TokenType.INTEGER_SUFFIX, 'i', line))
+        return True, ScanState.ANY, line
     else:
         store_acc(TokenType.NUMBER, acc, line, tokens)
         return False, ScanState.ANY, line

@@ -31,6 +31,7 @@ class OpCode(Enum):
     LOAD_GLOBAL = 22
     PRINT_BLANK = 23
     TYPE = 24
+    INTEGER = 25
 
     def __int__(self):
         return self.value
@@ -101,26 +102,27 @@ class TokenType(Enum):
     IDENTIFIER = 19,
     STRING = 20,
     NUMBER = 21,
+    INTEGER_SUFFIX = 22,
     # keywords
-    AND = 22,
-    CLASS = 23,
-    ELSE = 24,
-    FALSE = 25,
-    FOR = 26,
-    FUNC = 27,
-    IF = 28,
-    OR = 29,
-    PRINT = 30,
-    RETURN = 31,
-    SUPER = 32,
-    THIS = 33,
-    TRUE = 34,
+    AND = 23,
+    CLASS = 24,
+    ELSE = 25,
+    FALSE = 26,
+    FOR = 27,
+    FUNC = 28,
+    IF = 29,
+    OR = 30,
+    PRINT = 31,
+    RETURN = 32,
+    SUPER = 33,
+    THIS = 34,
+    TRUE = 35,
     VAL = 36,
-    WHILE = 38,
-    TYPE = 39
+    WHILE = 37,
+    TYPE = 38,
     # special
-    SPACE = 40,
-    EOF = 41
+    SPACE = 39,
+    EOF = 40
 
 keyword_types = {
 

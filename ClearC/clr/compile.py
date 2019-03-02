@@ -1,7 +1,7 @@
 
-from clr.tokens import tokenize, TokenType, token_info
+from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import emit_error
-from clr.assemble import assemble
+from clr.assemble import Index, assemble
 from clr.values import OpCode, Precedence, pratt_table, debug
 
 class Constants:
@@ -28,7 +28,8 @@ class Constants:
         self.code_list.append(OpCode.STORE_CONST)
         op_type = {
             float: lambda: OpCode.NUMBER,
-            str: lambda: OpCode.STRING
+            str: lambda: OpCode.STRING,
+            int: lambda: OpCode.INTEGER
         }.get(type(value), emit_error(
             f'Unknown constant value type: {type(value)}'
         ))()
@@ -52,9 +53,9 @@ class Globals:
         else:
             if debug:
                 print(f'Adding global {self.index}:{name}')
-            self.indices[name] = self.index
+            self.indices[name] = Index(self.index)
             self.index += 1
-            return self.index - 1
+            return self.indices[name]
 
 class Program:
 
@@ -64,7 +65,7 @@ class Program:
 
     def load_constant(self, constant):
         self.code_list.append(OpCode.LOAD_CONST)
-        self.code_list.append(constant)
+        self.code_list.append(Index(constant))
 
     def op_print(self):
         # TODO: Specify end?
@@ -207,7 +208,21 @@ class Parser(Cursor):
         token = self.get_prev()
         if token.token_type != TokenType.NUMBER:
             emit_error(f'Expected number token! {self.current_info()}')()
-        const_index = self.constants.add(float(token.lexeme))
+        if self.match(TokenType.INTEGER_SUFFIX):
+            try:
+                value = int(token.lexeme)
+            except ValueError:
+                emit_error(
+                    f'Int literal must be an integer! {self.current_info()}'
+                )()
+        else:
+            try:
+                value = float(token.lexeme)
+            except ValueError:
+                emit_error(
+                    f'Number literal must be a number! {self.current_info()}'
+                )()
+        const_index = self.constants.add(value)
         self.program.load_constant(const_index)
 
     def consume_string(self):

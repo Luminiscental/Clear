@@ -7,17 +7,27 @@ val x = x * (x - 1) * (x - 2);
 val y = "Hello";
 val y = y + " World!";
 
+val z = 12i;
+
 print "x =";
 print x;
+print type(x);
 
 print;
 
 print "y =";
 print y;
+print type(y);
 
 print;
 
 print "y == ""Hello World!"" =";
 print y == "Hello World!";
-print type(x);
+print type(y == "Hello World!");
+
+print;
+
+print "z =";
+print z;
+print type(z);
 
