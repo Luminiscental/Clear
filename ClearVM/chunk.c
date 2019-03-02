@@ -37,27 +37,52 @@ int addConstant(Chunk *chunk, Value value) {
 
 static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
-    uint8_t type = chunk->code[offset + 1];
-
     uint32_t result = offset + 2;
+
+    if (result > chunk->count) {
+
+        printf("|| EOF reached during constant value!\n");
+        return chunk->count;
+    }
+
+    uint8_t type = chunk->code[offset + 1];
 
     switch (type) {
     
         case OP_NUMBER: {
     
-            double *value = (double*)(chunk->code + offset + 2);
+            double *value = (double*)(chunk->code + result);
+
+            if (result + 8 > chunk->count) {
+
+                printf("|| EOF reached during constant value!\n");
+                return chunk->count;
+            }
+
             addConstant(chunk, makeNumber(*value));
             return result + 8;
     
         } break;
 
         case OP_STRING: {
+
+            if (result + 1 > chunk->count) {
+
+                printf("|| EOF reached during constant value!\n");
+                return chunk->count;
+            }
         
-            uint8_t size = chunk->code[offset + 2];
+            uint8_t size = chunk->code[result];
+
+            if (result + 1 + size > chunk->count) {
+
+                printf("|| EOF reached during constant value!\n");
+                return chunk->count;
+            }
 
             char *string = ALLOCATE(char, size + 1);
             string[size] = '\0';
-            memcpy(string, chunk->code + offset + 3, size);
+            memcpy(string, chunk->code + result + 1, size);
 
             addConstant(chunk, makeString(vm, size, string));
 
@@ -115,6 +140,12 @@ static uint32_t simpleInstruction(const char *name, uint32_t offset) {
 
 static uint32_t constantInstruction(const char *name, Chunk *chunk, uint32_t offset) {
 
+    if (offset + 2 > chunk->count) {
+
+        printf("|| EOF reached during constant instruction!\n");
+        return chunk->count;
+    }
+
     uint8_t constant = chunk->code[offset + 1];
 
     printf("%-16s %4d '", name, constant);
@@ -125,6 +156,12 @@ static uint32_t constantInstruction(const char *name, Chunk *chunk, uint32_t off
 
 static uint32_t indexInstruction(const char *name, Chunk *chunk, uint32_t offset) {
 
+    if (offset + 2 > chunk->count) {
+
+        printf("|| EOF reached during index instruction!\n");
+        return chunk->count;
+    }
+
     uint8_t index = chunk->code[offset + 1];
 
     printf("%-16s %4d\n", name, index);
@@ -134,6 +171,12 @@ static uint32_t indexInstruction(const char *name, Chunk *chunk, uint32_t offset
 uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
     
     printf("%04d ", offset);
+
+    if (offset >= chunk->count) {
+
+        printf("|| EOF reached during instruction!\n");
+        return chunk->count;
+    }
 
     uint8_t instruction = *(chunk->code + offset);
 

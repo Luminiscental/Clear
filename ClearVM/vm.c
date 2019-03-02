@@ -22,32 +22,33 @@ void resetStack(VM *vm) {
     vm->stackTop = vm->stack;
 }
 
-void push(VM *vm, Value value) {
+InterpretResult push(VM *vm, Value value) {
 
     if (vm->stackTop >= vm->stack + STACK_MAX - 1) {
 
-        // TODO: Error handling
         printf("|| Stack overflow!\n");
+        return INTERPRET_ERR;
 
     } else {
 
         *vm->stackTop = value;
         vm->stackTop++;
+        return INTERPRET_OK;
     }
 }
 
-Value pop(VM *vm) {
+InterpretResult pop(VM *vm, Value *out) {
 
     if (vm->stackTop <= vm->stack) {
 
-        // TODO: Error handling
         printf("|| Stack underflow!\n");
-        return makeNumber(0.0);
+        return INTERPRET_ERR;
 
     } else {
 
         vm->stackTop--;
-        return *vm->stackTop;
+        *out = *vm->stackTop;
+        return INTERPRET_OK;
     }
 }
 
@@ -66,32 +67,40 @@ InterpretResult interpret(VM *vm, Chunk *chunk) {
     return run(vm);
 }
 
-uint8_t readByte(VM *vm) {
+static InterpretResult readByte(VM *vm, uint8_t *out) {
 
     if (1 + vm->ip - vm->chunk->code > vm->chunk->count) {
 
-        // TODO: Error handling
         printf("|| Ran out of bytes!\n");
-        return (uint8_t) -1;
+        return INTERPRET_ERR;
 
     } else {
 
-        return *vm->ip++;
+        *out = *vm->ip++;
+        return INTERPRET_OK;
     }
 }
 
-Value readBoolean(VM *vm) {
+static InterpretResult readBoolean(VM *vm, Value *out) {
 
-    return makeBoolean((bool) readByte(vm));
+    uint8_t val;
+
+    if (readByte(vm, &val) != INTERPRET_OK) {
+
+        printf("|| Could not read boolean!\n");
+        return INTERPRET_ERR;
+    }
+
+    *out = makeBoolean((bool) val);
+    return INTERPRET_OK;
 }
 
-Value readDouble(VM *vm) {
+static InterpretResult readDouble(VM *vm, Value *out) {
 
     if (8 + vm->ip - vm->chunk->code > vm->chunk->count) {
 
-        // TODO: Error handling
         printf("|| Ran out of bytes!\n");
-        return makeNumber(0.0);
+        return INTERPRET_ERR;
 
     } else {
 
@@ -99,19 +108,18 @@ Value readDouble(VM *vm) {
 
         vm->ip += 8;
 
-        return makeNumber(*read);
+        *out = makeNumber(*read);
+        return INTERPRET_OK;
     }
 }
 
-Value readStringRaw(VM *vm) {
+static InterpretResult readStringRaw(VM *vm, Value *out) {
 
-    uint8_t size = readByte(vm);
+    uint8_t size;
+    if(readByte(vm, &size) != INTERPRET_OK) {
 
-    if (size == (uint8_t) -1) {
-
-        char *buffer = ALLOCATE(char, 1);
-        buffer[0] = '\0';
-        printf("|| Creating empty string\n");
+        printf("|| Could not read size of string!\n");
+        return INTERPRET_ERR;
     }
 
     char *buffer = ALLOCATE(char, size + 1);
@@ -119,38 +127,55 @@ Value readStringRaw(VM *vm) {
 
     for (size_t i = 0; i < size; i++) {
 
-        buffer[i] = readByte(vm);
+        uint8_t byte;
+        if (readByte(vm, &byte) != INTERPRET_OK) {
+
+            printf("|| Ran out of bytes reading string!\n");
+            return INTERPRET_ERR;
+        }
+
+        buffer[i] = byte;
     }
 
-    return makeString(vm, size, buffer);
+    *out = makeString(vm, size, buffer);
+    return INTERPRET_OK;
 }
 
-#define UNARY_OP \
-    Value a = pop(vm);
+#define ANY_OP(op) \
+    if (push(vm, op) != INTERPRET_OK) { \
+        printf("|| Could not push result of unary operation!\n"); \
+        return INTERPRET_ERR; \
+    }
 
-#define ANY_UNARY(op) \
-    push(vm, op);
+#define UNARY_OP \
+    Value a; \
+    if (pop(vm, &a) != INTERPRET_OK) { \
+        printf("|| Expected value for unary operation!\n"); \
+        return INTERPRET_ERR; \
+    }
 
 #define TYPED_UNARY(expected, op) \
     if (a.type == expected) { \
-        ANY_UNARY(op) \
+        ANY_OP(op) \
     }
 
 #define BINARY_OP \
-    Value b = pop(vm); \
-    Value a = pop(vm);
-
-#define ANY_BINARY(op) \
-    push(vm, op);
+    Value a; \
+    Value b; \
+    if (pop(vm, &b) != INTERPRET_OK \
+     || pop(vm, &a) != INTERPRET_OK) { \
+        printf("|| Expected two values for binary operation!\n"); \
+        return INTERPRET_ERR; \
+    }
 
 #define TYPED_BINARY(expected, op) \
     if (a.type == expected && b.type == expected) { \
-        ANY_BINARY(op) \
+        ANY_OP(op) \
     }
 
 #define OBJ_TYPED_BINARY(expected, op) \
     if (isObjType(a, expected) && isObjType(b, expected)) { \
-        ANY_BINARY(op) \
+        ANY_OP(op) \
     }
 
 static void printStack(VM *vm) {
@@ -183,7 +208,12 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-        uint8_t instruction = readByte(vm);
+        uint8_t instruction;
+        if (readByte(vm, &instruction) != INTERPRET_OK) {
+
+            printf("|| Ran out of instructions!\n");
+            return INTERPRET_ERR;
+        }
 
         switch (instruction) {
 
@@ -191,7 +221,7 @@ InterpretResult run(VM *vm) {
 
                 UNARY_OP
 
-                    ANY_UNARY(typeString(vm, a))
+                    ANY_OP(typeString(vm, a))
                 
             } break;
 
@@ -199,7 +229,11 @@ InterpretResult run(VM *vm) {
 
                 Value val = makeBoolean(true);
 
-                push(vm, val);
+                if (push(vm, val) != INTERPRET_OK) {
+
+                    printf("|| Could not push boolean literal!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
@@ -207,21 +241,42 @@ InterpretResult run(VM *vm) {
 
                 Value val = makeBoolean(false);
 
-                push(vm, val);
+                if (push(vm, val) != INTERPRET_OK) {
+
+                    printf("|| Could not push boolean literal!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
             case OP_DEFINE_GLOBAL: {
 
-                uint8_t index = readByte(vm);
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
 
-                tableSet(&vm->globals, makeInteger(index), pop(vm));
+                    printf("|| Expected index to define global!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value val;
+                if (pop(vm, &val) != INTERPRET_OK) {
+
+                    printf("|| Expected value to define global!\n");
+                    return INTERPRET_ERR;
+                }
+
+                tableSet(&vm->globals, makeInteger(index), val);
 
             } break;
 
             case OP_LOAD_GLOBAL: {
-            
-                uint8_t index = readByte(vm);
+ 
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index to load global!\n");
+                    return INTERPRET_ERR;
+                }
 
                 Value value;
                 if (!tableGet(&vm->globals, makeInteger(index), &value)) {
@@ -230,13 +285,18 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                push(vm, value);
+                if (push(vm, value) != INTERPRET_OK) {
+
+                    printf("|| Could not push global value!\n");
+                    return INTERPRET_ERR;
+                }
             
             } break;
 
             case OP_POP: {
 
-                pop(vm);
+                Value _;
+                pop(vm, &_);
 
             } break;
 
@@ -254,7 +314,13 @@ InterpretResult run(VM *vm) {
 
             case OP_PRINT: {
 
-                Value value = pop(vm);
+                Value value;
+
+                if (pop(vm, &value) != INTERPRET_OK) {
+                    
+                    printf("|| Expected value to print!\n");
+                    return INTERPRET_ERR;
+                }
 
                 printValue(value, true);
 
@@ -262,7 +328,12 @@ InterpretResult run(VM *vm) {
 
             case OP_LOAD_CONST: {
 
-                uint8_t index = readByte(vm);
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index of constant to load!\n");
+                    return INTERPRET_ERR;
+                }
 
                 if (index >= vm->chunk->constants.count) {
 
@@ -272,7 +343,11 @@ InterpretResult run(VM *vm) {
 
                 Value constant = vm->chunk->constants.values[index];
 
-                push(vm, constant);
+                if (push(vm, constant) != INTERPRET_OK) {
+
+                    printf("|| Could not push constant value!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
                 
@@ -354,7 +429,7 @@ InterpretResult run(VM *vm) {
 
                 BINARY_OP
 
-                    ANY_BINARY(makeBoolean(valuesEqual(a, b)))
+                    ANY_OP(makeBoolean(valuesEqual(a, b)))
             
             } break;
 
@@ -362,7 +437,7 @@ InterpretResult run(VM *vm) {
             
                 BINARY_OP
 
-                    ANY_BINARY(makeBoolean(!valuesEqual(a, b)))
+                    ANY_OP(makeBoolean(!valuesEqual(a, b)))
             
             } break;
 
@@ -438,7 +513,7 @@ InterpretResult run(VM *vm) {
 
             default: {
 
-                printf("|| Invalid op code!\n");
+                printf("|| Invalid op code %d!\n", instruction);
                 return INTERPRET_ERR;
 
             } break;
@@ -448,9 +523,8 @@ InterpretResult run(VM *vm) {
 
 #undef OBJ_TYPED_BINARY
 #undef TYPED_BINARY
-#undef ANY_BINARY
 #undef BINARY_OP
 #undef TYPED_UNARY
-#undef ANY_UNARY
 #undef UNARY_OP
+#undef ANY_OP
 

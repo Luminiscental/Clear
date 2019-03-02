@@ -28,8 +28,8 @@ typedef enum {
 
 void initVM(VM *vm);
 void resetStack(VM *vm);
-void push(VM *vm, Value value);
-Value pop(VM *vm);
+InterpretResult push(VM *vm, Value value);
+InterpretResult pop(VM *vm, Value *out);
 void freeVM(VM *vm);
 
 InterpretResult interpret(VM *vm, Chunk *chunk);
