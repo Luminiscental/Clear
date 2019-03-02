@@ -99,6 +99,18 @@ class Program:
     def op_type(self):
         self.code_list.append(OpCode.TYPE)
 
+    def op_int(self):
+        self.code_list.append(OpCode.INT)
+
+    def op_bool(self):
+        self.code_list.append(OpCode.BOOL)
+
+    def op_num(self):
+        self.code_list.append(OpCode.NUM)
+
+    def op_str(self):
+        self.code_list.append(OpCode.STR)
+
     def flush(self):
         return self.code_list
 
@@ -154,11 +166,20 @@ class Parser(Cursor):
     def current_precedence(self):
         return self.get_rule(self.get_current()).precedence
 
-    def consume_type(self):
+    def consume_builtin(self):
+        builtin = self.get_prev()
         self.consume(TokenType.LEFT_PAREN,
-            f'Expected parameter to type()! {self.current_info()}')
+            f'Expected parameter to built-in function! {self.current_info()}')
         self.finish_grouping()
-        self.program.op_type()
+        {
+            TokenType.TYPE : self.program.op_type,
+            TokenType.INT : self.program.op_int,
+            TokenType.BOOL : self.program.op_bool,
+            TokenType.NUM : self.program.op_num,
+            TokenType.STR : self.program.op_str
+        }.get(builtin.token_type,
+            emit_error(f'Expected built-in function! {self.current_info()}')
+        )()
 
     def consume_boolean(self):
         token = self.get_prev()

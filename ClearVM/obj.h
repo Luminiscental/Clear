@@ -28,6 +28,9 @@ typedef struct sObjString {
 } ObjString;
 
 Value makeStringFromLiteral(VM *vm, const char *string);
+Value makeStringFromInteger(VM *vm, int32_t integer);
+Value makeStringFromNumber(VM *vm, double number);
+
 Value makeString(VM *vm, size_t length, char *string);
 Value concatStrings(VM *vm, ObjString *first, ObjString *second);
 bool isObjType(Value a, ObjType type);

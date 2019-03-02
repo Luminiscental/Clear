@@ -33,7 +33,11 @@ typedef enum {
     OP_LOAD_GLOBAL = 22,
     OP_PRINT_BLANK = 23,
     OP_TYPE = 24,
-    OP_INTEGER = 25
+    OP_INTEGER = 25,
+    OP_INT = 26,
+    OP_BOOL = 27,
+    OP_NUM = 28,
+    OP_STR = 29
 
 } OpCode;
 

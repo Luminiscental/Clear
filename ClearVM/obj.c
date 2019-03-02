@@ -108,6 +108,52 @@ Value makeStringFromLiteral(VM *vm, const char *string) {
     return result;
 }
 
+static size_t countDigits(int32_t integer) {
+
+    size_t digits = 0;
+
+    do {
+
+        integer /= 10;
+        digits++;
+
+    } while (integer != 0);
+
+    return digits;
+}
+
+Value makeStringFromInteger(VM *vm, int32_t integer) {
+
+    size_t minusSignLength = (integer < 0) ? 1 : 0;
+    size_t digits = countDigits(integer);
+    size_t length = minusSignLength + digits;
+
+    char *buffer = ALLOCATE(char, length + 1);
+    buffer[length] = '\0';
+
+    snprintf(buffer, length + 1, "%d", integer);
+
+    return makeString(vm, digits, buffer);
+}
+
+// TODO: Lift this out to value and use it in comparison operators
+#define NUMBER_PRECISION 0.0000001
+#define NUMBER_PLACES 7
+
+Value makeStringFromNumber(VM *vm, double number) {
+
+    size_t minusSignLength = (number < 0) ? 1 : 0;
+    size_t preDecimalDigits = countDigits((int32_t) number);
+    size_t length = minusSignLength + preDecimalDigits + 1 + NUMBER_PLACES;
+
+    char *buffer = ALLOCATE(char, length + 1);
+    buffer[length] = '\0';
+
+    snprintf(buffer, length + 1, "%.*f", NUMBER_PLACES, number); 
+
+    return makeString(vm, length, buffer);
+}
+
 Value makeString(VM *vm, size_t length, char *string) {
 
     Entry *interned = tableFindString(&vm->strings, string, length);

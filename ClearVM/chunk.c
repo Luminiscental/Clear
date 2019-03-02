@@ -65,7 +65,11 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
                 return chunk->count;
             }
 
+#ifdef DEBUG_DIS
+
             printf("OP_INTEGER '%d'\n", *value);
+
+#endif
 
             addConstant(chunk, makeInteger(*value));
             return result + sizeof(int32_t);
@@ -82,7 +86,11 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
                 return chunk->count;
             }
 
+#ifdef DEBUG_DIS
+
             printf("OP_NUMBER '%g'\n", *value);
+
+#endif
 
             addConstant(chunk, makeNumber(*value));
             return result + sizeof(double);
@@ -109,7 +117,11 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
             string[size] = '\0';
             memcpy(string, chunk->code + result + 1, size);
 
+#ifdef DEBUG_DIS
+
             printf("OP_STRING '%s'\n", string);
+
+#endif
 
             addConstant(chunk, makeString(vm, size, string));
             return result + 1 + size;
@@ -337,6 +349,30 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         case OP_LOAD_GLOBAL: {
         
             return indexInstruction("OP_LOAD_GLOBAL", chunk, offset);
+        
+        } break;
+
+        case OP_INT: {
+        
+            return simpleInstruction("OP_INT", offset);
+        
+        } break;
+
+        case OP_BOOL: {
+        
+            return simpleInstruction("OP_BOOL", offset);
+        
+        } break;
+
+        case OP_NUM: {
+        
+            return simpleInstruction("OP_NUM", offset);
+        
+        } break;
+
+        case OP_STR: {
+        
+            return simpleInstruction("OP_STR", offset);
         
         } break;
 

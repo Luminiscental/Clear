@@ -1,54 +1,27 @@
 
 // Simple test program:
 
-val a = 2i;
-val a = a * 3i - 2i;
+val i = 2i;
+print "i = " + str(i);
 
-val b = -12i;
-val b = b + 3i;
+val x = 3.7;
+print "x = " + str(x);
 
-val c = a > b;
+val j = -293502935i;
+print "j = " + str(j);
 
-val x = 4;
-val x = x * (x - 1) * (x - 2);
+val y = 348.524 - 9204924.282326;
+print "y = " + str(y);
 
-val y = "Hello";
-val y = y + " World!";
+val combined = num(i) + x + num(j) + y;
+print "combined = " + str(combined);
+print "which is " + str(bool(combined));
 
-val z = false;
-val z = !z;
+val something = 0;
+print str(something) + " is " + str(bool(something));
 
-print "a =";
-print a;
-print type(a);
+val empty = "";
+print """" + empty + """ is " + str(bool(empty));
 
-print;
-
-print "b =";
-print b;
-print type(b);
-
-print;
-
-print "c =";
-print c;
-print type(c);
-
-print;
-
-print "x =";
-print x;
-print type(x);
-
-print;
-
-print "y =";
-print y;
-print type(y);
-
-print;
-
-print "z =";
-print z;
-print type(z);
-
+val notEmpty = "hello";
+print """" + notEmpty + """ is " + str(bool(notEmpty));

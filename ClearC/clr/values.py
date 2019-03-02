@@ -32,6 +32,10 @@ class OpCode(Enum):
     PRINT_BLANK = 23
     TYPE = 24
     INTEGER = 25
+    INT = 26
+    BOOL = 27
+    NUM = 28
+    STR = 29
 
     def __int__(self):
         return self.value
@@ -79,50 +83,54 @@ class Precedence(Enum):
 class TokenType(Enum):
 
     # symbols
-    LEFT_PAREN = 0,
-    RIGHT_PAREN = 1,
-    LEFT_BRACE = 2,
-    RIGHT_BRACE = 3,
-    COMMA = 4,
-    DOT = 5,
-    MINUS = 6,
-    PLUS = 7,
-    SEMICOLON = 8,
-    SLASH = 9,
-    STAR = 10,
-    BANG = 11,
-    BANG_EQUAL = 12,
-    EQUAL = 13,
-    EQUAL_EQUAL = 14,
-    GREATER = 15,
-    GREATER_EQUAL = 16,
-    LESS = 17,
-    LESS_EQUAL = 18,
+    LEFT_PAREN = 0
+    RIGHT_PAREN = 1
+    LEFT_BRACE = 2
+    RIGHT_BRACE = 3
+    COMMA = 4
+    DOT = 5
+    MINUS = 6
+    PLUS = 7
+    SEMICOLON = 8
+    SLASH = 9
+    STAR = 10
+    BANG = 11
+    BANG_EQUAL = 12
+    EQUAL = 13
+    EQUAL_EQUAL = 14
+    GREATER = 15
+    GREATER_EQUAL = 16
+    LESS = 17
+    LESS_EQUAL = 18
     # values
-    IDENTIFIER = 19,
-    STRING = 20,
-    NUMBER = 21,
-    INTEGER_SUFFIX = 22,
+    IDENTIFIER = 19
+    STRING = 20
+    NUMBER = 21
+    INTEGER_SUFFIX = 22
     # keywords
-    AND = 23,
-    CLASS = 24,
-    ELSE = 25,
-    FALSE = 26,
-    FOR = 27,
-    FUNC = 28,
-    IF = 29,
-    OR = 30,
-    PRINT = 31,
-    RETURN = 32,
-    SUPER = 33,
-    THIS = 34,
-    TRUE = 35,
-    VAL = 36,
-    WHILE = 37,
-    TYPE = 38,
+    AND = 23
+    CLASS = 24
+    ELSE = 25
+    FALSE = 26
+    FOR = 27
+    FUNC = 28
+    IF = 29
+    OR = 30
+    PRINT = 31
+    RETURN = 32
+    SUPER = 33
+    THIS = 34
+    TRUE = 35
+    VAL = 36
+    WHILE = 37
+    TYPE = 38
+    INT = 39
+    BOOL = 40
+    NUM = 41
+    STR = 42
     # special
-    SPACE = 39,
-    EOF = 40
+    SPACE = 43
+    EOF = 44
 
 keyword_types = {
 
@@ -141,7 +149,11 @@ keyword_types = {
     'true' : TokenType.TRUE,
     'val' : TokenType.VAL,
     'while' : TokenType.WHILE,
-    'type' : TokenType.TYPE
+    'type' : TokenType.TYPE,
+    'int' : TokenType.INT,
+    'bool' : TokenType.BOOL,
+    'num' : TokenType.NUM,
+    'str' : TokenType.STR
 }
 
 simple_tokens = {
@@ -255,7 +267,23 @@ def pratt_table(parser):
             prefix=parser.consume_variable_reference
         ),
         TokenType.TYPE: ParseRule(
-            prefix=parser.consume_type,
+            prefix=parser.consume_builtin,
+            precedence=Precedence.CALL
+        ),
+        TokenType.INT: ParseRule(
+            prefix=parser.consume_builtin,
+            precedence=Precedence.CALL
+        ),
+        TokenType.BOOL: ParseRule(
+            prefix=parser.consume_builtin,
+            precedence=Precedence.CALL
+        ),
+        TokenType.NUM: ParseRule(
+            prefix=parser.consume_builtin,
+            precedence=Precedence.CALL
+        ),
+        TokenType.STR: ParseRule(
+            prefix=parser.consume_builtin,
             precedence=Precedence.CALL
         )
     })
