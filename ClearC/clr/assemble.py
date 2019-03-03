@@ -1,28 +1,32 @@
-
 import struct
 from clr.values import OpCode
 from clr.errors import emit_error
 from clr.constants import Index, ClrInt, ClrNum, ClrStr
 
+
 def first_byte(value):
 
     return bytes([value])[0]
+
 
 def assemble_index(index, accum):
 
     accum.append(first_byte(index.value))
 
+
 def assemble_int(clrint, accum):
 
     value = clrint.value
-    for byte in struct.pack('i', value):
+    for byte in struct.pack("i", value):
         accum.append(byte)
+
 
 def assemble_number(clrnum, accum):
 
     value = clrnum.value
-    for byte in struct.pack('d', value):
+    for byte in struct.pack("d", value):
         accum.append(byte)
+
 
 def assemble_string(clrstr, accum):
 
@@ -33,9 +37,11 @@ def assemble_string(clrstr, accum):
     for byte in value.encode():
         accum.append(byte)
 
+
 def assemble_op(op, accum):
 
     accum.append(first_byte(op.value))
+
 
 def assemble(code_list):
 
@@ -46,10 +52,8 @@ def assemble(code_list):
             ClrStr: assemble_string,
             ClrInt: assemble_int,
             OpCode: assemble_op,
-            Index: assemble_index
-        }.get(type(code),
-            emit_error(f'Unknown code type to assemble! {type(code)}')
-        )(code, raw_bytes)
+            Index: assemble_index,
+        }.get(type(code), emit_error(f"Unknown code type to assemble! {type(code)}"))(
+            code, raw_bytes
+        )
     return raw_bytes
-
-

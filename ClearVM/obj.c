@@ -1,20 +1,20 @@
 
 #include "obj.h"
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include "vm.h"
-#include "table.h"
 #include "memory.h"
+#include "table.h"
+#include "vm.h"
 
-#define ALLOCATE_OBJ(vm, type, objType) \
-    (type*) allocateObject(vm, sizeof(type), objType)
+#define ALLOCATE_OBJ(vm, type, objType)                                        \
+    (type *)allocateObject(vm, sizeof(type), objType)
 
 static Obj *allocateObject(VM *vm, size_t size, ObjType type) {
 
-    Obj *obj = (Obj*) reallocate(NULL, 0, size);
+    Obj *obj = (Obj *)reallocate(NULL, 0, size);
 
     obj->type = type;
     obj->next = vm->objects;
@@ -48,7 +48,8 @@ static uint32_t hashChars(size_t length, const char *chars) {
 
 static Entry *tableFindString(Table *table, const char *string, size_t length) {
 
-    if (table->entries == NULL) return NULL;
+    if (table->entries == NULL)
+        return NULL;
 
     uint32_t hash = hashChars(length, string);
     uint32_t index = hash % table->capacity;
@@ -63,14 +64,12 @@ static Entry *tableFindString(Table *table, const char *string, size_t length) {
 
         } else if (entry->state == ENTRY_FULL) {
 
-            ObjString *entryStr = (ObjString*) entry->key.as.obj;
+            ObjString *entryStr = (ObjString *)entry->key.as.obj;
 
-            if (entryStr->length == length
-             && entry->key.hash == hash
-             && memcmp(entryStr->chars, string, length) == 0) {
+            if (entryStr->length == length && entry->key.hash == hash &&
+                memcmp(entryStr->chars, string, length) == 0) {
 
                 return entry;
-
             }
         }
 
@@ -98,7 +97,7 @@ Value makeStringFromLiteral(VM *vm, const char *string) {
     result.type = VAL_OBJ;
     result.hash = hashChars(length, string);
 
-    result.as.obj = (Obj*) stringObj;
+    result.as.obj = (Obj *)stringObj;
 
     stringObj->chars = copyStr;
     stringObj->length = length;
@@ -139,13 +138,13 @@ Value makeStringFromInteger(VM *vm, int32_t integer) {
 Value makeStringFromNumber(VM *vm, double number) {
 
     size_t minusSignLength = (number < 0) ? 1 : 0;
-    size_t preDecimalDigits = countDigits((int32_t) number);
+    size_t preDecimalDigits = countDigits((int32_t)number);
     size_t length = minusSignLength + preDecimalDigits + 1 + NUMBER_PLACES;
 
     char *buffer = ALLOCATE(char, length + 1);
     buffer[length] = '\0';
 
-    snprintf(buffer, length + 1, "%.*f", NUMBER_PLACES, number); 
+    snprintf(buffer, length + 1, "%.*f", NUMBER_PLACES, number);
 
     return makeString(vm, length, buffer);
 }
@@ -158,7 +157,7 @@ Value makeString(VM *vm, size_t length, char *string) {
 
         FREE_ARRAY(char, string, length + 1);
         return interned->key;
-    } 
+    }
 
     Value result;
 
@@ -167,7 +166,7 @@ Value makeString(VM *vm, size_t length, char *string) {
     result.type = VAL_OBJ;
     result.hash = hashChars(length, string);
 
-    result.as.obj = (Obj*) stringObj;
+    result.as.obj = (Obj *)stringObj;
 
     stringObj->chars = string;
     stringObj->length = length;
@@ -194,4 +193,3 @@ bool isObjType(Value a, ObjType type) {
 
     return a.type == VAL_OBJ && a.as.obj->type == type;
 }
-

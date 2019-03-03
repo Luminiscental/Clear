@@ -1,9 +1,9 @@
 
 #include "chunk.h"
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <memory.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "memory.h"
 
@@ -21,8 +21,8 @@ void writeChunk(Chunk *chunk, uint8_t byte) {
 
         int oldCapacity = chunk->capacity;
         chunk->capacity = GROW_CAPACITY(oldCapacity);
-        chunk->code = GROW_ARRAY(chunk->code, uint8_t, oldCapacity,
-                chunk->capacity);
+        chunk->code =
+            GROW_ARRAY(chunk->code, uint8_t, oldCapacity, chunk->capacity);
     }
 
     chunk->code[chunk->count] = byte;
@@ -55,9 +55,9 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
     switch (type) {
 
-         case OP_INTEGER: {
+        case OP_INTEGER: {
 
-            int32_t *value = (int32_t*)(chunk->code + result);
+            int32_t *value = (int32_t *)(chunk->code + result);
 
             if (result + sizeof(int32_t) > chunk->count) {
 
@@ -73,12 +73,12 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
             addConstant(chunk, makeInteger(*value));
             return result + sizeof(int32_t);
-    
+
         } break;
-   
+
         case OP_NUMBER: {
-    
-            double *value = (double*)(chunk->code + result);
+
+            double *value = (double *)(chunk->code + result);
 
             if (result + sizeof(double) > chunk->count) {
 
@@ -94,7 +94,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
             addConstant(chunk, makeNumber(*value));
             return result + sizeof(double);
-    
+
         } break;
 
         case OP_STRING: {
@@ -104,7 +104,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
                 printf("|| EOF reached during constant value!\n");
                 return chunk->count;
             }
-        
+
             uint8_t size = chunk->code[result];
 
             if (result + 1 + size > chunk->count) {
@@ -125,7 +125,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
             addConstant(chunk, makeString(vm, size, string));
             return result + 1 + size;
-        
+
         } break;
 
         default: {
@@ -176,7 +176,8 @@ static uint32_t simpleInstruction(const char *name, uint32_t offset) {
     return offset + 1;
 }
 
-static uint32_t constantInstruction(const char *name, Chunk *chunk, uint32_t offset) {
+static uint32_t constantInstruction(const char *name, Chunk *chunk,
+                                    uint32_t offset) {
 
     if (offset + 2 > chunk->count) {
 
@@ -192,7 +193,8 @@ static uint32_t constantInstruction(const char *name, Chunk *chunk, uint32_t off
     return offset + 2;
 }
 
-static uint32_t indexInstruction(const char *name, Chunk *chunk, uint32_t offset) {
+static uint32_t indexInstruction(const char *name, Chunk *chunk,
+                                 uint32_t offset) {
 
     if (offset + 2 > chunk->count) {
 
@@ -207,7 +209,7 @@ static uint32_t indexInstruction(const char *name, Chunk *chunk, uint32_t offset
 }
 
 uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
-    
+
     printf("%04d ", offset);
 
     if (offset >= chunk->count) {
@@ -227,9 +229,9 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         } break;
 
         case OP_PRINT: {
-        
+
             return simpleInstruction("OP_PRINT", offset);
-        
+
         } break;
 
         case OP_PRINT_BLANK: {
@@ -239,149 +241,148 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         } break;
 
         case OP_LOAD_CONST: {
-        
+
             return constantInstruction("OP_LOAD_CONST", chunk, offset);
-        
+
         } break;
 
         case OP_NEGATE: {
-        
+
             return simpleInstruction("OP_NEGATE", offset);
-        
+
         } break;
 
         case OP_ADD: {
-        
+
             return simpleInstruction("OP_ADD", offset);
-        
+
         } break;
 
         case OP_SUBTRACT: {
-        
+
             return simpleInstruction("OP_SUBTRACT", offset);
-        
+
         } break;
 
         case OP_MULTIPLY: {
-        
+
             return simpleInstruction("OP_MULTIPLY", offset);
-        
+
         } break;
 
         case OP_DIVIDE: {
-        
+
             return simpleInstruction("OP_DIVIDE", offset);
-        
+
         } break;
-    
+
         case OP_RETURN: {
-    
+
             return simpleInstruction("OP_RETURN", offset);
-    
+
         } break;
 
         case OP_POP: {
-        
+
             return simpleInstruction("OP_POP", offset);
-        
+
         } break;
 
         case OP_DEFINE_GLOBAL: {
-        
+
             return indexInstruction("OP_DEFINE_GLOBAL", chunk, offset);
-        
+
         } break;
 
         case OP_TRUE: {
-        
+
             return simpleInstruction("OP_TRUE", offset);
-        
+
         } break;
 
         case OP_FALSE: {
-        
+
             return simpleInstruction("OP_FALSE", offset);
-        
+
         } break;
 
         case OP_NOT: {
-        
+
             return simpleInstruction("OP_NOT", offset);
-        
+
         } break;
 
         case OP_LESS: {
-        
+
             return simpleInstruction("OP_LESS", offset);
-        
+
         } break;
 
         case OP_NLESS: {
-        
+
             return simpleInstruction("OP_NLESS", offset);
-        
+
         } break;
 
         case OP_GREATER: {
-        
+
             return simpleInstruction("OP_GREATER", offset);
-        
+
         } break;
 
         case OP_NGREATER: {
-        
+
             return simpleInstruction("OP_NGREATER", offset);
-        
+
         } break;
 
         case OP_EQUAL: {
-        
+
             return simpleInstruction("OP_EQUAL", offset);
-        
+
         } break;
 
         case OP_NEQUAL: {
-        
+
             return simpleInstruction("OP_NEQUAL", offset);
-        
+
         } break;
 
         case OP_LOAD_GLOBAL: {
-        
+
             return indexInstruction("OP_LOAD_GLOBAL", chunk, offset);
-        
+
         } break;
 
         case OP_INT: {
-        
+
             return simpleInstruction("OP_INT", offset);
-        
+
         } break;
 
         case OP_BOOL: {
-        
+
             return simpleInstruction("OP_BOOL", offset);
-        
+
         } break;
 
         case OP_NUM: {
-        
+
             return simpleInstruction("OP_NUM", offset);
-        
+
         } break;
 
         case OP_STR: {
-        
+
             return simpleInstruction("OP_STR", offset);
-        
+
         } break;
 
         default: {
-        
+
             printf("\nUnknown opcode %d\n", instruction);
             return offset + 1;
-        
+
         } break;
     }
 }
-

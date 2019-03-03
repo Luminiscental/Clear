@@ -6,8 +6,8 @@
 #include <string.h>
 
 #include "common.h"
-#include "obj.h"
 #include "memory.h"
+#include "obj.h"
 #include "value.h"
 
 void initVM(VM *vm) {
@@ -18,10 +18,7 @@ void initVM(VM *vm) {
     initTable(&vm->globals);
 }
 
-void resetStack(VM *vm) {
-
-    vm->stackTop = vm->stack;
-}
+void resetStack(VM *vm) { vm->stackTop = vm->stack; }
 
 InterpretResult push(VM *vm, Value value) {
 
@@ -92,7 +89,7 @@ static InterpretResult readBoolean(VM *vm, Value *out) {
         return INTERPRET_ERR;
     }
 
-    *out = makeBoolean((bool) val);
+    *out = makeBoolean((bool)val);
     return INTERPRET_OK;
 }
 
@@ -105,7 +102,7 @@ static InterpretResult readDouble(VM *vm, Value *out) {
 
     } else {
 
-        double *read = (double*) vm->ip;
+        double *read = (double *)vm->ip;
 
         vm->ip += 8;
 
@@ -117,7 +114,7 @@ static InterpretResult readDouble(VM *vm, Value *out) {
 static InterpretResult readStringRaw(VM *vm, Value *out) {
 
     uint8_t size;
-    if(readByte(vm, &size) != INTERPRET_OK) {
+    if (readByte(vm, &size) != INTERPRET_OK) {
 
         printf("|| Could not read size of string!\n");
         return INTERPRET_ERR;
@@ -142,46 +139,45 @@ static InterpretResult readStringRaw(VM *vm, Value *out) {
     return INTERPRET_OK;
 }
 
-#define ANY_OP(op) \
-    if (push(vm, op) != INTERPRET_OK) { \
-        printf("|| Could not push result of unary operation!\n"); \
-        return INTERPRET_ERR; \
+#define ANY_OP(op)                                                             \
+    if (push(vm, op) != INTERPRET_OK) {                                        \
+        printf("|| Could not push result of unary operation!\n");              \
+        return INTERPRET_ERR;                                                  \
     }
 
-#define UNARY_OP \
-    Value a; \
-    if (pop(vm, &a) != INTERPRET_OK) { \
-        printf("|| Expected value for unary operation!\n"); \
-        return INTERPRET_ERR; \
+#define UNARY_OP                                                               \
+    Value a;                                                                   \
+    if (pop(vm, &a) != INTERPRET_OK) {                                         \
+        printf("|| Expected value for unary operation!\n");                    \
+        return INTERPRET_ERR;                                                  \
     }
 
-#define TYPED_UNARY(expected, op) \
-    if (a.type == expected) { \
-        ANY_OP(op) \
+#define TYPED_UNARY(expected, op)                                              \
+    if (a.type == expected) {                                                  \
+        ANY_OP(op)                                                             \
     }
 
-#define OBJ_TYPED_UNARY(expected, op) \
-    if (isObjType(a, expected)) { \
-        ANY_OP(op) \
+#define OBJ_TYPED_UNARY(expected, op)                                          \
+    if (isObjType(a, expected)) {                                              \
+        ANY_OP(op)                                                             \
     }
 
-#define BINARY_OP \
-    Value a; \
-    Value b; \
-    if (pop(vm, &b) != INTERPRET_OK \
-     || pop(vm, &a) != INTERPRET_OK) { \
-        printf("|| Expected two values for binary operation!\n"); \
-        return INTERPRET_ERR; \
+#define BINARY_OP                                                              \
+    Value a;                                                                   \
+    Value b;                                                                   \
+    if (pop(vm, &b) != INTERPRET_OK || pop(vm, &a) != INTERPRET_OK) {          \
+        printf("|| Expected two values for binary operation!\n");              \
+        return INTERPRET_ERR;                                                  \
     }
 
-#define TYPED_BINARY(expected, op) \
-    if (a.type == expected && b.type == expected) { \
-        ANY_OP(op) \
+#define TYPED_BINARY(expected, op)                                             \
+    if (a.type == expected && b.type == expected) {                            \
+        ANY_OP(op)                                                             \
     }
 
-#define OBJ_TYPED_BINARY(expected, op) \
-    if (isObjType(a, expected) && isObjType(b, expected)) { \
-        ANY_OP(op) \
+#define OBJ_TYPED_BINARY(expected, op)                                         \
+    if (isObjType(a, expected) && isObjType(b, expected)) {                    \
+        ANY_OP(op)                                                             \
     }
 
 static void printStack(VM *vm) {
@@ -227,12 +223,12 @@ InterpretResult run(VM *vm) {
 
                 UNARY_OP
 
-                    ANY_OP(typeString(
+                ANY_OP(typeString(
 
-                        vm, a
+                    vm, a
 
                     ))
-                
+
             } break;
 
             case OP_TRUE: {
@@ -280,7 +276,7 @@ InterpretResult run(VM *vm) {
             } break;
 
             case OP_LOAD_GLOBAL: {
- 
+
                 uint8_t index;
                 if (readByte(vm, &index) != INTERPRET_OK) {
 
@@ -300,7 +296,7 @@ InterpretResult run(VM *vm) {
                     printf("|| Could not push global value!\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             case OP_POP: {
@@ -326,7 +322,7 @@ InterpretResult run(VM *vm) {
                 Value value;
 
                 if (pop(vm, &value) != INTERPRET_OK) {
-                    
+
                     printf("|| Expected value to print!\n");
                     return INTERPRET_ERR;
                 }
@@ -359,37 +355,40 @@ InterpretResult run(VM *vm) {
                 }
 
             } break;
-                
+
             case OP_ADD: {
 
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeNumber(
+                TYPED_BINARY(VAL_NUMBER, makeNumber(
 
-                        a.as.number + b.as.number
+                                             a.as.number + b.as.number
 
-                    ))
+                                             ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeInteger(
 
-                        a.as.integer + b.as.integer
+                                                  a.as.integer + b.as.integer
 
-                    ))
+                                                  ))
 
-                else
+                        else
 
                     OBJ_TYPED_BINARY(OBJ_STRING, concatStrings(
 
-                        vm, (ObjString*) a.as.obj, (ObjString*) b.as.obj
+                                                     vm, (ObjString *)a.as.obj,
+                                                     (ObjString *)b.as.obj
 
-                    ))
+                                                     ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot add values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers, integers or strings)\n");
+                    printf("|| Cannot add values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers, "
+                           "integers or strings)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -399,24 +398,26 @@ InterpretResult run(VM *vm) {
 
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeNumber(
+                TYPED_BINARY(VAL_NUMBER, makeNumber(
 
-                        a.as.number - b.as.number
+                                             a.as.number - b.as.number
 
-                    ))
+                                             ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeInteger(
 
-                        a.as.integer - b.as.integer
+                                                  a.as.integer - b.as.integer
 
-                    ))
+                                                  ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot subtract values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or integers)\n");
+                    printf("|| Cannot subtract values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or "
+                           "integers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -426,24 +427,26 @@ InterpretResult run(VM *vm) {
 
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeNumber(
+                TYPED_BINARY(VAL_NUMBER, makeNumber(
 
-                        a.as.number * b.as.number
+                                             a.as.number * b.as.number
 
-                    ))
+                                             ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeInteger(
 
-                        a.as.integer * b.as.integer
+                                                  a.as.integer * b.as.integer
 
-                    ))
+                                                  ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot multiply values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or integers)\n");
+                    printf("|| Cannot multiply values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or "
+                           "integers)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -453,15 +456,16 @@ InterpretResult run(VM *vm) {
 
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeNumber(
+                TYPED_BINARY(VAL_NUMBER, makeNumber(
 
-                        a.as.number / b.as.number
+                                             a.as.number / b.as.number
 
-                    ))
+                                             ))
 
                 else {
 
-                    printf("|| Cannot divide values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| Cannot divide values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
                     printf("|| (Values must be both numbers)\n");
                     return INTERPRET_ERR;
                 }
@@ -472,24 +476,26 @@ InterpretResult run(VM *vm) {
 
                 UNARY_OP
 
-                    TYPED_UNARY(VAL_NUMBER, makeNumber(
+                TYPED_UNARY(VAL_NUMBER, makeNumber(
 
-                        -a.as.number
+                                            -a.as.number
 
-                    ))
+                                            ))
 
                 else
 
                     TYPED_UNARY(VAL_INTEGER, makeInteger(
 
-                        -a.as.integer
+                                                 -a.as.integer
 
-                    ))
+                                                 ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot negate a value of type '%s'!\n", typeStringLiteral(a));
-                    printf("|| (Value must be either a number or an integer)\n");
+                    printf("|| Cannot negate a value of type '%s'!\n",
+                           typeStringLiteral(a));
+                    printf(
+                        "|| (Value must be either a number or an integer)\n");
                     return INTERPRET_ERR;
                 }
 
@@ -499,147 +505,160 @@ InterpretResult run(VM *vm) {
 
                 BINARY_OP
 
-                    ANY_OP(makeBoolean(
+                ANY_OP(makeBoolean(
 
-                        valuesEqual(a, b)
+                    valuesEqual(a, b)
 
-                    ))
-            
+                        ))
+
             } break;
 
             case OP_NEQUAL: {
-            
+
                 BINARY_OP
 
-                    ANY_OP(makeBoolean(
+                ANY_OP(makeBoolean(
 
-                        !valuesEqual(a, b)
+                    !valuesEqual(a, b)
 
-                    ))
-            
+                        ))
+
             } break;
 
             case OP_LESS: {
-            
+
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeBoolean(
+                TYPED_BINARY(VAL_NUMBER,
+                             makeBoolean(
 
-                        a.as.number < b.as.number - NUMBER_PRECISION
+                                 a.as.number < b.as.number - NUMBER_PRECISION
 
-                    ))
+                                 ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeBoolean(
 
-                        a.as.integer < b.as.integer
+                                                  a.as.integer < b.as.integer
 
-                    ))
+                                                  ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or integers)\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or "
+                           "integers)\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             case OP_NLESS: {
-            
+
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeBoolean(
+                TYPED_BINARY(VAL_NUMBER,
+                             makeBoolean(
 
-                        a.as.number > b.as.number - NUMBER_PRECISION
+                                 a.as.number > b.as.number - NUMBER_PRECISION
 
-                    ))
+                                 ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeBoolean(
 
-                        a.as.integer >= b.as.integer
+                                                  a.as.integer >= b.as.integer
 
-                    ))
+                                                  ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or integers)\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or "
+                           "integers)\n");
                     return INTERPRET_ERR;
                 }
 
             } break;
 
             case OP_GREATER: {
-            
+
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeBoolean(
+                TYPED_BINARY(VAL_NUMBER,
+                             makeBoolean(
 
-                        a.as.number > b.as.number + NUMBER_PRECISION
+                                 a.as.number > b.as.number + NUMBER_PRECISION
 
-                    ))
+                                 ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeBoolean(
 
-                        a.as.integer > b.as.integer
+                                                  a.as.integer > b.as.integer
 
-                    ))
+                                                  ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or integers)\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or "
+                           "integers)\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             case OP_NGREATER: {
-            
+
                 BINARY_OP
 
-                    TYPED_BINARY(VAL_NUMBER, makeBoolean(
+                TYPED_BINARY(VAL_NUMBER,
+                             makeBoolean(
 
-                        a.as.number < b.as.number + NUMBER_PRECISION
+                                 a.as.number < b.as.number + NUMBER_PRECISION
 
-                    ))
+                                 ))
 
                 else
 
                     TYPED_BINARY(VAL_INTEGER, makeBoolean(
 
-                        a.as.integer <= b.as.integer
+                                                  a.as.integer <= b.as.integer
 
-                    ))
+                                                  ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n", typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or integers)\n");
+                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
+                           typeStringLiteral(a), typeStringLiteral(b));
+                    printf("|| (Types must be the same, and either numbers or "
+                           "integers)\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             case OP_NOT: {
 
                 UNARY_OP
 
-                    TYPED_UNARY(VAL_BOOL, makeBoolean(
+                TYPED_UNARY(VAL_BOOL, makeBoolean(
 
-                        !a.as.boolean
+                                          !a.as.boolean
 
-                    ))
+                                          ))
 
                 else {
 
-                    printf("|| Cannot apply ! to a value of type '%s'!\n", typeStringLiteral(a));
+                    printf("|| Cannot apply ! to a value of type '%s'!\n",
+                           typeStringLiteral(a));
                     printf("|| (Value must be a boolean)\n");
                     return INTERPRET_ERR;
                 }
@@ -650,156 +669,169 @@ InterpretResult run(VM *vm) {
 
                 UNARY_OP
 
-                    TYPED_UNARY(VAL_INTEGER,
+                TYPED_UNARY(VAL_INTEGER,
 
-                        a
+                            a
 
-                    )
+                )
 
                 else
 
                     TYPED_UNARY(VAL_NUMBER, makeInteger(
 
-                        (int32_t) a.as.number
+                                                (int32_t)a.as.number
 
-                    ))
+                                                ))
 
-                else
+                        else
 
                     TYPED_UNARY(VAL_BOOL, makeInteger(
 
-                        a.as.boolean ? 1 : 0
+                                              a.as.boolean ? 1 : 0
 
-                    ))
+                                              ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot convert a value of type '%s' to an integer!\n", typeStringLiteral(a));
-                    printf("|| (Value must be an integer, number or boolean)\n");
+                    printf("|| Cannot convert a value of type '%s' to an "
+                           "integer!\n",
+                           typeStringLiteral(a));
+                    printf(
+                        "|| (Value must be an integer, number or boolean)\n");
                     return INTERPRET_ERR;
                 }
 
             } break;
 
             case OP_BOOL: {
-            
+
                 UNARY_OP
 
-                    TYPED_UNARY(VAL_BOOL,
+                TYPED_UNARY(VAL_BOOL,
 
-                        a
+                            a
 
-                    )
+                )
 
                 else
 
                     TYPED_UNARY(VAL_INTEGER, makeBoolean(
 
-                        a.as.integer != 0
+                                                 a.as.integer != 0
 
-                    ))
+                                                 ))
 
-                else
+                        else
 
                     TYPED_UNARY(VAL_NUMBER, makeBoolean(
 
-                        a.as.number != 0.0
+                                                a.as.number != 0.0
 
-                    ))
+                                                ))
 
-                else
+                        else
 
-                    OBJ_TYPED_UNARY(OBJ_STRING, makeBoolean(
+                    OBJ_TYPED_UNARY(OBJ_STRING,
+                                    makeBoolean(
 
-                        ((ObjString*) a.as.obj)->length != 0
+                                        ((ObjString *)a.as.obj)->length != 0
 
-                    ))
+                                        ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot convert value of type '%s' to a boolean!\n", typeStringLiteral(a));
-                    printf("|| (Value must be a number, integer, boolean or string)\n");
+                    printf(
+                        "|| Cannot convert value of type '%s' to a boolean!\n",
+                        typeStringLiteral(a));
+                    printf("|| (Value must be a number, integer, boolean or "
+                           "string)\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             case OP_NUM: {
-            
+
                 UNARY_OP
 
-                    TYPED_UNARY(VAL_NUMBER,
+                TYPED_UNARY(VAL_NUMBER,
 
-                        a
+                            a
 
-                    )
+                )
 
                 else
 
                     TYPED_UNARY(VAL_INTEGER, makeNumber(
 
-                        (double) a.as.integer
+                                                 (double)a.as.integer
 
-                    ))
+                                                 ))
 
-                else
+                        else
 
                     TYPED_UNARY(VAL_BOOL, makeNumber(
 
-                        a.as.boolean ? 1.0 : 0.0
+                                              a.as.boolean ? 1.0 : 0.0
 
-                    ))
+                                              ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot convert value of type '%s' to a number!\n", typeStringLiteral(a));
+                    printf(
+                        "|| Cannot convert value of type '%s' to a number!\n",
+                        typeStringLiteral(a));
                     printf("|| (Value must be a number, integer or boolean)\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             case OP_STR: {
-            
+
                 UNARY_OP
 
-                    OBJ_TYPED_UNARY(OBJ_STRING,
+                OBJ_TYPED_UNARY(OBJ_STRING,
 
-                        a
+                                a
 
-                    )
-
-                else
-
-                    TYPED_UNARY(VAL_BOOL, makeStringFromLiteral(
-
-                        vm, a.as.boolean ? "true" : "false"
-
-                    ))
+                )
 
                 else
+
+                    TYPED_UNARY(VAL_BOOL,
+                                makeStringFromLiteral(
+
+                                    vm, a.as.boolean ? "true" : "false"
+
+                                    ))
+
+                        else
 
                     TYPED_UNARY(VAL_INTEGER, makeStringFromInteger(
 
-                        vm, a.as.integer
+                                                 vm, a.as.integer
 
-                    ))
+                                                 ))
 
-                else
+                        else
 
                     TYPED_UNARY(VAL_NUMBER, makeStringFromNumber(
 
-                        vm, a.as.number
+                                                vm, a.as.number
 
-                    ))
+                                                ))
 
-                else {
+                        else {
 
-                    printf("|| Cannot convert a value of type '%s' to a string!\n", typeStringLiteral(a));
-                    printf("|| (Value must be a string, boolean, integer of number)\n");
+                    printf(
+                        "|| Cannot convert a value of type '%s' to a string!\n",
+                        typeStringLiteral(a));
+                    printf("|| (Value must be a string, boolean, integer of "
+                           "number)\n");
                     return INTERPRET_ERR;
                 }
-            
+
             } break;
 
             default: {
@@ -818,4 +850,3 @@ InterpretResult run(VM *vm) {
 #undef TYPED_UNARY
 #undef UNARY_OP
 #undef ANY_OP
-

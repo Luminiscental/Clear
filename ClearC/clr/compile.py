@@ -1,31 +1,33 @@
-
 from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import emit_error
 from clr.assemble import assemble
 from clr.constants import Constants, ClrNum, ClrInt, ClrStr, Index
 from clr.values import OpCode, Precedence, pratt_table, debug
 
-class Globals:
 
+class GlobalVariables:
     def __init__(self):
         self.indices = {}
         self.index = 0
 
+    def get_name(self, name):
+        try:
+            return self.indices[name]
+        except KeyError:
+            emit_error(f"Reference to undefined global {name}!")()
+
     def add_name(self, name):
-        if name in self.indices:
-            return self.indices[name]
-        else:
-            if debug:
-                print(f'Adding global {self.index}:{name}')
-            self.indices[name] = Index(self.index)
-            self.index += 1
-            return self.indices[name]
+        if debug:
+            print(f"Adding global {self.index}:{name}")
+        self.indices[name] = Index(self.index)
+        self.index += 1
+        return self.indices[name]
+
 
 class Program:
-
     def __init__(self):
         self.code_list = []
-        self.globals = Globals()
+        self.global_variables = GlobalVariables()
 
     def load_constant(self, constant):
         self.code_list.append(OpCode.LOAD_CONST)
@@ -61,12 +63,12 @@ class Program:
 
     def define_name(self, name):
         self.code_list.append(OpCode.DEFINE_GLOBAL)
-        index = self.globals.add_name(name)
+        index = self.global_variables.add_name(name)
         self.code_list.append(index)
 
     def load_name(self, name):
         self.code_list.append(OpCode.LOAD_GLOBAL)
-        index = self.globals.add_name(name)
+        index = self.global_variables.get_name(name)
         self.code_list.append(index)
 
     def op_true(self):
@@ -114,8 +116,8 @@ class Program:
     def flush(self):
         return self.code_list
 
-class Cursor:
 
+class Cursor:
     def __init__(self, tokens):
         self.index = 0
         self.tokens = tokens
@@ -130,6 +132,9 @@ class Cursor:
 
     def current_info(self):
         return token_info(self.get_current())
+
+    def prev_info(self):
+        return token_info(self.get_prev())
 
     def advance(self):
         self.index += 1
@@ -152,13 +157,10 @@ class Cursor:
         self.program.op_return()
         return self.constants.flush() + self.program.flush()
 
+
 class Parser(Cursor):
-
-    def __init__(self, tokens):
-        super().__init__(tokens)
-
     def get_rule(self, token):
-        err = emit_error(f'Expected expression! {token_info(token)}')
+        err = emit_error(f"Expected expression! {token_info(token)}")
         rule = pratt_table(self)[token.token_type]
         rule.fill(err)
         return rule
@@ -168,52 +170,51 @@ class Parser(Cursor):
 
     def consume_builtin(self):
         builtin = self.get_prev()
-        self.consume(TokenType.LEFT_PAREN,
-            f'Expected parameter to built-in function! {self.current_info()}')
+        self.consume(
+            TokenType.LEFT_PAREN,
+            f"Expected parameter to built-in function! {self.prev_info()}",
+        )
         self.finish_grouping()
         {
-            TokenType.TYPE : self.program.op_type,
-            TokenType.INT : self.program.op_int,
-            TokenType.BOOL : self.program.op_bool,
-            TokenType.NUM : self.program.op_num,
-            TokenType.STR : self.program.op_str
-        }.get(builtin.token_type,
-            emit_error(f'Expected built-in function! {self.current_info()}')
+            TokenType.TYPE: self.program.op_type,
+            TokenType.INT: self.program.op_int,
+            TokenType.BOOL: self.program.op_bool,
+            TokenType.NUM: self.program.op_num,
+            TokenType.STR: self.program.op_str,
+        }.get(
+            builtin.token_type,
+            emit_error(f"Expected built-in function! {self.prev_info()}"),
         )()
 
     def consume_boolean(self):
         token = self.get_prev()
-        err = emit_error(f'Expected boolean token! {self.current_info()}')
+        err = emit_error(f"Expected boolean token! {self.prev_info()}")
         {
             TokenType.TRUE: self.program.op_true,
-            TokenType.FALSE: self.program.op_false
+            TokenType.FALSE: self.program.op_false,
         }.get(token.token_type, err)()
 
     def consume_number(self):
         token = self.get_prev()
         if token.token_type != TokenType.NUMBER:
-            emit_error(f'Expected number token! {self.current_info()}')()
+            emit_error(f"Expected number token! {self.prev_info()}")()
         if self.match(TokenType.INTEGER_SUFFIX):
             try:
                 value = ClrInt(token.lexeme)
             except ValueError:
-                emit_error(
-                    f'Int literal must be an integer! {self.current_info()}'
-                )()
+                emit_error(f"Integer literal must be an integer! {self.prev_info()}")()
         else:
             try:
                 value = ClrNum(token.lexeme)
             except ValueError:
-                emit_error(
-                    f'Number literal must be a number! {self.current_info()}'
-                )()
+                emit_error(f"Number literal must be a number! {self.prev_info()}")()
         const_index = self.constants.add(value)
         self.program.load_constant(const_index)
 
     def consume_string(self):
         token = self.get_prev()
         if token.token_type != TokenType.STRING:
-            emit_error(f'Expected string token! {self.current_info()}')()
+            emit_error(f"Expected string token! {self.prev_info()}")()
 
         total = [token]
         while self.match(TokenType.STRING):
@@ -232,54 +233,58 @@ class Parser(Cursor):
 
     def finish_grouping(self):
         self.consume_expression()
-        self.consume(TokenType.RIGHT_PAREN,
-            f'Expected \')\' after expression! {self.current_info()}')
+        self.consume(
+            TokenType.RIGHT_PAREN, f"Expected ')' after expression! {self.prev_info()}"
+        )
 
     def finish_unary(self):
         op_token = self.get_prev()
         self.consume_precedence(Precedence.UNARY)
         {
-            TokenType.MINUS : self.program.op_negate,
-            TokenType.BANG : self.program.op_not
-        }.get(op_token.token_type, emit_error(
-            f'Expected unary operator! {self.current_info()}'
-        ))()
+            TokenType.MINUS: self.program.op_negate,
+            TokenType.BANG: self.program.op_not,
+        }.get(
+            op_token.token_type,
+            emit_error(f"Expected unary operator! {self.prev_info()}"),
+        )()
 
     def finish_binary(self):
         op_token = self.get_prev()
         rule = self.get_rule(op_token)
         self.consume_precedence(rule.precedence.next())
         {
-            TokenType.PLUS : self.program.op_add,
-            TokenType.MINUS : self.program.op_subtract,
-            TokenType.STAR : self.program.op_multiply,
-            TokenType.SLASH : self.program.op_divide,
+            TokenType.PLUS: self.program.op_add,
+            TokenType.MINUS: self.program.op_subtract,
+            TokenType.STAR: self.program.op_multiply,
+            TokenType.SLASH: self.program.op_divide,
             TokenType.EQUAL_EQUAL: self.program.op_equal,
             TokenType.BANG_EQUAL: self.program.op_nequal,
             TokenType.LESS: self.program.op_less,
             TokenType.GREATER_EQUAL: self.program.op_nless,
             TokenType.GREATER: self.program.op_greater,
-            TokenType.LESS_EQUAL: self.program.op_ngreater
-        }.get(op_token.token_type, emit_error(
-            f'Expected binary operator! {self.current_info()}'
-        ))()
+            TokenType.LESS_EQUAL: self.program.op_ngreater,
+        }.get(
+            op_token.token_type,
+            emit_error(f"Expected binary operator! {self.prev_info()}"),
+        )()
 
     def consume_expression(self):
         self.consume_precedence(Precedence.ASSIGNMENT)
 
     def consume_print_statement(self):
-        if self.match(TokenType.SEMICOLON): # Blank print statement
+        if self.match(TokenType.SEMICOLON):  # Blank print statement
             self.program.op_print_blank()
         else:
             self.consume_expression()
-            self.consume(TokenType.SEMICOLON,
-                f'Expected semicolon after statement! {self.current_info()}')
+            self.consume(
+                TokenType.SEMICOLON,
+                f"Expected semicolon after statement! {self.prev_info()}",
+            )
             self.program.op_print()
 
     def consume_expression_statement(self):
         self.consume_expression()
-        self.consume(TokenType.SEMICOLON,
-            f'Expected statement! {self.current_info()}')
+        self.consume(TokenType.SEMICOLON, f"Expected statement! {self.prev_info()}")
         self.program.op_pop()
 
     def consume_statement(self):
@@ -293,19 +298,21 @@ class Parser(Cursor):
         return self.get_prev().lexeme
 
     def consume_variable_declaration(self):
-        name = self.consume_variable(
-            f'Expected variable name! {self.current_info()}')
-        self.consume(TokenType.EQUAL,
-            f'Expected variable initializer! {self.current_info()}')
+        name = self.consume_variable(f"Expected variable name! {self.prev_info()}")
+        self.consume(
+            TokenType.EQUAL, f"Expected variable initializer! {self.prev_info()}"
+        )
         self.consume_expression()
-        self.consume(TokenType.SEMICOLON,
-            f'Expected semicolon after statement! {self.current_info()}')
+        self.consume(
+            TokenType.SEMICOLON,
+            f"Expected semicolon after statement! {self.prev_info()}",
+        )
         self.program.define_name(name)
 
     def consume_variable_reference(self):
         token = self.get_prev()
         if token.token_type != TokenType.IDENTIFIER:
-            emit_error(f'Expected variable! {self.current_info()}')()
+            emit_error(f"Expected variable! {self.prev_info()}")()
         self.program.load_name(token.lexeme)
 
     def consume_declaration(self):
@@ -314,17 +321,14 @@ class Parser(Cursor):
         else:
             self.consume_statement()
 
+
 def parse_source(source):
 
     tokens = tokenize(source)
-
     if debug:
-        print('Tokens:')
-        print(' '.join(map(lambda token: token.lexeme, tokens)))
-
+        print("Tokens:")
+        print(" ".join([token.lexeme for token in tokens]))
     parser = Parser(tokens)
     while not parser.match(TokenType.EOF):
         parser.consume_declaration()
-
     return assemble(parser.flush())
-

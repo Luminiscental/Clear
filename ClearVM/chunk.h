@@ -8,36 +8,51 @@ typedef struct sVM VM;
 
 typedef enum {
 
+    // Constant storage
     OP_STORE_CONST = 0,
-    OP_NUMBER = 1,
-    OP_STRING = 2,
-    OP_PRINT = 3,
+    OP_INTEGER = 1,
+    OP_NUMBER = 2,
+    OP_STRING = 3,
+
+    // Constant generation
     OP_LOAD_CONST = 4,
-    OP_NEGATE = 5,
-    OP_ADD = 6,
-    OP_SUBTRACT = 7,
-    OP_MULTIPLY = 8,
-    OP_DIVIDE = 9,
-    OP_RETURN = 10,
-    OP_POP = 11,
-    OP_DEFINE_GLOBAL = 12,
-    OP_TRUE = 13,
-    OP_FALSE = 14,
-    OP_NOT = 15,
-    OP_LESS = 16,
-    OP_NLESS = 17,
-    OP_GREATER = 18,
-    OP_NGREATER = 19,
-    OP_EQUAL = 20,
-    OP_NEQUAL = 21,
-    OP_LOAD_GLOBAL = 22,
-    OP_PRINT_BLANK = 23,
-    OP_TYPE = 24,
-    OP_INTEGER = 25,
-    OP_INT = 26,
-    OP_BOOL = 27,
-    OP_NUM = 28,
-    OP_STR = 29
+    OP_TRUE = 5,
+    OP_FALSE = 6,
+
+    // Variables
+    OP_DEFINE_GLOBAL = 7,
+    OP_LOAD_GLOBAL = 8,
+
+    // Built-ins
+    OP_TYPE = 9,
+    OP_INT = 10,
+    OP_BOOL = 11,
+    OP_NUM = 12,
+    OP_STR = 13,
+
+    // Statements
+    OP_PRINT = 14,
+    OP_PRINT_BLANK = 15,
+    OP_RETURN = 16,
+    OP_POP = 17,
+
+    // Arithmetic operators
+    OP_NEGATE = 18,
+    OP_ADD = 19,
+    OP_SUBTRACT = 20,
+    OP_MULTIPLY = 21,
+    OP_DIVIDE = 22,
+
+    // Comparison operators
+    OP_LESS = 23,
+    OP_NLESS = 24,
+    OP_GREATER = 25,
+    OP_NGREATER = 26,
+    OP_EQUAL = 27,
+    OP_NEQUAL = 28,
+
+    // Boolean operators
+    OP_NOT = 29
 
 } OpCode;
 

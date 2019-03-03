@@ -3,10 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "common.h"
 #include "chunk.h"
-#include "vm.h"
+#include "common.h"
 #include "memory.h"
+#include "vm.h"
 
 typedef struct {
 
@@ -35,7 +35,7 @@ FileBuffer readFile(const char *name) {
 
     FREE_ARRAY(char, fileName, fileNameLength + 1);
 
-    FileBuffer result = { .buffer = NULL, .length = 0 };
+    FileBuffer result = {.buffer = NULL, .length = 0};
 
     if (!inFile) {
 
@@ -43,7 +43,7 @@ FileBuffer readFile(const char *name) {
     }
 
     if (fseek(inFile, 0, SEEK_END)) {
-        
+
         fclose(inFile);
         return result;
     }
@@ -122,4 +122,3 @@ int main(int argc, char **argv) {
 
     return 0;
 }
-

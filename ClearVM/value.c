@@ -11,7 +11,7 @@
 Value makeInteger(int32_t integer) {
 
     Value result;
-    
+
     result.type = VAL_INTEGER;
     result.hash = integer;
     result.as.integer = integer;
@@ -35,7 +35,7 @@ Value makeNumber(double number) {
     Value result;
 
     result.type = VAL_NUMBER;
-    result.hash = *((uint32_t*) &number);
+    result.hash = *((uint32_t *)&number);
     result.as.number = number;
 
     return result;
@@ -46,37 +46,36 @@ const char *typeStringLiteral(Value a) {
     switch (a.type) {
 
         case VAL_INTEGER: {
-        
+
             return "integer";
-        
+
         } break;
-   
+
         case VAL_BOOL: {
-    
+
             return "bool";
-    
+
         } break;
 
         case VAL_NUMBER: {
-        
+
             return "number";
-        
+
         } break;
 
         case VAL_OBJ: {
-        
+
             switch (a.as.obj->type) {
-            
+
                 case OBJ_STRING: {
-            
+
                     return "string (obj)";
-            
+
                 } break;
             }
-        
+
         } break;
     }
-
 }
 
 Value typeString(VM *vm, Value a) {
@@ -86,8 +85,10 @@ Value typeString(VM *vm, Value a) {
 
 bool valuesEqual(Value a, Value b) {
 
-    if (a.type != b.type) return false;
-    if (a.hash != b.hash) return false;
+    if (a.type != b.type)
+        return false;
+    if (a.hash != b.hash)
+        return false;
 
     switch (a.type) {
 
@@ -96,7 +97,7 @@ bool valuesEqual(Value a, Value b) {
             return a.as.integer == b.as.integer;
 
         } break;
-    
+
         case VAL_BOOL: {
 
             return a.as.boolean == b.as.boolean;
@@ -106,21 +107,23 @@ bool valuesEqual(Value a, Value b) {
         case VAL_NUMBER: {
 
             double diff = a.as.number - b.as.number;
-            if (diff < 0) diff = -diff;
+            if (diff < 0)
+                diff = -diff;
             return diff < NUMBER_PRECISION;
 
         } break;
 
         case VAL_OBJ: {
 
-            if (a.as.obj->type != b.as.obj->type) return false;
+            if (a.as.obj->type != b.as.obj->type)
+                return false;
 
             switch (a.as.obj->type) {
-            
+
                 case OBJ_STRING: {
-            
+
                     return a.as.obj == b.as.obj;
-            
+
                 } break;
             }
 
@@ -141,8 +144,8 @@ void writeValueArray(ValueArray *array, Value value) {
 
         int oldCapacity = array->capacity;
         array->capacity = GROW_CAPACITY(oldCapacity);
-        array->values = GROW_ARRAY(array->values, Value, oldCapacity,
-                array->capacity);
+        array->values =
+            GROW_ARRAY(array->values, Value, oldCapacity, array->capacity);
     }
 
     array->values[array->count++] = value;
@@ -177,20 +180,20 @@ void printValue(Value value, bool endLine) {
         } break;
 
         case VAL_OBJ: {
-        
+
             switch (value.as.obj->type) {
-            
+
                 case OBJ_STRING: {
-            
-                    ObjString *strObj = (ObjString*) value.as.obj;
+
+                    ObjString *strObj = (ObjString *)value.as.obj;
                     printf("%s", strObj->chars);
-            
+
                 } break;
             }
-        
+
         } break;
     }
 
-    if (endLine) printf("\n");
+    if (endLine)
+        printf("\n");
 }
-

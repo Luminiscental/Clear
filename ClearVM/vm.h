@@ -2,8 +2,8 @@
 #define clearvm_vm_h
 
 #include "chunk.h"
-#include "value.h"
 #include "table.h"
+#include "value.h"
 
 #define STACK_MAX 256
 

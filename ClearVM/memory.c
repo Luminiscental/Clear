@@ -33,11 +33,11 @@ static void freeObject(Obj *object) {
     switch (object->type) {
 
         case OBJ_STRING: {
-        
-            ObjString *objStr = (ObjString*) object;
+
+            ObjString *objStr = (ObjString *)object;
             FREE_ARRAY(char, objStr->chars, objStr->length + 1);
             FREE(ObjString, objStr);
-        
+
         } break;
     }
 }

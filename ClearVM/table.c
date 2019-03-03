@@ -32,7 +32,8 @@ static Entry *findEntry(Entry *entries, size_t capacity, Value key) {
 
         } else if (entry->state == ENTRY_TOMBSTONE) {
 
-            if (tombstone == NULL) tombstone = entry;
+            if (tombstone == NULL)
+                tombstone = entry;
 
         } else if (valuesEqual(entry->key, key)) {
 
@@ -57,7 +58,8 @@ static void adjustCapacity(Table *table, size_t capacity) {
 
         Entry *entry = table->entries + i;
 
-        if (isAvailable(entry)) continue;
+        if (isAvailable(entry))
+            continue;
 
         Entry *dest = findEntry(entries, capacity, entry->key);
         dest->key = entry->key;
@@ -73,10 +75,12 @@ static void adjustCapacity(Table *table, size_t capacity) {
 
 bool tableGet(Table *table, Value key, Value *outValue) {
 
-    if (table->entries == NULL) return false;
+    if (table->entries == NULL)
+        return false;
 
     Entry *entry = findEntry(table->entries, table->capacity, key);
-    if (isAvailable(entry)) return false;
+    if (isAvailable(entry))
+        return false;
 
     *outValue = entry->value;
     return true;
@@ -93,7 +97,8 @@ bool tableSet(Table *table, Value key, Value value) {
     Entry *entry = findEntry(table->entries, table->capacity, key);
 
     bool isNewKey = entry->state == ENTRY_EMPTY;
-    if (isNewKey) table->count++;
+    if (isNewKey)
+        table->count++;
 
     entry->key = key;
     entry->value = value;
@@ -104,10 +109,12 @@ bool tableSet(Table *table, Value key, Value value) {
 
 bool tableDelete(Table *table, Value key) {
 
-    if (table->count == 0) return false;
+    if (table->count == 0)
+        return false;
 
     Entry *entry = findEntry(table->entries, table->capacity, key);
-    if (isAvailable(entry)) return false;
+    if (isAvailable(entry))
+        return false;
 
     entry->state = ENTRY_TOMBSTONE;
     return true;
@@ -131,4 +138,3 @@ void freeTable(Table *table) {
     FREE_ARRAY(Entry, table->entries, table->capacity);
     initTable(table);
 }
-

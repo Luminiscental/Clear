@@ -1,13 +1,13 @@
-
 from enum import Enum
 
+
 class TrieResult(Enum):
-    CONTINUE = 0,
-    FINISH = 1,
+    CONTINUE = 0
+    FINISH = 1
     BREAK = 2
 
-class Node:
 
+class Node:
     def __init__(self, char, string):
         self.children = []
         self.char = char
@@ -35,8 +35,8 @@ class Node:
                 return child
         return None
 
-class Trie:
 
+class Trie:
     def __init__(self, words=[]):
         self.roots = []
         self.reset()
@@ -62,9 +62,11 @@ class Trie:
             else:
                 self.pointer = find
 
-        return ((TrieResult.CONTINUE, self.pointer.string)
-                if self.pointer.children
-                else (TrieResult.FINISH, self.pointer.string))
+        return (
+            (TrieResult.CONTINUE, self.pointer.string)
+            if self.pointer.children
+            else (TrieResult.FINISH, self.pointer.string)
+        )
 
     def reset(self):
         self.pointer = None
@@ -82,5 +84,3 @@ class Trie:
                 if len(word) > 1:
                     new_node.add_word(word[1:])
                 self.roots.append(new_node)
-
-
