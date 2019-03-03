@@ -194,15 +194,17 @@ ParseRule = namedtuple(
 
 
 def make_rule(err, prefix=None, infix=None, precedence=Precedence.NONE):
-    prefix = prefix or err
-    infix = infix or err
+    if prefix is None:
+        prefix = err
+    if infix is None:
+        infix = err
     return ParseRule(prefix=prefix, infix=infix, precedence=precedence)
 
 
 def pratt_table(parser, err):
 
     return defaultdict(
-        ParseRule,
+        lambda: make_rule(err=err),
         {
             TokenType.LEFT_PAREN: make_rule(
                 prefix=parser.finish_grouping, precedence=Precedence.CALL, err=err

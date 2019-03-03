@@ -19,7 +19,7 @@ class ScanState(Enum):
 
 def token_info(token):
 
-    return f'<line {token.line}> {str(token.token_type)} "{token.lexeme}"'
+    return f'<line {token.line}> "{token.lexeme}"'
 
 
 def store_acc(token_type, acc, line, tokens):
@@ -107,9 +107,9 @@ def scan_any(char, acc, line, tokens, keyword_trie):
     elif char == '"':
         acc.append(char)
         next_state = ScanState.STRING
-    elif char == "\n":
-        line += 1
     elif char.isspace():
+        if char == "\n":
+            line += 1
         tokens.append(Token(TokenType.SPACE, " ", line))
     elif char.isalpha() or char == "_":
         if tokens and tokens[-1].token_type in KEYWORD_TYPES.values():
