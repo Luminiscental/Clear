@@ -30,7 +30,7 @@ def main():
     else:
         print("Compiled successfully")
         # TODO: Gen intermediate / AST
-        # TODO: Gen DEBUG symbols
+        # TODO: Gen debug symbols
         with open(dest_file_name, "wb") as dest_file:
             dest_file.write(byte_code)
 
