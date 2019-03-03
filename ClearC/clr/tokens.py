@@ -1,18 +1,11 @@
 import re
 from enum import Enum
+from collections import namedtuple
 from clr.errors import emit_error
 from clr.trie import Trie, TrieResult
-from clr.values import TokenType, keyword_types, simple_tokens, equal_suffix_tokens
+from clr.values import TokenType, KEYWORD_TYPES, SIMPLE_TOKENS, EQUAL_SUFFIX_TOKENS
 
-
-class Token:
-    def __init__(self, token_type, lexeme, line):
-        self.token_type = token_type
-        self.lexeme = lexeme
-        self.line = line
-
-    def __repr__(self):
-        return f"Token({self.token_type}, '{self.lexeme}', {self.line})"
+Token = namedtuple("Token", "token_type lexeme line")
 
 
 class ScanState(Enum):
@@ -35,47 +28,44 @@ def store_acc(token_type, acc, line, tokens):
     del acc[:]
 
 
-def scan_number(char, acc, line, keyword_trie, tokens):
+def scan_number(char, acc, line, tokens):
 
     if char.isdigit():
         acc.append(char)
         return True, None, line
-    elif char == ".":
+    if char == ".":
         acc.append(char)
         return True, ScanState.DECIMAL, line
-    elif char == "i":
+    if char == "i":
         store_acc(TokenType.NUMBER, acc, line, tokens)
         tokens.append(Token(TokenType.INTEGER_SUFFIX, "i", line))
         return True, ScanState.ANY, line
-    else:
-        store_acc(TokenType.NUMBER, acc, line, tokens)
-        return False, ScanState.ANY, line
+    store_acc(TokenType.NUMBER, acc, line, tokens)
+    return False, ScanState.ANY, line
 
 
-def scan_decimal(char, acc, line, keyword_trie, tokens):
+def scan_decimal(char, acc, line, tokens):
 
     if char.isdigit():
         acc.append(char)
         return True, None, line
-    else:
-        store_acc(TokenType.NUMBER, acc, line, tokens)
-        return False, ScanState.ANY, line
+    store_acc(TokenType.NUMBER, acc, line, tokens)
+    return False, ScanState.ANY, line
 
 
-def scan_string(char, acc, line, keyword_trie, tokens):
+def scan_string(char, acc, line, tokens):
 
     if char == '"':
         acc.append(char)
         store_acc(TokenType.STRING, acc, line, tokens)
         return True, ScanState.ANY, line
-    else:
-        if char == "\n":
-            line += 1
-        acc.append(char)
-        return True, None, line
+    if char == "\n":
+        line += 1
+    acc.append(char)
+    return True, None, line
 
 
-def scan_identifier(char, acc, line, keyword_trie, tokens):
+def scan_identifier(char, acc, line, tokens, keyword_trie):
 
     if char.isalpha() or char.isdigit() or char == "_":
         result, _ = keyword_trie.step(char)
@@ -83,58 +73,56 @@ def scan_identifier(char, acc, line, keyword_trie, tokens):
         if result == TrieResult.FINISH:
             lexeme = "".join(acc)
             try:
-                token_type = keyword_types[lexeme]
+                token_type = KEYWORD_TYPES[lexeme]
             except KeyError:
                 emit_error(f'Expected keyword! <line {line}> "{lexeme}"')()
             store_acc(token_type, acc, line, tokens)
             return True, ScanState.ANY, line
         return True, None, line
-    else:
-        store_acc(TokenType.IDENTIFIER, acc, line, tokens)
-        return False, ScanState.ANY, line
+    store_acc(TokenType.IDENTIFIER, acc, line, tokens)
+    return False, ScanState.ANY, line
 
 
-def scan_any(char, acc, line, keyword_trie, tokens):
+def scan_any(char, acc, line, tokens, keyword_trie):
 
-    if char in simple_tokens:
-        tokens.append(Token(simple_tokens[char], char, line))
-        return None, line
+    next_state = None
+
+    if char in SIMPLE_TOKENS:
+        tokens.append(Token(SIMPLE_TOKENS[char], char, line))
     elif (
         char == "="
         and tokens
-        and tokens[-1].lexeme in equal_suffix_tokens
+        and tokens[-1].lexeme in EQUAL_SUFFIX_TOKENS
         and tokens[-1].token_type != TokenType.EQUAL_EQUAL
     ):
-        suffix_type = equal_suffix_tokens[tokens[-1].lexeme]
+        suffix_type = EQUAL_SUFFIX_TOKENS[tokens[-1].lexeme]
         tokens[-1] = Token(suffix_type.present, tokens[-1].lexeme + "=", line)
-        return None, line
-    elif char in equal_suffix_tokens:
-        suffix_type = equal_suffix_tokens[char]
+    elif char in EQUAL_SUFFIX_TOKENS:
+        suffix_type = EQUAL_SUFFIX_TOKENS[char]
         tokens.append(Token(suffix_type.nonpresent, char, line))
-        return None, line
     elif char.isdigit():
         # TODO: Negative number literals?
         acc.append(char)
-        return ScanState.NUMBER, line
+        next_state = ScanState.NUMBER
     elif char == '"':
         acc.append(char)
-        return ScanState.STRING, line
+        next_state = ScanState.STRING
     elif char == "\n":
-        return None, line + 1
+        line += 1
     elif char.isspace():
         tokens.append(Token(TokenType.SPACE, " ", line))
-        return None, line
     elif char.isalpha() or char == "_":
-        if tokens and tokens[-1].token_type in keyword_types.values():
+        if tokens and tokens[-1].token_type in KEYWORD_TYPES.values():
             acc.extend(tokens[-1].lexeme)
             del tokens[-1]
         else:
             keyword_trie.reset()
         keyword_trie.step(char)
         acc.append(char)
-        return ScanState.IDENTIFIER, line
+        next_state = ScanState.IDENTIFIER
     else:
         emit_error(f"Unrecognized character '{char}'")()
+    return next_state, line
 
 
 def tokenize(source):
@@ -142,7 +130,7 @@ def tokenize(source):
     # Replace // followed by a string of non-newline characters with nothing
     source = re.sub(r"//.*", "", source)
 
-    keyword_trie = Trie(keyword_types)
+    keyword_trie = Trie(KEYWORD_TYPES)
     scan_state = ScanState.ANY
     tokens = []
     acc = []
@@ -154,15 +142,17 @@ def tokenize(source):
                 ScanState.NUMBER: scan_number,
                 ScanState.DECIMAL: scan_decimal,
                 ScanState.STRING: scan_string,
-                ScanState.IDENTIFIER: scan_identifier,
+                ScanState.IDENTIFIER: lambda char, acc, line, tokens: scan_identifier(
+                    char, acc, line, tokens, keyword_trie
+                ),
             }.get(scan_state, emit_error(f"Unknown scanning state! {scan_state}"))(
-                char, acc, line, keyword_trie, tokens
+                char, acc, line, tokens
             )
             if next_state:
                 scan_state = next_state
             if consumed:
                 continue
-        next_state, line = scan_any(char, acc, line, keyword_trie, tokens)
+        next_state, line = scan_any(char, acc, line, tokens, keyword_trie)
         if next_state:
             scan_state = next_state
 

@@ -1,7 +1,7 @@
 from collections import namedtuple, defaultdict
 from enum import Enum
 
-debug = False
+DEBUG = False
 
 
 class OpCode(Enum):
@@ -78,10 +78,9 @@ class Precedence(Enum):
     def __cmp__(self, other):
         if self.value == other.value:
             return 0
-        elif self.value < other.value:
+        if self.value < other.value:
             return -1
-        else:
-            return 1
+        return 1
 
     def next(self):
         return Precedence(self.value + 1)
@@ -141,7 +140,7 @@ class TokenType(Enum):
     EOF = 44
 
 
-keyword_types = {
+KEYWORD_TYPES = {
     "and": TokenType.AND,
     "class": TokenType.CLASS,
     "else": TokenType.ELSE,
@@ -164,7 +163,7 @@ keyword_types = {
     "str": TokenType.STR,
 }
 
-simple_tokens = {
+SIMPLE_TOKENS = {
     "+": TokenType.PLUS,
     "-": TokenType.MINUS,
     "*": TokenType.STAR,
@@ -180,89 +179,91 @@ simple_tokens = {
 
 SuffixType = namedtuple("SuffixType", "present nonpresent")
 
-equal_suffix_tokens = {
+EQUAL_SUFFIX_TOKENS = {
     "!": SuffixType(TokenType.BANG_EQUAL, TokenType.BANG),
     "=": SuffixType(TokenType.EQUAL_EQUAL, TokenType.EQUAL),
     "<": SuffixType(TokenType.LESS_EQUAL, TokenType.LESS),
     ">": SuffixType(TokenType.GREATER_EQUAL, TokenType.GREATER),
 }
 
-
-class ParseRule:
-    def __init__(self, prefix=None, infix=None, precedence=Precedence.NONE):
-        self.prefix = prefix
-        self.infix = infix
-        self.precedence = precedence
-
-    def fill(self, err):
-        if not self.prefix:
-            self.prefix = err
-        if not self.infix:
-            self.infix = err
+ParseRule = namedtuple(
+    "ParseRule",
+    ("prefix", "infix", "precedence"),
+    defaults=(None, None, Precedence.NONE),
+)
 
 
-def pratt_table(parser):
+def make_rule(err, prefix=None, infix=None, precedence=Precedence.NONE):
+    prefix = prefix or err
+    infix = infix or err
+    return ParseRule(prefix=prefix, infix=infix, precedence=precedence)
+
+
+def pratt_table(parser, err):
 
     return defaultdict(
         ParseRule,
         {
-            TokenType.LEFT_PAREN: ParseRule(
-                prefix=parser.finish_grouping, precedence=Precedence.CALL
+            TokenType.LEFT_PAREN: make_rule(
+                prefix=parser.finish_grouping, precedence=Precedence.CALL, err=err
             ),
-            TokenType.MINUS: ParseRule(
+            TokenType.MINUS: make_rule(
                 prefix=parser.finish_unary,
                 infix=parser.finish_binary,
                 precedence=Precedence.TERM,
+                err=err,
             ),
-            TokenType.PLUS: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.TERM
+            TokenType.PLUS: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.TERM, err=err
             ),
-            TokenType.SLASH: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.FACTOR
+            TokenType.SLASH: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.FACTOR, err=err
             ),
-            TokenType.STAR: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.FACTOR
+            TokenType.STAR: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.FACTOR, err=err
             ),
-            TokenType.NUMBER: ParseRule(prefix=parser.consume_number),
-            TokenType.STRING: ParseRule(prefix=parser.consume_string),
-            TokenType.TRUE: ParseRule(prefix=parser.consume_boolean),
-            TokenType.FALSE: ParseRule(prefix=parser.consume_boolean),
-            TokenType.AND: ParseRule(precedence=Precedence.AND),
-            TokenType.OR: ParseRule(precedence=Precedence.OR),
-            TokenType.BANG: ParseRule(prefix=parser.finish_unary),
-            TokenType.EQUAL_EQUAL: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.EQUALITY
+            TokenType.NUMBER: make_rule(prefix=parser.consume_number, err=err),
+            TokenType.STRING: make_rule(prefix=parser.consume_string, err=err),
+            TokenType.TRUE: make_rule(prefix=parser.consume_boolean, err=err),
+            TokenType.FALSE: make_rule(prefix=parser.consume_boolean, err=err),
+            TokenType.AND: make_rule(precedence=Precedence.AND, err=err),
+            TokenType.OR: make_rule(precedence=Precedence.OR, err=err),
+            TokenType.BANG: make_rule(prefix=parser.finish_unary, err=err),
+            TokenType.EQUAL_EQUAL: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.EQUALITY, err=err
             ),
-            TokenType.BANG_EQUAL: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.EQUALITY
+            TokenType.BANG_EQUAL: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.EQUALITY, err=err
             ),
-            TokenType.LESS: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.COMPARISON
+            TokenType.LESS: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.COMPARISON, err=err
             ),
-            TokenType.GREATER_EQUAL: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.COMPARISON
+            TokenType.GREATER_EQUAL: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.COMPARISON, err=err
             ),
-            TokenType.GREATER: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.COMPARISON
+            TokenType.GREATER: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.COMPARISON, err=err
             ),
-            TokenType.LESS_EQUAL: ParseRule(
-                infix=parser.finish_binary, precedence=Precedence.COMPARISON
+            TokenType.LESS_EQUAL: make_rule(
+                infix=parser.finish_binary, precedence=Precedence.COMPARISON, err=err
             ),
-            TokenType.IDENTIFIER: ParseRule(prefix=parser.consume_variable_reference),
-            TokenType.TYPE: ParseRule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL
+            TokenType.IDENTIFIER: make_rule(
+                prefix=parser.consume_variable_reference, err=err
             ),
-            TokenType.INT: ParseRule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL
+            TokenType.TYPE: make_rule(
+                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
             ),
-            TokenType.BOOL: ParseRule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL
+            TokenType.INT: make_rule(
+                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
             ),
-            TokenType.NUM: ParseRule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL
+            TokenType.BOOL: make_rule(
+                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
             ),
-            TokenType.STR: ParseRule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL
+            TokenType.NUM: make_rule(
+                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
+            ),
+            TokenType.STR: make_rule(
+                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
             ),
         },
     )

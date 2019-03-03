@@ -2,7 +2,7 @@ import struct
 import sys
 from clr.errors import ClrCompileError
 from clr.compile import parse_source
-from clr.values import debug
+from clr.values import DEBUG
 
 
 def main():
@@ -12,13 +12,13 @@ def main():
         sys.exit(1)
     source_file_name = sys.argv[1] + ".clr"
     dest_file_name = source_file_name + ".b"
-    if debug:
+    if DEBUG:
         print("src:", source_file_name)
         print("dest:", dest_file_name)
     with open(source_file_name, "r") as source_file:
         source = source_file.read()
     try:
-        if debug:
+        if DEBUG:
             print("Source code:")
             print(source)
             print()
@@ -30,7 +30,7 @@ def main():
     else:
         print("Compiled successfully")
         # TODO: Gen intermediate / AST
-        # TODO: Gen debug symbols
+        # TODO: Gen DEBUG symbols
         with open(dest_file_name, "wb") as dest_file:
             dest_file.write(byte_code)
 

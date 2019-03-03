@@ -1,10 +1,5 @@
-from clr.values import OpCode, debug
+from clr.values import OpCode, DEBUG
 from clr.errors import emit_error
-
-
-class Index:
-    def __init__(self, index):
-        self.value = index
 
 
 class ClrInt:
@@ -57,14 +52,13 @@ class Constants:
 
     def add(self, value):
         if value in self.values:
-            return Index(self.values.index(value))
-        else:
-            index = Index(self.count)
-            if debug:
-                print(f"Adding constant {index}:{value}")
-            self.values.append(value)
-            self.count += 1
-            return index
+            return self.values.index(value)
+        index = self.count
+        if DEBUG:
+            print(f"Adding constant {index}:{value}")
+        self.values.append(value)
+        self.count += 1
+        return index
 
     def store(self, value):
         self.code_list.append(OpCode.STORE_CONST)
