@@ -102,14 +102,14 @@ class Program:
             index = self.global_variables.add_name(name)
         self.code_list.append(index)
 
-    def load_name(self, name):
+    def load_name(self, name, err):
         opcode = OpCode.LOAD_LOCAL
         index = self.local_variables.get_name(name)
         if index is None:
             opcode = OpCode.LOAD_GLOBAL
             index = self.global_variables.get_name(name)
             if index is None:
-                emit_error(f"Reference to undefined identifier {name}!")()
+                err()
         self.code_list.append(opcode)
         self.code_list.append(index)
 
@@ -313,7 +313,10 @@ class Parser(Cursor):
         token = self.get_prev()
         if token.token_type != TokenType.IDENTIFIER:
             emit_error(f"Expected variable! {self.prev_info()}")()
-        self.program.load_name(token.lexeme)
+        self.program.load_name(
+            token.lexeme,
+            emit_error(f"Reference to undefined identifier! {self.prev_info()}"),
+        )
 
     def consume_declaration(self):
         if self.match(TokenType.VAL):

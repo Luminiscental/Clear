@@ -9,7 +9,11 @@ print "i = " + str(i);
     // Shadow global
     val i = 3.2;
 
+    // Unique local
+    val local = 29i;
+
     print "Local i = " + str(i);
+    print "Local local = " + str(local);
 
 } // End block
 
