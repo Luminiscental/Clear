@@ -22,7 +22,8 @@ class LocalVariables:
     def push_scope(self):
         self.scopes.append({})
         self.level += 1
-        print(f"Pushed scope, level is now {self.level}")
+        if DEBUG:
+            print(f"Pushed scope, level is now {self.level}")
 
     def pop_scope(self):
         if not self.scoped():
@@ -32,8 +33,14 @@ class LocalVariables:
         count = len(popped_scope.values())
         del self.scopes[self.level]
         self.level -= 1
-        print(f"Popped scope, level is now {self.level}, index is now {self.index}")
+        if DEBUG:
+            print(f"Popped scope, level is now {self.level}, index is now {self.index}")
         return count
+
+    def get_name(self, name):
+        if not self.scoped():
+            return None
+        return self.current_scope().get(name, None)
 
     def add_name(self, name):
         if not self.scoped():
@@ -43,16 +50,11 @@ class LocalVariables:
             return prev
         self.current_scope()[name] = self.index
         self.index += 1
-        print(f"Defined name {name}, index is now {self.index}")
+        if DEBUG:
+            print(
+                f"Defined local name {name} at level {self.level}, index is now {self.index}"
+            )
         return self.index - 1
-
-    def get_name(self, name):
-        if not self.scoped():
-            return None
-        return self.scopes[self.level].get(name, None)
-
-    def print_info(self):
-        print(str(self.scopes))
 
 
 class GlobalVariables:
@@ -69,6 +71,8 @@ class GlobalVariables:
             return prev
         self.indices[name] = self.index
         self.index += 1
+        if DEBUG:
+            print(f"Defined global name {name}, index is now {self.index}")
         return self.indices[name]
 
 

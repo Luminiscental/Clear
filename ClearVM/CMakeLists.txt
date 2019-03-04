@@ -3,7 +3,7 @@ project(clr C)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
 # add_compile_definitions(DEBUG_FILE)
-# add_compile_definitions(DEBUG_DIS)
+add_compile_definitions(DEBUG_DIS)
 # add_compile_definitions(DEBUG_TRACE)
 # add_compile_definitions(DEBUG_STACK)
 # add_compile_definitions(DEBUG_MEM)

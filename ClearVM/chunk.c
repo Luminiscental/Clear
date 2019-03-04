@@ -294,6 +294,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         } break;
 
+        case OP_DEFINE_LOCAL: {
+        
+            return indexInstruction("OP_DEFINE_LOCAL", chunk, offset);
+        
+        } break;
+
         case OP_TRUE: {
 
             return simpleInstruction("OP_TRUE", offset);
@@ -352,6 +358,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
             return indexInstruction("OP_LOAD_GLOBAL", chunk, offset);
 
+        } break;
+
+        case OP_LOAD_LOCAL: {
+        
+            return indexInstruction("OP_LOAD_LOCAL", chunk, offset);
+        
         } break;
 
         case OP_INT: {
