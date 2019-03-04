@@ -7,22 +7,52 @@ from clr.values import OpCode, Precedence, pratt_table, DEBUG
 
 class LocalVariables:
     def __init__(self):
-        pass
+        self.scopes = []
+        self.level = -1
+        self.index = 0
 
     def scoped(self):
-        return False
+        return self.level > -1
+
+    def current_scope(self):
+        if not self.scoped():
+            emit_error("Global scope is not local!")()
+        return self.scopes[self.level]
 
     def push_scope(self):
-        pass
+        self.scopes.append({})
+        self.level += 1
+        print(f"Pushed scope, level is now {self.level}")
 
     def pop_scope(self):
-        pass
+        if not self.scoped():
+            emit_error("Cannot pop scope at global scope!")()
+        popped_scope = self.current_scope()
+        self.index = min(popped_scope.values())
+        count = len(popped_scope.values())
+        del self.scopes[self.level]
+        self.level -= 1
+        print(f"Popped scope, level is now {self.level}, index is now {self.index}")
+        return count
 
     def add_name(self, name):
-        return 0
+        if not self.scoped():
+            emit_error("Cannot define local variable in global scope!")()
+        prev = self.get_name(name)
+        if prev is not None:
+            return prev
+        self.current_scope()[name] = self.index
+        self.index += 1
+        print(f"Defined name {name}, index is now {self.index}")
+        return self.index - 1
 
     def get_name(self, name):
-        return None
+        if not self.scoped():
+            return None
+        return self.scopes[self.level].get(name, None)
+
+    def print_info(self):
+        print(str(self.scopes))
 
 
 class GlobalVariables:
@@ -34,8 +64,9 @@ class GlobalVariables:
         return self.indices.get(name, None)
 
     def add_name(self, name):
-        if DEBUG:
-            print(f"Adding global {self.index}:{name}")
+        prev = self.get_name(name)
+        if prev is not None:
+            return prev
         self.indices[name] = self.index
         self.index += 1
         return self.indices[name]
@@ -58,7 +89,9 @@ class Program:
         self.local_variables.push_scope()
 
     def pop_scope(self):
-        self.local_variables.pop_scope()
+        count = self.local_variables.pop_scope()
+        for i in range(0, count):
+            self.simple_op(OpCode.POP)
 
     def define_name(self, name):
         if self.local_variables.scoped():
@@ -255,6 +288,8 @@ class Parser(Cursor):
     def consume_statement(self):
         if self.match(TokenType.PRINT):
             self.consume_print_statement()
+        elif self.match(TokenType.LEFT_BRACE):
+            self.consume_block()
         else:
             self.consume_expression_statement()
 
@@ -285,6 +320,12 @@ class Parser(Cursor):
             self.consume_variable_declaration()
         else:
             self.consume_statement()
+
+    def consume_block(self):
+        self.program.push_scope()
+        while not self.match(TokenType.RIGHT_BRACE):
+            self.consume_declaration()
+        self.program.pop_scope()
 
 
 def parse_source(source):

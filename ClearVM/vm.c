@@ -302,6 +302,46 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+            case OP_DEFINE_LOCAL: {
+
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index to define local!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value val;
+                if (pop(vm, &val) != INTERPRET_OK) {
+
+                    printf("|| Expected value to define global!\n");
+                    return INTERPRET_ERR;
+                }
+
+                vm->stack[index] = val;
+                vm->stackTop = vm->stack + index + 1;
+
+            } break;
+
+            case OP_LOAD_LOCAL: {
+
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index to load local!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value val = vm->stack[index];
+
+                if (push(vm, val) != INTERPRET_OK) {
+
+                    printf("|| Could not push local value!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
             case OP_POP: {
 
                 UNARY_OP

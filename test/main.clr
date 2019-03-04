@@ -4,6 +4,17 @@
 val i = 2i;
 print "i = " + str(i);
 
+{ // Begin block
+
+    // Shadow global
+    val i = 3.2;
+
+    print "Local i = " + str(i);
+
+} // End block
+
+print "Global i is still " + str(i);
+
 print;
 
 val x = 3.7;
