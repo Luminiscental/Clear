@@ -22,37 +22,39 @@ typedef enum {
     // Variables
     OP_DEFINE_GLOBAL = 7,
     OP_LOAD_GLOBAL = 8,
+    OP_DEFINE_LOCAL = 9,
+    OP_LOAD_LOCAL = 10,
 
     // Built-ins
-    OP_TYPE = 9,
-    OP_INT = 10,
-    OP_BOOL = 11,
-    OP_NUM = 12,
-    OP_STR = 13,
+    OP_TYPE = 11,
+    OP_INT = 12,
+    OP_BOOL = 13,
+    OP_NUM = 14,
+    OP_STR = 15,
 
     // Statements
-    OP_PRINT = 14,
-    OP_PRINT_BLANK = 15,
-    OP_RETURN = 16,
-    OP_POP = 17,
+    OP_PRINT = 16,
+    OP_PRINT_BLANK = 17,
+    OP_RETURN = 18,
+    OP_POP = 19,
 
     // Arithmetic operators
-    OP_NEGATE = 18,
-    OP_ADD = 19,
-    OP_SUBTRACT = 20,
-    OP_MULTIPLY = 21,
-    OP_DIVIDE = 22,
+    OP_NEGATE = 20,
+    OP_ADD = 21,
+    OP_SUBTRACT = 22,
+    OP_MULTIPLY = 23,
+    OP_DIVIDE = 24,
 
     // Comparison operators
-    OP_LESS = 23,
-    OP_NLESS = 24,
-    OP_GREATER = 25,
-    OP_NGREATER = 26,
-    OP_EQUAL = 27,
-    OP_NEQUAL = 28,
+    OP_LESS = 25,
+    OP_NLESS = 26,
+    OP_GREATER = 27,
+    OP_NGREATER = 28,
+    OP_EQUAL = 29,
+    OP_NEQUAL = 30,
 
     // Boolean operators
-    OP_NOT = 29
+    OP_NOT = 31
 
 } OpCode;
 

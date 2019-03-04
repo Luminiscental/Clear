@@ -18,32 +18,34 @@ class OpCode(Enum):
     # Variables
     DEFINE_GLOBAL = 7
     LOAD_GLOBAL = 8
+    DEFINE_LOCAL = 9
+    LOAD_LOCAL = 10
     # Built-ins
-    TYPE = 9
-    INT = 10
-    BOOL = 11
-    NUM = 12
-    STR = 13
+    TYPE = 11
+    INT = 12
+    BOOL = 13
+    NUM = 14
+    STR = 15
     # Statements
-    PRINT = 14
-    PRINT_BLANK = 15
-    RETURN = 16
-    POP = 17
+    PRINT = 16
+    PRINT_BLANK = 17
+    RETURN = 18
+    POP = 19
     # Arithmetic operators
-    NEGATE = 18
-    ADD = 19
-    SUBTRACT = 20
-    MULTIPLY = 21
-    DIVIDE = 22
+    NEGATE = 20
+    ADD = 21
+    SUBTRACT = 22
+    MULTIPLY = 23
+    DIVIDE = 24
     # Comparison operators
-    LESS = 23
-    NLESS = 24
-    GREATER = 25
-    NGREATER = 26
-    EQUAL = 27
-    NEQUAL = 28
+    LESS = 25
+    NLESS = 26
+    GREATER = 27
+    NGREATER = 28
+    EQUAL = 29
+    NEQUAL = 30
     # Boolean operators
-    NOT = 29
+    NOT = 31
 
     def __str__(self):
         return "OP_" + self.name

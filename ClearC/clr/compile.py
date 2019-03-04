@@ -5,16 +5,33 @@ from clr.constants import Constants, ClrNum, ClrInt, ClrStr
 from clr.values import OpCode, Precedence, pratt_table, DEBUG
 
 
+class LocalVariables:
+    def __init__(self):
+        pass
+
+    def scoped(self):
+        return False
+
+    def push_scope(self):
+        pass
+
+    def pop_scope(self):
+        pass
+
+    def add_name(self, name):
+        return 0
+
+    def get_name(self, name):
+        return None
+
+
 class GlobalVariables:
     def __init__(self):
         self.indices = {}
         self.index = 0
 
     def get_name(self, name):
-        try:
-            return self.indices[name]
-        except KeyError:
-            emit_error(f"Reference to undefined global {name}!")()
+        return self.indices.get(name, None)
 
     def add_name(self, name):
         if DEBUG:
@@ -28,6 +45,7 @@ class Program:
     def __init__(self):
         self.code_list = []
         self.global_variables = GlobalVariables()
+        self.local_variables = LocalVariables()
 
     def load_constant(self, constant):
         self.code_list.append(OpCode.LOAD_CONST)
@@ -36,14 +54,30 @@ class Program:
     def simple_op(self, opcode):
         self.code_list.append(opcode)
 
+    def push_scope(self):
+        self.local_variables.push_scope()
+
+    def pop_scope(self):
+        self.local_variables.pop_scope()
+
     def define_name(self, name):
-        self.code_list.append(OpCode.DEFINE_GLOBAL)
-        index = self.global_variables.add_name(name)
+        if self.local_variables.scoped():
+            self.code_list.append(OpCode.DEFINE_LOCAL)
+            index = self.local_variables.add_name(name)
+        else:
+            self.code_list.append(OpCode.DEFINE_GLOBAL)
+            index = self.global_variables.add_name(name)
         self.code_list.append(index)
 
     def load_name(self, name):
-        self.code_list.append(OpCode.LOAD_GLOBAL)
-        index = self.global_variables.get_name(name)
+        opcode = OpCode.LOAD_LOCAL
+        index = self.local_variables.get_name(name)
+        if index is None:
+            opcode = OpCode.LOAD_GLOBAL
+            index = self.global_variables.get_name(name)
+            if index is None:
+                emit_error(f"Reference to undefined identifier {name}!")()
+        self.code_list.append(opcode)
         self.code_list.append(index)
 
     def flush(self):
