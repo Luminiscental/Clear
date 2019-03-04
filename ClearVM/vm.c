@@ -10,12 +10,89 @@
 #include "obj.h"
 #include "value.h"
 
+Scope *makeScope(Scope *parent) {
+
+    Scope *result = (Scope *)malloc(sizeof(Scope));
+
+    result->parent = parent;
+    result->variables = 0;
+
+    return result;
+}
+
+void freeScope(Scope *scope) {
+
+    while (scope != NULL) {
+
+        Scope *parent = scope->parent;
+        free(scope);
+        scope = parent;
+    }
+}
+
+void initLocalState(LocalState *state) {
+
+    state->currentScope = makeScope(NULL);
+    state->localIndex = 0;
+}
+
+void addLocal(LocalState *state, size_t index) {
+
+    if (index == state->localIndex) {
+
+        state->currentScope->variables++;
+        state->localIndex++;
+    }
+}
+
+void pushScope(LocalState *state) {
+
+    state->currentScope = makeScope(state->currentScope);
+}
+
+size_t popScope(LocalState *state) {
+
+    Scope *popped = state->currentScope;
+    state->currentScope = popped->parent;
+    state->localIndex -= popped->variables;
+    return popped->variables;
+}
+
+void freeLocalState(LocalState *state) { freeScope(state->currentScope); }
+
+void initGlobalState(GlobalState *state) {
+    initTable(&state->globals);
+    state->globalIndex = 0;
+}
+
+void addGlobal(GlobalState *state, size_t index, Value value) {
+
+    // TODO: Use a dynamic array instead of a hash table
+    Value indexValue = makeInteger(index);
+    tableSet(&state->globals, indexValue, value);
+
+    if (index == state->globalIndex) {
+
+        state->globalIndex++;
+    }
+}
+
+InterpretResult getGlobal(GlobalState *state, Value index, Value *out) {
+
+    return tableGet(&state->globals, index, out);
+}
+
+void freeGlobalState(GlobalState *state) { freeTable(&state->globals); }
+
 void initVM(VM *vm) {
 
     resetStack(vm);
+
     vm->objects = NULL;
     initTable(&vm->strings);
-    initTable(&vm->globals);
+
+    initGlobalState(&vm->globalState);
+    initLocalState(&vm->localState);
 }
 
 void resetStack(VM *vm) { vm->stackTop = vm->stack; }
@@ -45,7 +122,8 @@ InterpretResult pop(VM *vm, Value *out) {
     } else {
 
         vm->stackTop--;
-        *out = *vm->stackTop;
+        if (out != NULL)
+            *out = *vm->stackTop;
         return INTERPRET_OK;
     }
 }
@@ -53,7 +131,8 @@ InterpretResult pop(VM *vm, Value *out) {
 void freeVM(VM *vm) {
 
     freeTable(&vm->strings);
-    freeTable(&vm->globals);
+    freeLocalState(&vm->localState);
+    freeGlobalState(&vm->globalState);
     freeObjects(vm);
 }
 
@@ -222,6 +301,26 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
+            case OP_PUSH_SCOPE: {
+
+                pushScope(&vm->localState);
+
+            } break;
+
+            case OP_POP_SCOPE: {
+
+                size_t popped = popScope(&vm->localState);
+                for (size_t i = 0; i < popped; i++) {
+
+                    if (pop(vm, NULL) != INTERPRET_OK) {
+
+                        printf("|| Could not fully pop scope!\n");
+                        return INTERPRET_ERR;
+                    }
+                }
+
+            } break;
+
             case OP_TYPE: {
 
                 UNARY_OP
@@ -274,7 +373,7 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                tableSet(&vm->globals, makeInteger(index), val);
+                addGlobal(&vm->globalState, index, val);
 
             } break;
 
@@ -288,7 +387,7 @@ InterpretResult run(VM *vm) {
                 }
 
                 Value value;
-                if (!tableGet(&vm->globals, makeInteger(index), &value)) {
+                if (!getGlobal(&vm->globalState, makeInteger(index), &value)) {
 
                     printf("|| Undefined identifier!\n");
                     return INTERPRET_ERR;
@@ -305,21 +404,35 @@ InterpretResult run(VM *vm) {
             case OP_DEFINE_LOCAL: {
 
                 uint8_t index;
+
                 if (readByte(vm, &index) != INTERPRET_OK) {
 
-                    printf("|| Expected index to define local!\n");
+                    printf("|| Expected index to define local variable!\n");
                     return INTERPRET_ERR;
                 }
 
                 Value val;
                 if (pop(vm, &val) != INTERPRET_OK) {
 
-                    printf("|| Expected value to define global!\n");
+                    printf("|| Expected value to define local variable!\n");
                     return INTERPRET_ERR;
                 }
 
-                vm->stack[index] = val;
-                vm->stackTop = vm->stack + index + 1;
+                addLocal(&vm->localState, index);
+
+                if (index == vm->stackTop - vm->stack) {
+
+                    push(vm, val);
+
+                } else if (index < vm->stackTop - vm->stack) {
+
+                    vm->stack[index] = val;
+
+                } else {
+
+                    printf("|| Local variables indexed out of range!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 

@@ -30,12 +30,10 @@ class LocalVariables:
             emit_error("Cannot pop scope at global scope!")()
         popped_scope = self.current_scope()
         self.index = min(popped_scope.values())
-        count = len(popped_scope.values())
         del self.scopes[self.level]
         self.level -= 1
         if DEBUG:
             print(f"Popped scope, level is now {self.level}, index is now {self.index}")
-        return count
 
     def get_name(self, name):
         if not self.scoped():
@@ -45,16 +43,17 @@ class LocalVariables:
     def add_name(self, name):
         if not self.scoped():
             emit_error("Cannot define local variable in global scope!")()
-        prev = self.get_name(name)
-        if prev is not None:
-            return prev
-        self.current_scope()[name] = self.index
+        index = self.get_name(name)
+        if index is not None:
+            return index
+        new_index = self.index
         self.index += 1
+        self.current_scope()[name] = new_index
         if DEBUG:
             print(
                 f"Defined local name {name} at level {self.level}, index is now {self.index}"
             )
-        return self.index - 1
+        return new_index
 
 
 class GlobalVariables:
@@ -66,14 +65,15 @@ class GlobalVariables:
         return self.indices.get(name, None)
 
     def add_name(self, name):
-        prev = self.get_name(name)
-        if prev is not None:
-            return prev
-        self.indices[name] = self.index
+        index = self.get_name(name)
+        if index is not None:
+            return index
+        new_index = self.index
         self.index += 1
+        self.indices[name] = new_index
         if DEBUG:
             print(f"Defined global name {name}, index is now {self.index}")
-        return self.indices[name]
+        return new_index
 
 
 class Program:
@@ -91,19 +91,19 @@ class Program:
 
     def push_scope(self):
         self.local_variables.push_scope()
+        self.simple_op(OpCode.PUSH_SCOPE)
 
     def pop_scope(self):
-        count = self.local_variables.pop_scope()
-        for i in range(0, count):
-            self.simple_op(OpCode.POP)
+        self.local_variables.pop_scope()
+        self.simple_op(OpCode.POP_SCOPE)
 
     def define_name(self, name):
         if self.local_variables.scoped():
-            self.code_list.append(OpCode.DEFINE_LOCAL)
             index = self.local_variables.add_name(name)
+            self.code_list.append(OpCode.DEFINE_LOCAL)
         else:
-            self.code_list.append(OpCode.DEFINE_GLOBAL)
             index = self.global_variables.add_name(name)
+            self.code_list.append(OpCode.DEFINE_GLOBAL)
         self.code_list.append(index)
 
     def load_name(self, name, err):

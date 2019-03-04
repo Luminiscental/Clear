@@ -54,7 +54,11 @@ typedef enum {
     OP_NEQUAL = 30,
 
     // Boolean operators
-    OP_NOT = 31
+    OP_NOT = 31,
+
+    // Scoping
+    OP_PUSH_SCOPE = 32,
+    OP_POP_SCOPE = 33
 
 } OpCode;
 

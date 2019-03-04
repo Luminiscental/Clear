@@ -46,6 +46,9 @@ class OpCode(Enum):
     NEQUAL = 30
     # Boolean operators
     NOT = 31
+    # Scoping
+    PUSH_SCOPE = 32
+    POP_SCOPE = 33
 
     def __str__(self):
         return "OP_" + self.name

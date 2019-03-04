@@ -1,25 +1,46 @@
 
 // Simple test program:
 
-val i = 2i;
-print "i = " + str(i);
+{
+    val i = "happens in a scope";
+    {
+        val i = "gets shadowed ~~ooo~~";
 
-{ // Begin block
+        val i = 1i; // replaced
+        val f = i;
 
-    // Shadow global
-    val i = 3.2;
+        val i = i + 1i;
+        val f = i * f;
 
-    // Unique local
-    val local = 29i;
+        val i = i + 1i;
+        val f = i * f;
 
-    print "Local i = " + str(i);
-    print "Local local = " + str(local);
+        val i = i + 1i;
+        val f = i * f;
 
-} // End block
+        val i = i + 1i;
+        val f = i * f;
 
-print "Global i is still " + str(i);
+        val i = i + 1i;
+        val f = i * f;
 
-print;
+        val i = i + 1i;
+        val f = i * f;
+
+        val i = i + 1i;
+        val f = i * f;
+
+        val i = i + 1i;
+        val f = i * f;
+
+        val i = i + 1i;
+        val f = i * f;
+
+        print str(i) + "! = " + str(f);
+        print;
+    }
+    print i;
+}
 
 val x = 3.7;
 print "x = " + str(x);
@@ -42,12 +63,6 @@ val notTasty = false;
 print "tasty = " + str(tasty);
 print "notTasty = " + str(notTasty);
 print "tasty == !notTasty = " + str(tasty == !notTasty);
-
-print;
-
-val combined = num(i) + x + num(j) + y;
-print "combined = " + str(combined);
-print "which is " + str(bool(combined));
 
 print;
 

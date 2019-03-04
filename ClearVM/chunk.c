@@ -222,6 +222,18 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
     switch (instruction) {
 
+        case OP_POP_SCOPE: {
+
+            return simpleInstruction("OP_POP_SCOPE", offset);
+
+        } break;
+
+        case OP_PUSH_SCOPE: {
+
+            return simpleInstruction("OP_PUSH_SCOPE", offset);
+
+        } break;
+
         case OP_TYPE: {
 
             return simpleInstruction("OP_TYPE", offset);
@@ -295,9 +307,9 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         } break;
 
         case OP_DEFINE_LOCAL: {
-        
+
             return indexInstruction("OP_DEFINE_LOCAL", chunk, offset);
-        
+
         } break;
 
         case OP_TRUE: {
@@ -361,9 +373,9 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         } break;
 
         case OP_LOAD_LOCAL: {
-        
+
             return indexInstruction("OP_LOAD_LOCAL", chunk, offset);
-        
+
         } break;
 
         case OP_INT: {
