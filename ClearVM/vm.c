@@ -141,14 +141,16 @@ static InterpretResult readStringRaw(VM *vm, Value *out) {
 
 #define ANY_OP(op)                                                             \
     if (push(vm, op) != INTERPRET_OK) {                                        \
-        printf("|| Could not push result of unary operation!\n");              \
+        printf("|| Could not push result of unary operation (code %d)!\n",     \
+               instruction);                                                   \
         return INTERPRET_ERR;                                                  \
     }
 
 #define UNARY_OP                                                               \
     Value a;                                                                   \
     if (pop(vm, &a) != INTERPRET_OK) {                                         \
-        printf("|| Expected value for unary operation!\n");                    \
+        printf("|| Expected value for unary operation! (code %d)\n",           \
+               instruction);                                                   \
         return INTERPRET_ERR;                                                  \
     }
 
@@ -166,7 +168,8 @@ static InterpretResult readStringRaw(VM *vm, Value *out) {
     Value a;                                                                   \
     Value b;                                                                   \
     if (pop(vm, &b) != INTERPRET_OK || pop(vm, &a) != INTERPRET_OK) {          \
-        printf("|| Expected two values for binary operation!\n");              \
+        printf("|| Expected two values for binary operation! (code %d)\n",     \
+               instruction);                                                   \
         return INTERPRET_ERR;                                                  \
     }
 
