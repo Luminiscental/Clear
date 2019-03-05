@@ -193,6 +193,20 @@ static uint32_t constantInstruction(const char *name, Chunk *chunk,
     return offset + 2;
 }
 
+static uint32_t uintInstruction(const char *name, Chunk *chunk,
+                                uint32_t offset) {
+
+    if (offset + 1 + sizeof(uint32_t) > chunk->count) {
+
+        printf("|| EOF reached during uint instruction!\n");
+        return chunk->count;
+    }
+
+    uint32_t *read = (uint32_t *)(chunk->code + offset + 1);
+    printf("%-16s %4d\n", name, *read);
+    return offset + 1 + sizeof(uint32_t);
+}
+
 static uint32_t indexInstruction(const char *name, Chunk *chunk,
                                  uint32_t offset) {
 
@@ -221,6 +235,18 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
     uint8_t instruction = *(chunk->code + offset);
 
     switch (instruction) {
+
+        case OP_JUMP: {
+
+            return uintInstruction("OP_JUMP", chunk, offset);
+
+        } break;
+
+        case OP_JUMP_IF_NOT: {
+
+            return uintInstruction("OP_JUMP_IF_NOT", chunk, offset);
+
+        } break;
 
         case OP_POP_SCOPE: {
 

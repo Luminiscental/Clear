@@ -1,7 +1,7 @@
 import struct
 from clr.values import OpCode
 from clr.errors import emit_error
-from clr.constants import ClrInt, ClrNum, ClrStr
+from clr.constants import ClrInt, ClrUint, ClrNum, ClrStr
 
 
 def first_byte(value):
@@ -18,6 +18,13 @@ def assemble_int(clrint, accum):
 
     value = clrint.value
     for byte in struct.pack("i", value):
+        accum.append(byte)
+
+
+def assemble_uint(clruint, accum):
+
+    value = clruint.value
+    for byte in struct.pack("I", value):
         accum.append(byte)
 
 
@@ -51,6 +58,7 @@ def assemble(code_list):
             ClrNum: assemble_number,
             ClrStr: assemble_string,
             ClrInt: assemble_int,
+            ClrUint: assemble_uint,
             OpCode: assemble_op,
             int: assemble_index,
         }.get(type(code), emit_error(f"Unknown code type to assemble! {type(code)}"))(

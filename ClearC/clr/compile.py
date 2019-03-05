@@ -1,7 +1,7 @@
 from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import emit_error
 from clr.assemble import assemble
-from clr.constants import Constants, ClrNum, ClrInt, ClrStr
+from clr.constants import Constants, ClrNum, ClrInt, ClrUint, ClrStr
 from clr.values import OpCode, Precedence, pratt_table, DEBUG
 
 
@@ -29,7 +29,8 @@ class LocalVariables:
         if not self.scoped():
             emit_error("Cannot pop scope at global scope!")()
         popped_scope = self.current_scope()
-        self.index = min(popped_scope.values())
+        if popped_scope:
+            self.index = min(popped_scope.values())
         del self.scopes[self.level]
         self.level -= 1
         if DEBUG:
@@ -117,6 +118,17 @@ class Program:
         self.code_list.append(opcode)
         self.code_list.append(index)
 
+    def begin_jump(self, conditional=False):
+        self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
+        index = len(self.code_list)
+        temp_offset = ClrUint(0)
+        self.code_list.append(temp_offset)
+        return index
+
+    def end_jump(self, jump_ref):
+        offset = len(self.code_list) - jump_ref
+        self.code_list[jump_ref] = ClrUint(offset)
+
     def flush(self):
         return self.code_list
 
@@ -157,7 +169,6 @@ class Cursor:
             emit_error(message)()
 
     def flush(self):
-        self.program.simple_op(OpCode.RETURN)
         return self.constants.flush() + self.program.flush()
 
 
@@ -170,7 +181,7 @@ class Parser(Cursor):
     def current_precedence(self):
         return self.get_rule(self.get_current()).precedence
 
-    def consume_builtin(self):
+    def finish_builtin(self):
         builtin = self.get_prev()
         self.consume(
             TokenType.LEFT_PAREN,
@@ -188,7 +199,7 @@ class Parser(Cursor):
             emit_error(f"Expected built-in function! {self.prev_info()}"),
         )()
 
-    def consume_boolean(self):
+    def finish_boolean(self):
         token = self.get_prev()
         err = emit_error(f"Expected boolean token! {self.prev_info()}")
         {
@@ -196,7 +207,7 @@ class Parser(Cursor):
             TokenType.FALSE: lambda: self.program.simple_op(OpCode.FALSE),
         }.get(token.token_type, err)()
 
-    def consume_number(self):
+    def finish_number(self):
         token = self.get_prev()
         if token.token_type != TokenType.NUMBER:
             emit_error(f"Expected number token! {self.prev_info()}")()
@@ -213,7 +224,7 @@ class Parser(Cursor):
         const_index = self.constants.add(value)
         self.program.load_constant(const_index)
 
-    def consume_string(self):
+    def finish_string(self):
         token = self.get_prev()
         if token.token_type != TokenType.STRING:
             emit_error(f"Expected string token! {self.prev_info()}")()
@@ -273,7 +284,7 @@ class Parser(Cursor):
     def consume_expression(self):
         self.consume_precedence(Precedence.ASSIGNMENT)
 
-    def consume_print_statement(self):
+    def finish_print_statement(self):
         if self.match(TokenType.SEMICOLON):  # Blank print statement
             self.program.simple_op(OpCode.PRINT_BLANK)
         else:
@@ -289,11 +300,24 @@ class Parser(Cursor):
         self.consume(TokenType.SEMICOLON, f"Expected statement! {self.prev_info()}")
         self.program.simple_op(OpCode.POP)
 
+    def finish_if_statement(self):
+        self.consume_expression()
+        jump_ref = self.program.begin_jump(conditional=True)
+        self.consume(
+            TokenType.LEFT_BRACE, f"If statement requires a block! {self.prev_info()}"
+        )
+        self.finish_block()
+        self.program.end_jump(jump_ref)
+        # TODO: else
+
     def consume_statement(self):
         if self.match(TokenType.PRINT):
-            self.consume_print_statement()
+            self.finish_print_statement()
         elif self.match(TokenType.LEFT_BRACE):
-            self.consume_block()
+            self.finish_block()
+        elif self.match(TokenType.IF):
+            self.finish_if_statement()
+        # TODO: for
         else:
             self.consume_expression_statement()
 
@@ -301,7 +325,7 @@ class Parser(Cursor):
         self.consume(TokenType.IDENTIFIER, message)
         return self.get_prev().lexeme
 
-    def consume_variable_declaration(self):
+    def finish_variable_declaration(self):
         name = self.consume_variable(f"Expected variable name! {self.prev_info()}")
         self.consume(
             TokenType.EQUAL, f"Expected variable initializer! {self.prev_info()}"
@@ -313,7 +337,7 @@ class Parser(Cursor):
         )
         self.program.define_name(name)
 
-    def consume_variable_reference(self):
+    def finish_variable_reference(self):
         token = self.get_prev()
         if token.token_type != TokenType.IDENTIFIER:
             emit_error(f"Expected variable! {self.prev_info()}")()
@@ -324,11 +348,11 @@ class Parser(Cursor):
 
     def consume_declaration(self):
         if self.match(TokenType.VAL):
-            self.consume_variable_declaration()
+            self.finish_variable_declaration()
         else:
             self.consume_statement()
 
-    def consume_block(self):
+    def finish_block(self):
         self.program.push_scope()
         while not self.match(TokenType.RIGHT_BRACE):
             self.consume_declaration()

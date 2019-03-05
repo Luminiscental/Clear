@@ -16,6 +16,22 @@ class ClrInt:
         return isinstance(other, ClrInt) and self.value == other.value
 
 
+class ClrUint:
+    def __init__(self, value):
+        if value < 0:
+            emit_error(f"Uint created with negative value {value}!")()
+        self.value = int(value)
+
+    def __repr__(self):
+        return f"ClrUint({self.value})"
+
+    def __hash__(self):
+        return hash(self.value) ^ 73
+
+    def __eq__(self, other):
+        return isinstance(other, ClrUint) and self.value == other.value
+
+
 class ClrNum:
     def __init__(self, value):
         self.value = float(value)

@@ -58,7 +58,11 @@ typedef enum {
 
     // Scoping
     OP_PUSH_SCOPE = 32,
-    OP_POP_SCOPE = 33
+    OP_POP_SCOPE = 33,
+
+    // Control flow
+    OP_JUMP = 34,
+    OP_JUMP_IF_NOT = 35
 
 } OpCode;
 

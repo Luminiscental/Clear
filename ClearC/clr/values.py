@@ -1,7 +1,7 @@
 from collections import namedtuple, defaultdict
 from enum import Enum
 
-DEBUG = True
+DEBUG = False
 
 
 class OpCode(Enum):
@@ -49,6 +49,9 @@ class OpCode(Enum):
     # Scoping
     PUSH_SCOPE = 32
     POP_SCOPE = 33
+    # Control flow
+    JUMP = 34
+    JUMP_IF_NOT = 35
 
     def __str__(self):
         return "OP_" + self.name
@@ -229,10 +232,10 @@ def pratt_table(parser, err):
             TokenType.STAR: make_rule(
                 infix=parser.finish_binary, precedence=Precedence.FACTOR, err=err
             ),
-            TokenType.NUMBER: make_rule(prefix=parser.consume_number, err=err),
-            TokenType.STRING: make_rule(prefix=parser.consume_string, err=err),
-            TokenType.TRUE: make_rule(prefix=parser.consume_boolean, err=err),
-            TokenType.FALSE: make_rule(prefix=parser.consume_boolean, err=err),
+            TokenType.NUMBER: make_rule(prefix=parser.finish_number, err=err),
+            TokenType.STRING: make_rule(prefix=parser.finish_string, err=err),
+            TokenType.TRUE: make_rule(prefix=parser.finish_boolean, err=err),
+            TokenType.FALSE: make_rule(prefix=parser.finish_boolean, err=err),
             TokenType.AND: make_rule(precedence=Precedence.AND, err=err),
             TokenType.OR: make_rule(precedence=Precedence.OR, err=err),
             TokenType.BANG: make_rule(prefix=parser.finish_unary, err=err),
@@ -255,22 +258,22 @@ def pratt_table(parser, err):
                 infix=parser.finish_binary, precedence=Precedence.COMPARISON, err=err
             ),
             TokenType.IDENTIFIER: make_rule(
-                prefix=parser.consume_variable_reference, err=err
+                prefix=parser.finish_variable_reference, err=err
             ),
             TokenType.TYPE: make_rule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
+                prefix=parser.finish_builtin, precedence=Precedence.CALL, err=err
             ),
             TokenType.INT: make_rule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
+                prefix=parser.finish_builtin, precedence=Precedence.CALL, err=err
             ),
             TokenType.BOOL: make_rule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
+                prefix=parser.finish_builtin, precedence=Precedence.CALL, err=err
             ),
             TokenType.NUM: make_rule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
+                prefix=parser.finish_builtin, precedence=Precedence.CALL, err=err
             ),
             TokenType.STR: make_rule(
-                prefix=parser.consume_builtin, precedence=Precedence.CALL, err=err
+                prefix=parser.finish_builtin, precedence=Precedence.CALL, err=err
             ),
         },
     )

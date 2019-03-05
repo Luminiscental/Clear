@@ -42,6 +42,32 @@
     print i;
 }
 
+{
+    print " ~~ooo~~ empty scope";
+}
+
+if true {
+
+    print "It was true!";
+}
+
+if false {
+
+    print "It was false!";
+}
+
+{
+    val mine = 23.7;
+    val yours = 14;
+
+    if mine > yours {
+
+        print "Mine's bigger than yours ~~~";
+    }
+}
+
+print;
+
 val x = 3.7;
 print "x = " + str(x);
 
