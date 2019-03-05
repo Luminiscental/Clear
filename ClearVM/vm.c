@@ -74,8 +74,6 @@ void addGlobal(GlobalState *state, size_t index, Value value) {
     state->isSet[index] = true;
     state->values[index] = value;
 
-    printf("Set isSet[%zu]\n", index);
-
     if (index == state->globalIndex) {
 
         state->globalIndex++;
@@ -93,8 +91,6 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out) {
 
         return INTERPRET_OK;
     }
-
-    printf("isSet[%zu] was not true!\n", index);
 
     return INTERPRET_ERR;
 }
