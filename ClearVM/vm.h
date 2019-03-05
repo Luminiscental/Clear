@@ -5,6 +5,7 @@
 #include "table.h"
 #include "value.h"
 
+// TODO: Multiple-byte indices
 #define STACK_MAX 256
 
 typedef enum {
@@ -39,15 +40,15 @@ void freeLocalState(LocalState *state);
 
 typedef struct {
 
-    Table globals;
+    bool isSet[STACK_MAX];
+    Value values[STACK_MAX];
     size_t globalIndex;
 
 } GlobalState;
 
 void initGlobalState(GlobalState *state);
 void addGlobal(GlobalState *state, size_t index, Value value);
-InterpretResult getGlobal(GlobalState *state, Value index, Value *out);
-void freeGlobalState(GlobalState *state);
+InterpretResult getGlobal(GlobalState *state, size_t index, Value *out);
 
 typedef struct sVM {
 

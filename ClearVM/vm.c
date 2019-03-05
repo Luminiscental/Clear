@@ -61,15 +61,20 @@ size_t popScope(LocalState *state) {
 void freeLocalState(LocalState *state) { freeScope(state->currentScope); }
 
 void initGlobalState(GlobalState *state) {
-    initTable(&state->globals);
     state->globalIndex = 0;
+
+    for (size_t i = 0; i < STACK_MAX; i++) {
+
+        state->isSet[i] = false;
+    }
 }
 
 void addGlobal(GlobalState *state, size_t index, Value value) {
 
-    // TODO: Use a dynamic array instead of a hash table
-    Value indexValue = makeInteger(index);
-    tableSet(&state->globals, indexValue, value);
+    state->isSet[index] = true;
+    state->values[index] = value;
+
+    printf("Set isSet[%zu]\n", index);
 
     if (index == state->globalIndex) {
 
@@ -77,12 +82,22 @@ void addGlobal(GlobalState *state, size_t index, Value value) {
     }
 }
 
-InterpretResult getGlobal(GlobalState *state, Value index, Value *out) {
+InterpretResult getGlobal(GlobalState *state, size_t index, Value *out) {
 
-    return tableGet(&state->globals, index, out);
+    if (state->isSet[index]) {
+
+        if (out != NULL) {
+
+            *out = state->values[index];
+        }
+
+        return INTERPRET_OK;
+    }
+
+    printf("isSet[%zu] was not true!\n", index);
+
+    return INTERPRET_ERR;
 }
-
-void freeGlobalState(GlobalState *state) { freeTable(&state->globals); }
 
 void initVM(VM *vm) {
 
@@ -132,7 +147,6 @@ void freeVM(VM *vm) {
 
     freeTable(&vm->strings);
     freeLocalState(&vm->localState);
-    freeGlobalState(&vm->globalState);
     freeObjects(vm);
 }
 
@@ -161,7 +175,6 @@ static InterpretResult readByte(VM *vm, uint8_t *out) {
 static InterpretResult readBoolean(VM *vm, Value *out) {
 
     uint8_t val;
-
     if (readByte(vm, &val) != INTERPRET_OK) {
 
         printf("|| Could not read boolean!\n");
@@ -387,7 +400,8 @@ InterpretResult run(VM *vm) {
                 }
 
                 Value value;
-                if (!getGlobal(&vm->globalState, makeInteger(index), &value)) {
+                if (getGlobal(&vm->globalState, index, &value) !=
+                    INTERPRET_OK) {
 
                     printf("|| Undefined identifier!\n");
                     return INTERPRET_ERR;
@@ -404,7 +418,6 @@ InterpretResult run(VM *vm) {
             case OP_DEFINE_LOCAL: {
 
                 uint8_t index;
-
                 if (readByte(vm, &index) != INTERPRET_OK) {
 
                     printf("|| Expected index to define local variable!\n");
