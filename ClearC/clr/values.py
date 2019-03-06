@@ -276,5 +276,11 @@ def pratt_table(parser, err):
             TokenType.STR: make_rule(
                 prefix=parser.finish_builtin, precedence=Precedence.CALL, err=err
             ),
+            TokenType.AND: make_rule(
+                infix=parser.finish_and, precedence=Precedence.AND, err=err
+            ),
+            TokenType.OR: make_rule(
+                infix=parser.finish_or, precedence=Precedence.OR, err=err
+            ),
         },
     )

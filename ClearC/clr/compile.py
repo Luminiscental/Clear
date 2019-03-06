@@ -118,21 +118,26 @@ class Program:
         self.code_list.append(opcode)
         self.code_list.append(index)
 
-    def begin_jump(self, conditional=False):
+    def begin_jump(self, conditional=False, leave_value=False):
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
         index = len(self.code_list)
         if DEBUG:
             print(f"Defining a jump from {index}")
         temp_offset = ClrUint(0)
         self.code_list.append(temp_offset)
-        return index
+        if conditional and not leave_value:
+            self.code_list.append(OpCode.POP)
+        return index, conditional
 
-    def end_jump(self, jump_ref):
-        contained = self.code_list[jump_ref + 1 :]
+    def end_jump(self, jump_ref, leave_value=False):
+        index, conditional = jump_ref
+        contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         if DEBUG:
             print(f"Jump from index set with offset {offset}")
-        self.code_list[jump_ref] = ClrUint(offset)
+        self.code_list[index] = ClrUint(offset)
+        if conditional and not leave_value:
+            self.code_list.append(OpCode.POP)
 
     def flush(self):
         return self.code_list
@@ -266,6 +271,18 @@ class Parser(Cursor):
             emit_error(f"Expected unary operator! {self.prev_info()}"),
         )()
 
+    def finish_and(self):
+        short_circuit = self.program.begin_jump(conditional=True)
+        self.consume_precedence(Precedence.AND)
+        self.program.end_jump(short_circuit, leave_value=True)
+
+    def finish_or(self):
+        long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
+        short_circuit = self.program.begin_jump()
+        self.program.end_jump(long_circuit)
+        self.consume_precedence(Precedence.OR)
+        self.program.end_jump(short_circuit, leave_value=True)
+
     def finish_binary(self):
         op_token = self.get_prev()
         rule = self.get_rule(op_token)
@@ -378,8 +395,11 @@ class Parser(Cursor):
             self.consume_statement()
 
     def finish_block(self):
+        opener = self.get_prev()
         self.program.push_scope()
         while not self.match(TokenType.RIGHT_BRACE):
+            if self.match(TokenType.EOF):
+                emit_error(f"Unclosed block! {token_info(opener)}")()
             self.consume_declaration()
         self.program.pop_scope()
 

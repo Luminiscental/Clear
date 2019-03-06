@@ -133,8 +133,26 @@ InterpretResult pop(VM *vm, Value *out) {
     } else {
 
         vm->stackTop--;
+
         if (out != NULL)
             *out = *vm->stackTop;
+
+        return INTERPRET_OK;
+    }
+}
+
+InterpretResult peek(VM *vm, Value *out) {
+
+    if (vm->stackTop <= vm->stack) {
+
+        printf("|| Stack underflow!\n");
+        return INTERPRET_ERR;
+
+    } else {
+
+        if (out != NULL)
+            *out = vm->stackTop[-1];
+
         return INTERPRET_OK;
     }
 }
@@ -325,7 +343,7 @@ InterpretResult run(VM *vm) {
             case OP_JUMP_IF_NOT: {
 
                 Value condition;
-                if (pop(vm, &condition) != INTERPRET_OK) {
+                if (peek(vm, &condition) != INTERPRET_OK) {
 
                     printf("|| Could not read jump condition!\n");
                     return INTERPRET_ERR;

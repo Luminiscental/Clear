@@ -67,6 +67,7 @@ void initVM(VM *vm);
 void resetStack(VM *vm);
 InterpretResult push(VM *vm, Value value);
 InterpretResult pop(VM *vm, Value *out);
+InterpretResult peek(VM *vm, Value *out);
 void freeVM(VM *vm);
 
 InterpretResult interpret(VM *vm, Chunk *chunk);

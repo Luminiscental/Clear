@@ -1,9 +1,25 @@
 
 // Simple test program:
 
-if true {
+val cond = false or true;
 
-    print "true";
+if true or false {
+
+    print "true or false = true";
+
+    if true and true {
+
+        print "true and true = true";
+    }
+
+    if true and false {
+
+        print "true and false = true";
+
+    } else {
+
+        print "true and false = false";
+    }
 
 } else if false {
 
