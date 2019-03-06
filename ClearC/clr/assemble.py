@@ -4,50 +4,50 @@ from clr.errors import emit_error
 from clr.constants import ClrInt, ClrUint, ClrNum, ClrStr
 
 
-def first_byte(value):
+def _first_byte(value):
 
     return bytes([value])[0]
 
 
-def assemble_index(index, accum):
+def _assemble_index(index, accum):
 
-    accum.append(first_byte(index))
+    accum.append(_first_byte(index))
 
 
-def assemble_int(clrint, accum):
+def _assemble_int(clrint, accum):
 
     value = clrint.value
     for byte in struct.pack("i", value):
         accum.append(byte)
 
 
-def assemble_uint(clruint, accum):
+def _assemble_uint(clruint, accum):
 
     value = clruint.value
     for byte in struct.pack("I", value):
         accum.append(byte)
 
 
-def assemble_number(clrnum, accum):
+def _assemble_number(clrnum, accum):
 
     value = clrnum.value
     for byte in struct.pack("d", value):
         accum.append(byte)
 
 
-def assemble_string(clrstr, accum):
+def _assemble_string(clrstr, accum):
 
     value = clrstr.value
     size = len(value)
-    byte_size = first_byte(size)
+    byte_size = _first_byte(size)
     accum.append(byte_size)
     for byte in value.encode():
         accum.append(byte)
 
 
-def assemble_op(opcode, accum):
+def _assemble_op(opcode, accum):
 
-    accum.append(first_byte(opcode.value))
+    accum.append(_first_byte(opcode.value))
 
 
 def assembled_size(code_list):
@@ -69,19 +69,19 @@ def assembled_size(code_list):
 def assemble(code_list):
 
     if DEBUG_ASSEMBLE:
-        print("Byte code to assemble:")
+        print("Byte code to _assemble:")
         for i, code in enumerate(code_list):
             print(f"{i}:{code}")
 
     raw_bytes = bytearray()
     for code in code_list:
         {
-            ClrNum: assemble_number,
-            ClrStr: assemble_string,
-            ClrInt: assemble_int,
-            ClrUint: assemble_uint,
-            OpCode: assemble_op,
-            int: assemble_index,
+            ClrNum: _assemble_number,
+            ClrStr: _assemble_string,
+            ClrInt: _assemble_int,
+            ClrUint: _assemble_uint,
+            OpCode: _assemble_op,
+            int: _assemble_index,
         }.get(type(code), emit_error(f"Unknown code type to assemble! {type(code)}"))(
             code, raw_bytes
         )

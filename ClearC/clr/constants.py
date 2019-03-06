@@ -76,7 +76,7 @@ class Constants:
         self.count += 1
         return index
 
-    def store(self, value):
+    def _store(self, value):
         self.code_list.append(OpCode.STORE_CONST)
         try:
             op_type = {
@@ -91,5 +91,5 @@ class Constants:
 
     def flush(self):
         for value in self.values:
-            self.store(value)
+            self._store(value)
         return self.code_list

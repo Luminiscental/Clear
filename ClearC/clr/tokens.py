@@ -166,7 +166,7 @@ def tokenize(source):
 
     if scan_state == ScanState.STRING:
         emit_error(f"Unclosed string literal reaches end of file!")()
-    elif scan_state == ScanState.NUMBER or scan_state == ScanState.DECIMAL:
+    elif scan_state in (ScanState.NUMBER, ScanState.DECIMAL):
         store_acc(TokenType.NUMBER, acc, line, tokens)
     elif scan_state == ScanState.IDENTIFIER:
         store_acc(TokenType.IDENTIFIER, acc, line, tokens)
