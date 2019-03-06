@@ -312,17 +312,28 @@ class Parser(Cursor):
             TokenType.LEFT_BRACE, f"If statement requires a block! {self.prev_info()}"
         )
         self.finish_block()
-        if self.match(TokenType.ELSE):
-            else_jump = self.program.begin_jump()
-            self.program.end_jump(if_jump)
-            self.consume(
-                TokenType.LEFT_BRACE,
-                f"Else branch requires a block! {self.prev_info()}",
-            )
-            self.finish_block()
-            self.program.end_jump(else_jump)
-        else:
-            self.program.end_jump(if_jump)
+        final_jumps = [self.program.begin_jump()]
+        self.program.end_jump(if_jump)
+        while self.match(TokenType.ELSE):
+            if self.match(TokenType.IF):
+                self.consume_expression()
+                elif_jump = self.program.begin_jump(conditional=True)
+                self.consume(
+                    TokenType.LEFT_BRACE,
+                    f"Else if branch requires a block! {self.prev_info()}",
+                )
+                self.finish_block()
+                final_jumps.append(self.program.begin_jump())
+                self.program.end_jump(elif_jump)
+            else:
+                self.consume(
+                    TokenType.LEFT_BRACE,
+                    f"Else branch requires a block! {self.prev_info()}",
+                )
+                self.finish_block()
+                break
+        for final_jump in final_jumps:
+            self.program.end_jump(final_jump)
 
     def consume_statement(self):
         if self.match(TokenType.PRINT):

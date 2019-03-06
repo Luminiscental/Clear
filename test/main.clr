@@ -1,6 +1,19 @@
 
 // Simple test program:
 
+if true {
+
+    print "true";
+
+} else if false {
+
+    print "false";
+
+} else {
+
+    print "neither";
+}
+
 {
     val i = "happens in a scope";
     {
@@ -71,6 +84,10 @@ if false {
     if mine > yours {
 
         print "Mine's bigger than yours ~~~";
+
+    } else {
+
+        print "...we won't talk about this.";
     }
 }
 
