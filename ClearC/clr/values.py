@@ -2,6 +2,7 @@ from collections import namedtuple, defaultdict
 from enum import Enum
 
 DEBUG = False
+DEBUG_ASSEMBLE = False
 
 
 class OpCode(Enum):

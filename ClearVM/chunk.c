@@ -430,7 +430,7 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         default: {
 
-            printf("\nUnknown opcode %d\n", instruction);
+            printf("\n");
             return offset + 1;
 
         } break;

@@ -1,5 +1,5 @@
 import struct
-from clr.values import OpCode
+from clr.values import OpCode, DEBUG_ASSEMBLE
 from clr.errors import emit_error
 from clr.constants import ClrInt, ClrUint, ClrNum, ClrStr
 
@@ -50,7 +50,28 @@ def assemble_op(opcode, accum):
     accum.append(first_byte(opcode.value))
 
 
+def assembled_size(code_list):
+    size = 0
+    for code in code_list:
+        size += {
+            ClrNum: lambda code: 8,
+            ClrStr: lambda code: 1 + len(code.value),
+            ClrInt: lambda code: 4,
+            ClrUint: lambda code: 4,
+            OpCode: lambda code: 1,
+            int: lambda code: 1,
+        }.get(type(code), emit_error(f"Unknown code type to assemble! {type(code)}"))(
+            code
+        )
+    return size
+
+
 def assemble(code_list):
+
+    if DEBUG_ASSEMBLE:
+        print("Byte code to assemble:")
+        for i, code in enumerate(code_list):
+            print(f"{i}:{code}")
 
     raw_bytes = bytearray()
     for code in code_list:

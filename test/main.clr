@@ -48,12 +48,20 @@
 
 if true {
 
-    print "It was true!";
+    print "true is true!";
+
+} else {
+
+    print "true isn't true!";
 }
 
 if false {
 
-    print "It was false!";
+    print "false is true!";
+
+} else {
+
+    print "false isn't true!";
 }
 
 {

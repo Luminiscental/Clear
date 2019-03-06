@@ -1,6 +1,6 @@
 from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import emit_error
-from clr.assemble import assemble
+from clr.assemble import assemble, assembled_size
 from clr.constants import Constants, ClrNum, ClrInt, ClrUint, ClrStr
 from clr.values import OpCode, Precedence, pratt_table, DEBUG
 
@@ -121,12 +121,17 @@ class Program:
     def begin_jump(self, conditional=False):
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
         index = len(self.code_list)
+        if DEBUG:
+            print(f"Defining a jump from {index}")
         temp_offset = ClrUint(0)
         self.code_list.append(temp_offset)
         return index
 
     def end_jump(self, jump_ref):
-        offset = len(self.code_list) - jump_ref
+        contained = self.code_list[jump_ref + 1 :]
+        offset = assembled_size(contained)
+        if DEBUG:
+            print(f"Jump from index set with offset {offset}")
         self.code_list[jump_ref] = ClrUint(offset)
 
     def flush(self):
@@ -302,13 +307,22 @@ class Parser(Cursor):
 
     def finish_if_statement(self):
         self.consume_expression()
-        jump_ref = self.program.begin_jump(conditional=True)
+        if_jump = self.program.begin_jump(conditional=True)
         self.consume(
             TokenType.LEFT_BRACE, f"If statement requires a block! {self.prev_info()}"
         )
         self.finish_block()
-        self.program.end_jump(jump_ref)
-        # TODO: else
+        if self.match(TokenType.ELSE):
+            else_jump = self.program.begin_jump()
+            self.program.end_jump(if_jump)
+            self.consume(
+                TokenType.LEFT_BRACE,
+                f"Else branch requires a block! {self.prev_info()}",
+            )
+            self.finish_block()
+            self.program.end_jump(else_jump)
+        else:
+            self.program.end_jump(if_jump)
 
     def consume_statement(self):
         if self.match(TokenType.PRINT):
