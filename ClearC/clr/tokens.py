@@ -3,7 +3,13 @@ from enum import Enum
 from collections import namedtuple
 from clr.errors import emit_error
 from clr.trie import Trie, TrieResult
-from clr.values import TokenType, KEYWORD_TYPES, SIMPLE_TOKENS, EQUAL_SUFFIX_TOKENS
+from clr.values import (
+    TokenType,
+    KEYWORD_TYPES,
+    SIMPLE_TOKENS,
+    EQUAL_SUFFIX_TOKENS,
+    DEBUG,
+)
 
 Token = namedtuple("Token", "token_type lexeme line")
 
@@ -121,7 +127,9 @@ def scan_any(char, acc, line, tokens, keyword_trie):
         acc.append(char)
         next_state = ScanState.IDENTIFIER
     else:
-        emit_error(f"Unrecognized character '{char}'")()
+        tokens.append(Token(TokenType.ERR, char, line))
+        if DEBUG:
+            print(f"Unrecognized character '{char}'")
     return next_state, line
 
 
@@ -155,6 +163,13 @@ def tokenize(source):
         next_state, line = scan_any(char, acc, line, tokens, keyword_trie)
         if next_state:
             scan_state = next_state
+
+    if scan_state == ScanState.STRING:
+        emit_error(f"Unclosed string literal reaches end of file!")()
+    elif scan_state == ScanState.NUMBER or scan_state == ScanState.DECIMAL:
+        store_acc(TokenType.NUMBER, acc, line, tokens)
+    elif scan_state == ScanState.IDENTIFIER:
+        store_acc(TokenType.IDENTIFIER, acc, line, tokens)
 
     tokens = [token for token in tokens if token.token_type != TokenType.SPACE]
     tokens.append(Token(TokenType.EOF, "", line))

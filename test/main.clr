@@ -7,6 +7,8 @@ if true or false {
 
     print "true or false = true";
 
+    val a = "!!~~~";
+
     if true and true {
 
         print "true and true = true";

@@ -147,6 +147,7 @@ class TokenType(Enum):
     # special
     SPACE = 43
     EOF = 44
+    ERR = 45
 
 
 KEYWORD_TYPES = {
