@@ -169,8 +169,11 @@ class Compiler:
         self.program.define_name(token.lexeme)
 
     def print_expression(self, expression):
-        expression.gen_code(self)
-        self.program.simple_op(OpCode.PRINT)
+        if expression is None:
+            self.program.simple_op(OpCode.PRINT_BLANK)
+        else:
+            expression.gen_code(self)
+            self.program.simple_op(OpCode.PRINT)
 
     def run_if(self, checks, otherwise):
         final_jumps = []

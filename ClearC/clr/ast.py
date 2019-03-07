@@ -99,8 +99,8 @@ ParseRule = namedtuple(
     "ParseRule",
     ("prefix", "infix", "precedence"),
     defaults=(
-        lambda parser: parse_error("Expected expression!", parser),
-        lambda left, parser: parse_error("Expected expression!", parser),
+        lambda parser: parse_error("Expected expression!", parser)(),
+        lambda left, parser: parse_error("Expected expression!", parser)(),
         Precedence.NONE,
     ),
 )
@@ -206,15 +206,18 @@ class AstPrintStat:
     """
     AstPrintStat : 'print' AstExpr ';' ;
 
-    self.value: expression evaluating to the value to print
+    self.value: expression evaluating to the value to print or None
     """
 
     def __init__(self, parser):
         if not parser.match(TokenType.PRINT):
             parse_error("Expected print statement!", parser)()
-        self.value = AstExpr(parser)
         if not parser.match(TokenType.SEMICOLON):
-            parse_error("Expected semicolon for print statement!", parser)()
+            self.value = AstExpr(parser)
+            if not parser.match(TokenType.SEMICOLON):
+                parse_error("Expected semicolon for print statement!", parser)()
+        else:
+            self.value = None
 
     def gen_code(self, compiler):
         compiler.print_expression(self.value)
