@@ -166,7 +166,7 @@ class AstValDecl:
             parse_error("Expected value name!", parser)()
         self.name = parser.get_prev()
         if not parser.match(TokenType.EQUAL):
-            parse_error("Expected value initializer!", parser)()
+            parse_error("Expected '=' for value initializer!", parser)()
         self.value = AstExpr(parser)
         parser.consume(
             TokenType.SEMICOLON,
