@@ -46,6 +46,7 @@ class Parser:
         elif not self.match(possibilities[0]):
             self.consume_one(possibilities[1:], err)
 
+
 def parse_source(source):
 
     tokens = tokenize(source)
@@ -98,8 +99,8 @@ ParseRule = namedtuple(
     "ParseRule",
     ("prefix", "infix", "precedence"),
     defaults=(
-        lambda parser: parse_error(f"Expected expression!", parser),
-        lambda left, parser: parse_error(f"Expected expression!", parser),
+        lambda parser: parse_error("Expected expression!", parser),
+        lambda left, parser: parse_error("Expected expression!", parser),
         Precedence.NONE,
     ),
 )
@@ -113,7 +114,7 @@ class Ast:
     """
     Ast : AstDecl* ;
 
-    self.children: the declarations
+    self.children: a list of the declarations
     """
 
     def __init__(self, parser):
@@ -154,22 +155,22 @@ class AstValDecl:
     """
     AstValDecl : 'val' id '=' AstExpr ';' ;
 
-    self.name: the identifier
+    self.name: the identifier token
     self.value: expression evaluating to the intializer of the value
     """
 
     def __init__(self, parser):
         if not parser.match(TokenType.VAL):
-            parse_error(f"Expected value declaration!", parser)()
+            parse_error("Expected value declaration!", parser)()
         if not parser.match(TokenType.IDENTIFIER):
-            parse_error(f"Expected value name!", parser)()
-        self.name = parser.get_prev().lexeme
+            parse_error("Expected value name!", parser)()
+        self.name = parser.get_prev()
         if not parser.match(TokenType.EQUAL):
-            parse_error(f"Expected value initializer!", parser)()
+            parse_error("Expected value initializer!", parser)()
         self.value = AstExpr(parser)
         parser.consume(
             TokenType.SEMICOLON,
-            parse_error(f"Expected semicolon after value declaration!", parser),
+            parse_error("Expected semicolon after value declaration!", parser),
         )
 
     def gen_code(self, compiler):
@@ -210,10 +211,10 @@ class AstPrintStat:
 
     def __init__(self, parser):
         if not parser.match(TokenType.PRINT):
-            parse_error(f"Expected print statement!", parser)()
+            parse_error("Expected print statement!", parser)()
         self.value = AstExpr(parser)
         if not parser.match(TokenType.SEMICOLON):
-            parse_error(f"Expected semicolon for print statement!", parser)()
+            parse_error("Expected semicolon for print statement!", parser)()
 
     def gen_code(self, compiler):
         compiler.print_expression(self.value)
@@ -229,7 +230,7 @@ class AstIfStat:
 
     def __init__(self, parser):
         if not parser.match(TokenType.IF):
-            parse_error(f"Expected if statement!", parser)()
+            parse_error("Expected if statement!", parser)()
         self.checks = [(AstExpr(parser), AstBlock(parser))]
         self.otherwise = None
         while parser.match(TokenType.ELSE):
@@ -255,7 +256,7 @@ class AstExprStat:
     def __init__(self, parser):
         self.value = AstExpr(parser)
         if not parser.match(TokenType.SEMICOLON):
-            parse_error(f"Expected semicolon to end expression statement!", parser)()
+            parse_error("Expected semicolon to end expression statement!", parser)()
 
     def gen_code(self, compiler):
         compiler.drop_expression(self.value)
@@ -265,12 +266,12 @@ class AstBlock:
     """
     AstBlock : '{' AstDecl* '}' ;
 
-    self.declarations: List of declarations
+    self.declarations: a list of the declarations
     """
 
     def __init__(self, parser):
         if not parser.match(TokenType.LEFT_BRACE):
-            parse_error(f"Expected block!", parser)()
+            parse_error("Expected block!", parser)()
         opener = parser.get_prev()
         self.declarations = []
         while not parser.match(TokenType.RIGHT_BRACE):
@@ -310,10 +311,10 @@ class AstGrouping:
 
     def __init__(self, parser):
         if not parser.match(TokenType.LEFT_PAREN):
-            parse_error(f"Expected grouping!", parser)()
+            parse_error("Expected '(' before expression!", parser)()
         self.value = AstExpr(parser)
         if not parser.match(TokenType.RIGHT_PAREN):
-            parse_error(f"Expected ')' after expression!", parser)()
+            parse_error("Expected ')' after expression!", parser)()
 
     def gen_code(self, compiler):
         self.value.gen_code(compiler)
@@ -328,7 +329,7 @@ class AstUnary:
     def __init__(self, parser):
         parser.consume_one(
             [TokenType.MINUS, TokenType.BANG],
-            parse_error(f"Expected unary operator!", parser),
+            parse_error("Expected unary operator!", parser),
         )
         self.operator = parser.get_prev()
         self.target = AstExpr(parser, precedence=Precedence.UNARY)
@@ -359,7 +360,7 @@ class AstBinary:
                 TokenType.GREATER,
                 TokenType.LESS_EQUAL,
             ],
-            parse_error(f"Expected binary operator!", parser),
+            parse_error("Expected binary operator!", parser),
         )
         self.operator = parser.get_prev()
         prec = get_rule(self.operator).precedence
@@ -376,18 +377,18 @@ class AstNumber:
 
     def __init__(self, parser):
         if not parser.match(TokenType.NUMBER):
-            parse_error(f"Expected number!", parser)()
+            parse_error("Expected number!", parser)()
         token = parser.get_prev()
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
                 self.value = ClrInt(token.lexeme)
             except ValueError:
-                parse_error(f"Integer literal must be an integer!", parser)()
+                parse_error("Integer literal must be an integer!", parser)()
         else:
             try:
                 self.value = ClrNum(token.lexeme)
             except ValueError:
-                parse_error(f"Number literal must be a number!", parser)()
+                parse_error("Number literal must be a number!", parser)()
 
     def gen_code(self, compiler):
         compiler.load_constant(self.value)
@@ -400,7 +401,7 @@ class AstString:
 
     def __init__(self, parser):
         if not parser.match(TokenType.STRING):
-            parse_error(f"Expected string!", parser)()
+            parse_error("Expected string!", parser)()
         token = parser.get_prev()
         total = [token]
         while parser.match(TokenType.STRING):
@@ -420,7 +421,7 @@ class AstBoolean:
     def __init__(self, parser):
         parser.consume_one(
             [TokenType.TRUE, TokenType.FALSE],
-            parse_error(f"Expected boolean literal!", parser),
+            parse_error("Expected boolean literal!", parser),
         )
         self.value = parser.get_prev()
 
@@ -435,7 +436,7 @@ class AstIdent:
 
     def __init__(self, parser):
         if not parser.match(TokenType.IDENTIFIER):
-            parse_error(f"Expected variable!", parser)()
+            parse_error("Expected variable!", parser)()
         token = parser.get_prev()
         self.name = token
 
@@ -458,7 +459,7 @@ class AstBuiltin:
                 TokenType.NUM,
                 TokenType.STR,
             ],
-            parse_error(f"Expected builtin function!", parser),
+            parse_error("Expected builtin function!", parser),
         )
         self.function = parser.get_prev()
         self.target = AstGrouping(parser)
@@ -475,7 +476,7 @@ class AstAnd:
 
     def __init__(self, left, parser):
         self.left = left
-        parser.consume(TokenType.AND, parse_error(f"Expected and operator!", parser))
+        parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
         self.right = AstExpr(parser, precedence=Precedence.AND)
 
     def gen_code(self, compiler):
@@ -490,7 +491,7 @@ class AstOr:
 
     def __init__(self, left, parser):
         self.left = left
-        parser.consume(TokenType.OR, parse_error(f"Expected and operator!", parser))
+        parser.consume(TokenType.OR, parse_error("Expected and operator!", parser))
         self.right = AstExpr(parser, precedence=Precedence.OR)
 
     def gen_code(self, compiler):

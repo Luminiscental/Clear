@@ -164,9 +164,9 @@ class Compiler:
     def flush_code(self):
         return self.constants.flush() + self.program.flush()
 
-    def init_value(self, name, initializer):
+    def init_value(self, token, initializer):
         initializer.gen_code(self)
-        self.program.define_name(name)
+        self.program.define_name(token.lexeme)
 
     def print_expression(self, expression):
         expression.gen_code(self)
