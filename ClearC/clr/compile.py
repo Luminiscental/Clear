@@ -147,7 +147,7 @@ class Program:
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         if DEBUG:
-            print(f"Jump from index set with offset {offset}")
+            print(f"Jump from {index} set with offset {offset}")
         self.code_list[index] = ClrUint(offset)
         if conditional and not leave_value:
             self.code_list.append(OpCode.POP)
