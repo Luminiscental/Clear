@@ -3,15 +3,112 @@ from enum import Enum
 from collections import namedtuple
 from clr.errors import emit_error
 from clr.trie import Trie, TrieResult
-from clr.values import (
-    TokenType,
-    KEYWORD_TYPES,
-    SIMPLE_TOKENS,
-    EQUAL_SUFFIX_TOKENS,
-    DEBUG,
-)
+from clr.values import DEBUG
+
+
+class TokenType(Enum):
+
+    # symbols
+    LEFT_PAREN = 0
+    RIGHT_PAREN = 1
+    LEFT_BRACE = 2
+    RIGHT_BRACE = 3
+    COMMA = 4
+    DOT = 5
+    MINUS = 6
+    PLUS = 7
+    SEMICOLON = 8
+    SLASH = 9
+    STAR = 10
+    BANG = 11
+    BANG_EQUAL = 12
+    EQUAL = 13
+    EQUAL_EQUAL = 14
+    GREATER = 15
+    GREATER_EQUAL = 16
+    LESS = 17
+    LESS_EQUAL = 18
+    # values
+    IDENTIFIER = 19
+    STRING = 20
+    NUMBER = 21
+    INTEGER_SUFFIX = 22
+    # keywords
+    AND = 23
+    CLASS = 24
+    ELSE = 25
+    FALSE = 26
+    FOR = 27
+    FUNC = 28
+    IF = 29
+    OR = 30
+    PRINT = 31
+    RETURN = 32
+    SUPER = 33
+    THIS = 34
+    TRUE = 35
+    VAL = 36
+    WHILE = 37
+    # built-ins
+    TYPE = 38
+    INT = 39
+    BOOL = 40
+    NUM = 41
+    STR = 42
+    # special
+    SPACE = 43
+    EOF = 44
+    ERR = 45
+
 
 Token = namedtuple("Token", "token_type lexeme line")
+
+
+KEYWORD_TYPES = {
+    "and": TokenType.AND,
+    "class": TokenType.CLASS,
+    "else": TokenType.ELSE,
+    "false": TokenType.FALSE,
+    "for": TokenType.FOR,
+    "func": TokenType.FUNC,
+    "if": TokenType.IF,
+    "or": TokenType.OR,
+    "print": TokenType.PRINT,
+    "return": TokenType.RETURN,
+    "super": TokenType.SUPER,
+    "this": TokenType.THIS,
+    "true": TokenType.TRUE,
+    "val": TokenType.VAL,
+    "while": TokenType.WHILE,
+    "type": TokenType.TYPE,
+    "int": TokenType.INT,
+    "bool": TokenType.BOOL,
+    "num": TokenType.NUM,
+    "str": TokenType.STR,
+}
+
+SIMPLE_TOKENS = {
+    "+": TokenType.PLUS,
+    "-": TokenType.MINUS,
+    "*": TokenType.STAR,
+    "/": TokenType.SLASH,
+    ";": TokenType.SEMICOLON,
+    ",": TokenType.COMMA,
+    ".": TokenType.DOT,
+    "(": TokenType.LEFT_PAREN,
+    ")": TokenType.RIGHT_PAREN,
+    "{": TokenType.LEFT_BRACE,
+    "}": TokenType.RIGHT_BRACE,
+}
+
+SuffixType = namedtuple("SuffixType", "present nonpresent")
+
+EQUAL_SUFFIX_TOKENS = {
+    "!": SuffixType(TokenType.BANG_EQUAL, TokenType.BANG),
+    "=": SuffixType(TokenType.EQUAL_EQUAL, TokenType.EQUAL),
+    "<": SuffixType(TokenType.LESS_EQUAL, TokenType.LESS),
+    ">": SuffixType(TokenType.GREATER_EQUAL, TokenType.GREATER),
+}
 
 
 class ScanState(Enum):

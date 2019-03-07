@@ -1,14 +1,8 @@
 
-val cond = true or false;
-{
-    val inside = "inside";
-    {
-        val deeper = 12i;
-        print "deeper = " + str(deeper);
-        print "inside = " + str(inside);
-        print "cond = " + str(cond);
-    }
-    print "inside = " + str(inside);
-    print "cond = " + str(cond);
+val x = 1 + 2;
+
+if true or false {
+
+    print "True or False!";
 }
-print "cond = " + str(cond);
+

@@ -8,3 +8,7 @@ def emit_error(message):
         raise ClrCompileError(message)
 
     return emission
+
+
+def parse_error(message, parser):
+    return emit_error(message + f" {parser.current_info()}")

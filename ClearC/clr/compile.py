@@ -1,8 +1,8 @@
-from clr.tokens import TokenType, token_info, tokenize
+from clr.tokens import token_info, tokenize
 from clr.errors import emit_error
 from clr.assemble import assemble, assembled_size
 from clr.constants import Constants, ClrNum, ClrInt, ClrUint, ClrStr
-from clr.values import OpCode, Precedence, pratt_table, DEBUG
+from clr.values import OpCode, DEBUG
 
 
 class LocalVariables:
@@ -156,7 +156,7 @@ class Program:
         return self.code_list
 
 
-class Cursor:
+class Parser:
     def __init__(self, tokens):
         self.index = 0
         self.tokens = tokens
@@ -187,234 +187,18 @@ class Cursor:
         self.advance()
         return True
 
-    def _consume(self, expected_type, message):
+    def consume(self, expected_type, err):
         if not self.match(expected_type):
-            emit_error(message)()
+            err()
+
+    def consume_one(self, possibilities, err):
+        if not possibilities:
+            err()
+        elif not self.match(possibilities[0]):
+            self.consume_one(possibilities[1:], err)
 
     def flush(self):
         return self.constants.flush() + self.program.flush()
-
-
-class Parser(Cursor):
-    def _get_rule(self, token):
-        return pratt_table(
-            self, err=emit_error(f"Expected expression! {token_info(token)}")
-        )[token.token_type]
-
-    def _current_precedence(self):
-        return self._get_rule(self.get_current()).precedence
-
-    def finish_builtin(self):
-        builtin = self.get_prev()
-        self._consume(
-            TokenType.LEFT_PAREN,
-            f"Expected parameter to built-in function! {self.prev_info()}",
-        )
-        self.finish_grouping()
-        {
-            TokenType.TYPE: lambda: self.program.simple_op(OpCode.TYPE),
-            TokenType.INT: lambda: self.program.simple_op(OpCode.INT),
-            TokenType.BOOL: lambda: self.program.simple_op(OpCode.BOOL),
-            TokenType.NUM: lambda: self.program.simple_op(OpCode.NUM),
-            TokenType.STR: lambda: self.program.simple_op(OpCode.STR),
-        }.get(
-            builtin.token_type,
-            emit_error(f"Expected built-in function! {self.prev_info()}"),
-        )()
-
-    def finish_boolean(self):
-        token = self.get_prev()
-        err = emit_error(f"Expected boolean token! {self.prev_info()}")
-        {
-            TokenType.TRUE: lambda: self.program.simple_op(OpCode.TRUE),
-            TokenType.FALSE: lambda: self.program.simple_op(OpCode.FALSE),
-        }.get(token.token_type, err)()
-
-    def finish_number(self):
-        token = self.get_prev()
-        if token.token_type != TokenType.NUMBER:
-            emit_error(f"Expected number token! {self.prev_info()}")()
-        if self.match(TokenType.INTEGER_SUFFIX):
-            try:
-                value = ClrInt(token.lexeme)
-            except ValueError:
-                emit_error(f"Integer literal must be an integer! {self.prev_info()}")()
-        else:
-            try:
-                value = ClrNum(token.lexeme)
-            except ValueError:
-                emit_error(f"Number literal must be a number! {self.prev_info()}")()
-        const_index = self.constants.add(value)
-        self.program.load_constant(const_index)
-
-    def finish_string(self):
-        token = self.get_prev()
-        if token.token_type != TokenType.STRING:
-            emit_error(f"Expected string token! {self.prev_info()}")()
-
-        total = [token]
-        while self.match(TokenType.STRING):
-            total.append(self.get_prev())
-
-        string = ClrStr('"'.join(map(lambda t: t.lexeme[1:-1], total)))
-        const_index = self.constants.add(string)
-        self.program.load_constant(const_index)
-
-    def _consume_precedence(self, precedence):
-        self.advance()
-        self._get_rule(self.get_prev()).prefix()
-        while precedence <= self._current_precedence():
-            self.advance()
-            self._get_rule(self.get_prev()).infix()
-
-    def finish_grouping(self):
-        self._consume_expression()
-        self._consume(
-            TokenType.RIGHT_PAREN, f"Expected ')' after expression! {self.prev_info()}"
-        )
-
-    def finish_unary(self):
-        op_token = self.get_prev()
-        self._consume_precedence(Precedence.UNARY)
-        {
-            TokenType.MINUS: lambda: self.program.simple_op(OpCode.NEGATE),
-            TokenType.BANG: lambda: self.program.simple_op(OpCode.NOT),
-        }.get(
-            op_token.token_type,
-            emit_error(f"Expected unary operator! {self.prev_info()}"),
-        )()
-
-    def finish_and(self):
-        short_circuit = self.program.begin_jump(conditional=True)
-        self._consume_precedence(Precedence.AND)
-        self.program.end_jump(short_circuit, leave_value=True)
-
-    def finish_or(self):
-        long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
-        short_circuit = self.program.begin_jump()
-        self.program.end_jump(long_circuit)
-        self._consume_precedence(Precedence.OR)
-        self.program.end_jump(short_circuit, leave_value=True)
-
-    def finish_binary(self):
-        op_token = self.get_prev()
-        rule = self._get_rule(op_token)
-        self._consume_precedence(rule.precedence.next())
-        {
-            TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
-            TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
-            TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
-            TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
-            TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
-            TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
-            TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
-            TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
-            TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
-            TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
-        }.get(
-            op_token.token_type,
-            emit_error(f"Expected binary operator! {self.prev_info()}"),
-        )()
-
-    def _consume_expression(self):
-        self._consume_precedence(Precedence.ASSIGNMENT)
-
-    def finish_print_statement(self):
-        if self.match(TokenType.SEMICOLON):  # Blank print statement
-            self.program.simple_op(OpCode.PRINT_BLANK)
-        else:
-            self._consume_expression()
-            self._consume(
-                TokenType.SEMICOLON,
-                f"Expected semicolon after statement! {self.prev_info()}",
-            )
-            self.program.simple_op(OpCode.PRINT)
-
-    def _consume_expression_statement(self):
-        self._consume_expression()
-        self._consume(TokenType.SEMICOLON, f"Expected statement! {self.prev_info()}")
-        self.program.simple_op(OpCode.POP)
-
-    def finish_if_statement(self):
-        self._consume_expression()
-        if_jump = self.program.begin_jump(conditional=True)
-        self._consume(
-            TokenType.LEFT_BRACE, f"If statement requires a block! {self.prev_info()}"
-        )
-        self.finish_block()
-        final_jumps = [self.program.begin_jump()]
-        self.program.end_jump(if_jump)
-        while self.match(TokenType.ELSE):
-            if self.match(TokenType.IF):
-                self._consume_expression()
-                elif_jump = self.program.begin_jump(conditional=True)
-                self._consume(
-                    TokenType.LEFT_BRACE,
-                    f"Else if branch requires a block! {self.prev_info()}",
-                )
-                self.finish_block()
-                final_jumps.append(self.program.begin_jump())
-                self.program.end_jump(elif_jump)
-            else:
-                self._consume(
-                    TokenType.LEFT_BRACE,
-                    f"Else branch requires a block! {self.prev_info()}",
-                )
-                self.finish_block()
-                break
-        for final_jump in final_jumps:
-            self.program.end_jump(final_jump)
-
-    def _consume_statement(self):
-        if self.match(TokenType.PRINT):
-            self.finish_print_statement()
-        elif self.match(TokenType.LEFT_BRACE):
-            self.finish_block()
-        elif self.match(TokenType.IF):
-            self.finish_if_statement()
-        # TODO: for
-        else:
-            self._consume_expression_statement()
-
-    def _consume_variable(self, message):
-        self._consume(TokenType.IDENTIFIER, message)
-        return self.get_prev().lexeme
-
-    def finish_variable_declaration(self):
-        name = self._consume_variable(f"Expected variable name! {self.prev_info()}")
-        self._consume(
-            TokenType.EQUAL, f"Expected variable initializer! {self.prev_info()}"
-        )
-        self._consume_expression()
-        self._consume(
-            TokenType.SEMICOLON,
-            f"Expected semicolon after statement! {self.prev_info()}",
-        )
-        self.program.define_name(name)
-
-    def finish_variable_reference(self):
-        token = self.get_prev()
-        if token.token_type != TokenType.IDENTIFIER:
-            emit_error(f"Expected variable! {self.prev_info()}")()
-        self.program.load_name(
-            token.lexeme,
-            emit_error(f"Reference to undefined identifier! {self.prev_info()}"),
-        )
-
-    def consume_declaration(self):
-        if self.match(TokenType.VAL):
-            self.finish_variable_declaration()
-        else:
-            self._consume_statement()
-
-    def finish_block(self):
-        opener = self.get_prev()
-        self.program.push_scope()
-        while not self.match(TokenType.RIGHT_BRACE):
-            if self.match(TokenType.EOF):
-                emit_error(f"Unclosed block! {token_info(opener)}")()
-            self.consume_declaration()
-        self.program.pop_scope()
 
 
 def parse_source(source):
@@ -423,7 +207,4 @@ def parse_source(source):
     if DEBUG:
         print("Tokens:")
         print(" ".join([token.lexeme for token in tokens]))
-    parser = Parser(tokens)
-    while not parser.match(TokenType.EOF):
-        parser.consume_declaration()
-    return assemble(parser.flush())
+    return Parser(tokens)

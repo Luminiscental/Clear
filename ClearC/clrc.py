@@ -3,6 +3,7 @@ import sys
 from clr.errors import ClrCompileError
 from clr.compile import parse_source
 from clr.values import DEBUG
+from clr.ast import Ast
 
 
 def main():
@@ -20,16 +21,14 @@ def main():
     try:
         if DEBUG:
             print("Compiling:")
-        byte_code = parse_source(source)
+        parser = parse_source(source)
+        ast = Ast(parser)
     except ClrCompileError as e:
         print("Could not compile:")
         print(e)
     else:
         print("Compiled successfully")
-        # TODO: Gen intermediate / AST
         # TODO: Gen debug symbols
-        with open(dest_file_name, "wb") as dest_file:
-            dest_file.write(byte_code)
 
 
 if __name__ == "__main__":
