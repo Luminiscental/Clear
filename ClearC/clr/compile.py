@@ -19,6 +19,11 @@ class LocalVariables:
             emit_error("Global scope is not local!")()
         return self.scopes[self.level]
 
+    def _get_scope(self, lookback):
+        if not self.scoped():
+            emit_error("Global scope is not local!")()
+        return self.scopes[self.level - lookback]
+
     def push_scope(self):
         self.scopes.append({})
         self.level += 1
@@ -37,9 +42,17 @@ class LocalVariables:
             print(f"Popped scope, level is now {self.level}, index is now {self.index}")
 
     def get_name(self, name):
+        result = None
         if not self.scoped():
-            return None
-        return self._current_scope().get(name, None)
+            return result
+        lookback = 0
+        while result is None:
+            try:
+                result = self._get_scope(lookback).get(name, None)
+                lookback += 1
+            except IndexError:
+                break
+        return result
 
     def add_name(self, name):
         if not self.scoped():
