@@ -1,9 +1,60 @@
-from clr.tokens import TokenType, token_info
-from clr.errors import ClrCompileError, parse_error, emit_error
-from clr.compile import Parser
-from clr.constants import ClrInt, ClrNum, ClrStr
 from enum import Enum
 from collections import namedtuple, defaultdict
+from clr.tokens import TokenType, token_info, tokenize
+from clr.errors import parse_error, emit_error
+from clr.values import DEBUG
+from clr.constants import ClrInt, ClrNum, ClrStr
+from clr.compile import Compiler
+
+
+class Parser:
+    def __init__(self, tokens):
+        self.index = 0
+        self.tokens = tokens
+
+    def get_current(self):
+        return self.tokens[self.index]
+
+    def get_prev(self):
+        return self.tokens[self.index - 1]
+
+    def current_info(self):
+        return token_info(self.get_current())
+
+    def prev_info(self):
+        return token_info(self.get_prev())
+
+    def advance(self):
+        self.index += 1
+
+    def check(self, token_type):
+        return self.get_current().token_type == token_type
+
+    def match(self, expected_type):
+        if not self.check(expected_type):
+            return False
+        self.advance()
+        return True
+
+    def consume(self, expected_type, err):
+        if not self.match(expected_type):
+            err()
+
+    def consume_one(self, possibilities, err):
+        if not possibilities:
+            err()
+        elif not self.match(possibilities[0]):
+            self.consume_one(possibilities[1:], err)
+
+def parse_source(source):
+
+    tokens = tokenize(source)
+    if DEBUG:
+        print("Tokens:")
+        print(" ".join([token.lexeme for token in tokens]))
+    parser = Parser(tokens)
+    ast = Ast(parser)
+    return ast
 
 
 class Precedence(Enum):
@@ -73,6 +124,12 @@ class Ast:
     def add_child(self, child):
         self.children.append(child)
 
+    def gen_code(self):
+        compiler = Compiler()
+        for child in self.children:
+            child.gen_code(compiler)
+        return compiler.flush_code()
+
 
 class AstDecl:
     """
@@ -88,6 +145,9 @@ class AstDecl:
             self.value = AstValDecl(parser)
         else:
             self.value = AstStat(parser)
+
+    def gen_code(self, compiler):
+        self.value.gen_code(compiler)
 
 
 class AstValDecl:
@@ -112,6 +172,9 @@ class AstValDecl:
             parse_error(f"Expected semicolon after value declaration!", parser),
         )
 
+    def gen_code(self, compiler):
+        compiler.init_value(self.name, self.value)
+
 
 class AstStat:
     """
@@ -134,6 +197,9 @@ class AstStat:
         else:
             self.value = AstExprStat(parser)
 
+    def gen_code(self, compiler):
+        self.value.gen_code(compiler)
+
 
 class AstPrintStat:
     """
@@ -149,32 +215,34 @@ class AstPrintStat:
         if not parser.match(TokenType.SEMICOLON):
             parse_error(f"Expected semicolon for print statement!", parser)()
 
+    def gen_code(self, compiler):
+        compiler.print_expression(self.value)
+
 
 class AstIfStat:
     """
     AstIfStat : 'if' AstExpr AstBlock ( 'else' 'if' AstExpr AstBlock )* ( 'else' AstBlock )? ;
 
-    self.condition: expression evaluating to the if condition
-    self.block: block for the if branch
-    self.others: list of (condition, block) tuples for the else-if branches
-    self.final: block for the else branch or None
+    self.checks: list of (condition, block) tuples for the if / else-if branches
+    self.otherwise: block for the else branch or None
     """
 
     def __init__(self, parser):
         if not parser.match(TokenType.IF):
             parse_error(f"Expected if statement!", parser)()
-        self.condition = AstExpr(parser)
-        self.block = AstBlock(parser)
-        self.others = []
-        self.final = None
+        self.checks = [(AstExpr(parser), AstBlock(parser))]
+        self.otherwise = None
         while parser.match(TokenType.ELSE):
             if parser.match(TokenType.IF):
                 other_cond = AstExpr(parser)
                 other_block = AstBlock(parser)
-                self.others.append((other_cond, other_block))
+                self.checks.append((other_cond, other_block))
             else:
-                self.final = AstBlock(parser)
+                self.otherwise = AstBlock(parser)
                 break
+
+    def gen_code(self, compiler):
+        compiler.run_if(self.checks, self.otherwise)
 
 
 class AstExprStat:
@@ -188,6 +256,9 @@ class AstExprStat:
         self.value = AstExpr(parser)
         if not parser.match(TokenType.SEMICOLON):
             parse_error(f"Expected semicolon to end expression statement!", parser)()
+
+    def gen_code(self, compiler):
+        compiler.drop_expression(self.value)
 
 
 class AstBlock:
@@ -209,6 +280,12 @@ class AstBlock:
             self.declarations.append(decl)
             pass
 
+    def gen_code(self, compiler):
+        compiler.push_scope()
+        for decl in self.declarations:
+            decl.gen_code(compiler)
+        compiler.pop_scope()
+
 
 class AstExpr:
     """
@@ -222,6 +299,9 @@ class AstExpr:
             rule = get_rule(parser.get_current())
             self.value = rule.infix(self.value, parser)
 
+    def gen_code(self, compiler):
+        self.value.gen_code(compiler)
+
 
 class AstGrouping:
     """
@@ -234,6 +314,9 @@ class AstGrouping:
         self.value = AstExpr(parser)
         if not parser.match(TokenType.RIGHT_PAREN):
             parse_error(f"Expected ')' after expression!", parser)()
+
+    def gen_code(self, compiler):
+        self.value.gen_code(compiler)
 
 
 class AstUnary:
@@ -249,6 +332,9 @@ class AstUnary:
         )
         self.operator = parser.get_prev()
         self.target = AstExpr(parser, precedence=Precedence.UNARY)
+
+    def gen_code(self, compiler):
+        compiler.apply_unary(self.operator, self.target)
 
 
 class AstBinary:
@@ -279,6 +365,9 @@ class AstBinary:
         prec = get_rule(self.operator).precedence
         self.right = AstExpr(parser, precedence=prec.next())
 
+    def gen_code(self, compiler):
+        compiler.apply_binary(self.operator, self.left, self.right)
+
 
 class AstNumber:
     """
@@ -300,6 +389,9 @@ class AstNumber:
             except ValueError:
                 parse_error(f"Number literal must be a number!", parser)()
 
+    def gen_code(self, compiler):
+        compiler.load_constant(self.value)
+
 
 class AstString:
     """
@@ -316,10 +408,13 @@ class AstString:
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
         self.value = ClrStr(joined)
 
+    def gen_code(self, compiler):
+        compiler.load_constant(self.value)
+
 
 class AstBoolean:
     """
-    self.value: the literal value, a bool
+    self.value: the boolean token
     """
 
     def __init__(self, parser):
@@ -327,20 +422,25 @@ class AstBoolean:
             [TokenType.TRUE, TokenType.FALSE],
             parse_error(f"Expected boolean literal!", parser),
         )
-        token = parser.get_prev()
-        self.value = token.token_type == TokenType.TRUE
+        self.value = parser.get_prev()
+
+    def gen_code(self, compiler):
+        compiler.load_boolean(self.value)
 
 
 class AstIdent:
     """
-    self.name: the name of the variable referenced
+    self.name: the variable name token
     """
 
     def __init__(self, parser):
         if not parser.match(TokenType.IDENTIFIER):
             parse_error(f"Expected variable!", parser)()
         token = parser.get_prev()
-        self.name = token.lexeme
+        self.name = token
+
+    def gen_code(self, compiler):
+        compiler.load_variable(self.name)
 
 
 class AstBuiltin:
@@ -363,6 +463,9 @@ class AstBuiltin:
         self.function = parser.get_prev()
         self.target = AstGrouping(parser)
 
+    def gen_code(self, compiler):
+        compiler.apply_builtin(self.function, self.target)
+
 
 class AstAnd:
     """
@@ -375,6 +478,9 @@ class AstAnd:
         parser.consume(TokenType.AND, parse_error(f"Expected and operator!", parser))
         self.right = AstExpr(parser, precedence=Precedence.AND)
 
+    def gen_code(self, compiler):
+        compiler.apply_and(self.left, self.right)
+
 
 class AstOr:
     """
@@ -386,6 +492,9 @@ class AstOr:
         self.left = left
         parser.consume(TokenType.OR, parse_error(f"Expected and operator!", parser))
         self.right = AstExpr(parser, precedence=Precedence.OR)
+
+    def gen_code(self, compiler):
+        compiler.apply_or(self.left, self.right)
 
 
 PRATT_TABLE = defaultdict(

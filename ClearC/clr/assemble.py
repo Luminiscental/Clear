@@ -69,7 +69,7 @@ def assembled_size(code_list):
 def assemble(code_list):
 
     if DEBUG_ASSEMBLE:
-        print("Byte code to _assemble:")
+        print("Byte code to assemble:")
         for i, code in enumerate(code_list):
             print(f"{i}:{code}")
 

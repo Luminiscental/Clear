@@ -1,4 +1,3 @@
-from collections import namedtuple, defaultdict
 from enum import Enum
 
 DEBUG = False

@@ -1,8 +1,8 @@
-from clr.tokens import token_info, tokenize
 from clr.errors import emit_error
-from clr.assemble import assemble, assembled_size
-from clr.constants import Constants, ClrNum, ClrInt, ClrUint, ClrStr
+from clr.assemble import assembled_size
+from clr.constants import Constants, ClrUint
 from clr.values import OpCode, DEBUG
+from clr.tokens import TokenType, token_info
 
 
 class LocalVariables:
@@ -156,55 +156,116 @@ class Program:
         return self.code_list
 
 
-class Parser:
-    def __init__(self, tokens):
-        self.index = 0
-        self.tokens = tokens
-        self.constants = Constants()
+class Compiler:
+    def __init__(self):
         self.program = Program()
+        self.constants = Constants()
 
-    def get_current(self):
-        return self.tokens[self.index]
-
-    def get_prev(self):
-        return self.tokens[self.index - 1]
-
-    def current_info(self):
-        return token_info(self.get_current())
-
-    def prev_info(self):
-        return token_info(self.get_prev())
-
-    def advance(self):
-        self.index += 1
-
-    def check(self, token_type):
-        return self.get_current().token_type == token_type
-
-    def match(self, expected_type):
-        if not self.check(expected_type):
-            return False
-        self.advance()
-        return True
-
-    def consume(self, expected_type, err):
-        if not self.match(expected_type):
-            err()
-
-    def consume_one(self, possibilities, err):
-        if not possibilities:
-            err()
-        elif not self.match(possibilities[0]):
-            self.consume_one(possibilities[1:], err)
-
-    def flush(self):
+    def flush_code(self):
         return self.constants.flush() + self.program.flush()
 
+    def init_value(self, name, initializer):
+        initializer.gen_code(self)
+        self.program.define_name(name)
 
-def parse_source(source):
+    def print_expression(self, expression):
+        expression.gen_code(self)
+        self.program.simple_op(OpCode.PRINT)
 
-    tokens = tokenize(source)
-    if DEBUG:
-        print("Tokens:")
-        print(" ".join([token.lexeme for token in tokens]))
-    return Parser(tokens)
+    def run_if(self, checks, otherwise):
+        final_jumps = []
+        for check in checks:
+            check_cond, check_block = check
+            check_cond.gen_code(self)
+            check_jump = self.program.begin_jump(conditional=True)
+            check_block.gen_code(self)
+            final_jumps.append(self.program.begin_jump())
+            self.program.end_jump(check_jump)
+        if otherwise is not None:
+            otherwise.gen_code(self)
+        for final_jump in final_jumps:
+            self.program.end_jump(final_jump)
+
+    def drop_expression(self, expression):
+        expression.gen_code(self)
+        self.program.simple_op(OpCode.POP)
+
+    def push_scope(self):
+        self.program.push_scope()
+
+    def pop_scope(self):
+        self.program.pop_scope()
+
+    def apply_unary(self, operator, expression):
+        expression.gen_code(self)
+        {
+            TokenType.MINUS: lambda: self.program.simple_op(OpCode.NEGATE),
+            TokenType.BANG: lambda: self.program.simple_op(OpCode.NOT),
+        }.get(
+            operator.token_type,
+            emit_error(f"Unknown unary operator! {token_info(operator)}"),
+        )()
+
+    def apply_binary(self, operator, left_expr, right_expr):
+        left_expr.gen_code(self)
+        right_expr.gen_code(self)
+        {
+            TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
+            TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
+            TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
+            TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
+            TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
+            TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
+            TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
+            TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
+            TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
+            TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
+        }.get(
+            operator.token_type,
+            emit_error(f"Unknown binary operator! {token_info(operator)}"),
+        )()
+
+    def load_constant(self, value):
+        const_index = self.constants.add(value)
+        self.program.load_constant(const_index)
+
+    def load_boolean(self, token):
+        {
+            TokenType.TRUE: lambda: self.program.simple_op(OpCode.TRUE),
+            TokenType.FALSE: lambda: self.program.simple_op(OpCode.FALSE),
+        }.get(
+            token.token_type, emit_error(f"Expected boolean token! {token_info(token)}")
+        )()
+
+    def load_variable(self, token):
+        self.program.load_name(
+            token.lexeme,
+            emit_error(f"Reference to undefined identifier! {token_info(token)}"),
+        )
+
+    def apply_builtin(self, builtin, target):
+        target.gen_code(self)
+        {
+            TokenType.TYPE: lambda: self.program.simple_op(OpCode.TYPE),
+            TokenType.INT: lambda: self.program.simple_op(OpCode.INT),
+            TokenType.BOOL: lambda: self.program.simple_op(OpCode.BOOL),
+            TokenType.NUM: lambda: self.program.simple_op(OpCode.NUM),
+            TokenType.STR: lambda: self.program.simple_op(OpCode.STR),
+        }.get(
+            builtin.token_type,
+            emit_error(f"Expected built-in function! {token_info(builtin)}"),
+        )()
+
+    def apply_and(self, left_expr, right_expr):
+        left_expr.gen_code(self)
+        short_circuit = self.program.begin_jump(conditional=True)
+        right_expr.gen_code(self)
+        self.program.end_jump(short_circuit, leave_value=True)
+
+    def apply_or(self, left_expr, right_expr):
+        left_expr.gen_code(self)
+        long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
+        short_circuit = self.program.begin_jump()
+        self.program.end_jump(long_circuit)
+        right_expr.gen_code(self)
+        self.program.end_jump(short_circuit, leave_value=True)

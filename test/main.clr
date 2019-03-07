@@ -1,5 +1,6 @@
 
 val x = 1 + 2;
+print x;
 
 if true or false {
 
