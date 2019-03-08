@@ -437,7 +437,9 @@ class AstBinary:
         )
         self.operator = parser.get_prev()
         prec = get_rule(self.operator).precedence
-        self.right = AstExpr(parser, precedence=prec.next())
+        if self.operator.token_type not in LEFT_ASSOC_OPS:
+            prec = prec.next()
+        self.right = AstExpr(parser, precedence=prec)
         self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
@@ -675,6 +677,11 @@ class AstOr:
             emit_error(
                 f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
             )()
+
+LEFT_ASSOC_OPS = {
+    # TokenType.SLASH,
+    # TokenType.MINUS,
+}
 
 
 PRATT_TABLE = defaultdict(

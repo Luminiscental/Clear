@@ -3,6 +3,7 @@
 
 // TODO: fix
 print "1 / 2 / 3 = " + str(1 / 2 / 3);
+print "1 - 2 - 3 = " + str(1 - 2 - 3);
 
 val cond = false or true;
 
