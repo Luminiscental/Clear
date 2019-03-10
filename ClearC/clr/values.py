@@ -1,3 +1,7 @@
+"""
+This module provides clr module scope constants such as debug flags
+or file format specification values.
+"""
 from enum import Enum
 
 DEBUG = False
@@ -5,6 +9,10 @@ DEBUG_ASSEMBLE = False
 
 
 class OpCode(Enum):
+    """
+    This class enumerates the possible opcodes for .clr.b files
+    along with their byte values as ints.
+    """
 
     # Constant storage
     STORE_CONST = 0

@@ -1,8 +1,17 @@
+"""
+This module provides a Resolver class to visit AST nodes resolving
+identifiers to find their types and variable indices.
+"""
 from enum import Enum
 from collections import namedtuple, defaultdict
 
 
 class ValueType(Enum):
+    """
+    This class enumerates the possible types of Clear variables,
+    including an unresolved option.
+    """
+
     INT = "int"
     NUM = "num"
     STR = "str"
@@ -21,6 +30,11 @@ ResolvedName = namedtuple(
 
 
 class Resolver:
+    """
+    This class provides functionality for visiting AST nodes to resolve
+    the type and variable index of identifiers / declarations thereof.
+    """
+
     def __init__(self):
         self.scopes = [defaultdict(ResolvedName)]
         self.level = 0
@@ -37,10 +51,16 @@ class Resolver:
         return self.scopes[self.level - lookback]
 
     def push_scope(self):
+        """
+        This function pushes a new scope to resolve within.
+        """
         self.scopes.append(defaultdict(ResolvedName))
         self.level += 1
 
     def pop_scope(self):
+        """
+        This function pops the current resolution scope.
+        """
         if self.level > 0:
             popped = self._current_scope()
             if popped:
@@ -51,6 +71,10 @@ class Resolver:
         self.level -= 1
 
     def add_name(self, name, value_type):
+        """
+        This function resolves the given name as a new variable in the current scope
+        or as a redefinition of it if it already exists, returning the resolved information.
+        """
         prev = self.lookup_name(name)
         if prev.value_type == ValueType.UNRESOLVED:
             if self.level > 0:
@@ -66,6 +90,11 @@ class Resolver:
         return result
 
     def lookup_name(self, name):
+        """
+        This function resolves the given name to a previously resolved
+        declaration, returning the resolved information set as unresolved
+        if no such declaration was found.
+        """
         result = ResolvedName()
         lookback = 0
         while lookback < self.level:

@@ -1,3 +1,6 @@
+"""
+This module provides classes to compose an AST for Clear programs.
+"""
 from enum import Enum
 from collections import namedtuple, defaultdict
 from clr.tokens import TokenType, token_info, tokenize
@@ -9,39 +12,65 @@ from clr.resolve import Resolver, ValueType, ResolvedName
 
 
 class Parser:
+    """
+    This class wraps a list of tokens with functionality to walk along the list
+    and check the token types that occur as well as their values. It is used
+    by the AST nodes to build the tree from these tokens.
+    """
+
     def __init__(self, tokens):
         self.index = 0
         self.tokens = tokens
 
     def get_current(self):
+        """This function returns the token currently pointed to."""
         return self.tokens[self.index]
 
     def get_prev(self):
+        """This function returns the token last pointed to."""
         return self.tokens[self.index - 1]
 
     def current_info(self):
+        """This function returns information about the current token as a string."""
         return token_info(self.get_current())
 
     def prev_info(self):
+        """This function returns information about the last token as a string."""
         return token_info(self.get_prev())
 
     def advance(self):
+        """This function moves the parser onto the next token."""
         self.index += 1
 
     def check(self, token_type):
+        """This function returns whether the current token is of the given token type."""
         return self.get_current().token_type == token_type
 
     def match(self, expected_type):
+        """
+        This function checks if the current token is of the given token type;
+        if it is the parser advances to the next token, otherwise it does not.
+        """
         if not self.check(expected_type):
             return False
         self.advance()
         return True
 
     def consume(self, expected_type, err):
+        """
+        This method checks if the current token is of the given token type;
+        if it is the parser advances to the next token, otherwise the error
+        function that was passed is called.
+        """
         if not self.match(expected_type):
             err()
 
     def consume_one(self, possibilities, err):
+        """
+        This method checks if the current token matches one of the possible
+        token types and if so advances the parser, otherwise calling the passed
+        error function.
+        """
         if not possibilities:
             err()
         elif not self.match(possibilities[0]):
@@ -49,6 +78,12 @@ class Parser:
 
 
 class Precedence(Enum):
+
+    """
+    This class enumerates the possible precedences of operators
+    in Clear expressions, matched with numerical values to show the
+    ordering and rich comparison protocols.
+    """
 
     NONE = 0
     ASSIGNMENT = 1
@@ -82,6 +117,7 @@ class Precedence(Enum):
         return 1
 
     def next(self):
+        """This function returns the next precedence above self."""
         return Precedence(self.value + 1)
 
 
@@ -97,14 +133,16 @@ ParseRule = namedtuple(
 
 
 def get_rule(token):
+    """This function returns the parse rule associated with the given token."""
     return PRATT_TABLE[token.token_type]
 
 
 class Ast:
     """
-    Ast : AstDecl* ;
+    This class is the root node for a Clear program's AST.
+    It representes the following grammar rule:
 
-    self.children: a list of the declarations
+    Ast : AstDecl* ;
     """
 
     def __init__(self, parser):
@@ -116,6 +154,7 @@ class Ast:
             child.resolve(resolver)
 
     def compile(self):
+        """This function walks over the AST and produces bytecode for the program."""
         compiler = Compiler()
         for child in self.children:
             child.gen_code(compiler)
@@ -123,7 +162,10 @@ class Ast:
 
     @staticmethod
     def from_source(source):
-
+        """
+        This function takes a string of Clear source; tokenizes it and
+        generates an AST by parsing those tokens.
+        """
         tokens = tokenize(source)
         if DEBUG:
             print("Tokens:")
@@ -138,33 +180,41 @@ class Ast:
 
 class AstDecl:
     """
-    AstDecl : AstValDecl
-            | AstStat
-            ;
+    This class is an AST node for a declaration; either a value declaration
+    or a statement. It represents the following grammar rule:
 
-    self.value: the declaration
+    AstDecl : AstValDecl
+            | AstStmt
+            ;
     """
 
     def __init__(self, parser):
         if parser.check(TokenType.VAL):
             self.value = AstValDecl(parser)
         else:
-            self.value = AstStat(parser)
+            self.value = AstStmt(parser)
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         self.value.gen_code(compiler)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.value.resolve(resolver)
 
 
 class AstValDecl:
     """
-    AstValDecl : 'val' id '=' AstExpr ';' ;
+    This class is an AST node for a value declaration. It represents
+    the following grammar rule:
 
-    self.name: the identifier token
-    self.value: expression evaluating to the intializer of the value
-    self.resolved_name: resolution info about this value; unresolved by default
+    AstValDecl : 'val' id '=' AstExpr ';' ;
     """
 
     def __init__(self, parser):
@@ -183,46 +233,65 @@ class AstValDecl:
         self.resolved_name = ResolvedName()
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.init_value(self.resolved_name, self.value)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.value.resolve(resolver)
         self.resolved_name = resolver.add_name(self.name.lexeme, self.value.value_type)
 
 
-class AstStat:
+class AstStmt:
     """
-    AstStat : AstPrintStat
-            | AstBlock
-            | AstIfStat
-            | AstExprStat
-            ;
+    This class is an AST node for a statement. Either a print statement,
+    a simple block, an if statement or an expression statement. It represents
+    the following grammar rule:
 
-    self.value: the statement
+    AstStmt : AstPrintStmt
+            | AstBlock
+            | AstIfStmt
+            | AstExprStmt
+            ;
     """
 
     def __init__(self, parser):
         if parser.check(TokenType.PRINT):
-            self.value = AstPrintStat(parser)
+            self.value = AstPrintStmt(parser)
         elif parser.check(TokenType.LEFT_BRACE):
             self.value = AstBlock(parser)
         elif parser.check(TokenType.IF):
-            self.value = AstIfStat(parser)
+            self.value = AstIfStmt(parser)
         else:
-            self.value = AstExprStat(parser)
+            self.value = AstExprStmt(parser)
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         self.value.gen_code(compiler)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.value.resolve(resolver)
 
 
-class AstPrintStat:
+class AstPrintStmt:
     """
-    AstPrintStat : 'print' AstExpr ';' ;
+    This class is an AST node for a print statement. It represents
+    the following grammar rule:
 
-    self.value: expression evaluating to the value to print or None
+    AstPrintStmt : 'print' AstExpr ';' ;
     """
 
     def __init__(self, parser):
@@ -236,19 +305,27 @@ class AstPrintStat:
             self.value = None
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.print_expression(self.value)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         if self.value:
             self.value.resolve(resolver)
 
 
-class AstIfStat:
+class AstIfStmt:
     """
-    AstIfStat : 'if' AstExpr AstBlock ( 'else' 'if' AstExpr AstBlock )* ( 'else' AstBlock )? ;
+    This class is an AST node for an if statement with optional else-if and
+    else branches. It represents the following grammar rule:
 
-    self.checks: list of (condition, block) tuples for the if / else-if branches
-    self.otherwise: block for the else branch or None
+    AstIfStmt : 'if' AstExpr AstBlock ( 'else' 'if' AstExpr AstBlock )* ( 'else' AstBlock )? ;
     """
 
     def __init__(self, parser):
@@ -266,9 +343,17 @@ class AstIfStat:
                 break
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.run_if(self.checks, self.otherwise)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         for check in self.checks:
             cond, block = check
             cond.resolve(resolver)
@@ -277,11 +362,12 @@ class AstIfStat:
             self.otherwise.resolve(resolver)
 
 
-class AstExprStat:
+class AstExprStmt:
     """
-    AstExprStat : AstExpr ';' ;
+    This class is an AST node for an expression statement where the result of
+    the expression is discarded. It represents the following grammar rule:
 
-    self.value: the expression
+    AstExprStmt : AstExpr ';' ;
     """
 
     def __init__(self, parser):
@@ -290,17 +376,26 @@ class AstExprStat:
             parse_error("Expected semicolon to end expression statement!", parser)()
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.drop_expression(self.value)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.value.resolve(resolver)
 
 
 class AstBlock:
     """
-    AstBlock : '{' AstDecl* '}' ;
+    This class is an AST node for a simple block scoping a list of declarations.
+    It represents the following grammar rule:
 
-    self.declarations: a list of the declarations
+    AstBlock : '{' AstDecl* '}' ;
     """
 
     def __init__(self, parser):
@@ -315,12 +410,20 @@ class AstBlock:
             self.declarations.append(decl)
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.push_scope()
         for decl in self.declarations:
             decl.gen_code(compiler)
         compiler.pop_scope()
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         resolver.push_scope()
         for decl in self.declarations:
             decl.resolve(resolver)
@@ -329,8 +432,9 @@ class AstBlock:
 
 class AstExpr:
     """
-    self.value: tree of the expression
-    self.value_type: the type the expression evaluates to
+    This class is an AST node representing an expression in the Clear language.
+    This involves literals, arithmetic operators with precedence, and the logic
+    operators "and" and "or"
     """
 
     def __init__(self, parser, precedence=Precedence.ASSIGNMENT):
@@ -342,9 +446,17 @@ class AstExpr:
         self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         self.value.gen_code(compiler)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.value.resolve(resolver)
         self.value_type = self.value.value_type
 
@@ -354,8 +466,8 @@ class AstExpr:
 
 class AstGrouping:
     """
-    self.value: the enclosed expression
-    self.value_type: the type the expression evaluates to
+    This class is an AST node for a grouped expression, surrounded with parentheses
+    to prioritize the expression's precedence.
     """
 
     def __init__(self, parser):
@@ -367,9 +479,17 @@ class AstGrouping:
         self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         self.value.gen_code(compiler)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.value.resolve(resolver)
         self.value_type = self.value.value_type
 
@@ -379,9 +499,7 @@ class AstGrouping:
 
 class AstUnary:
     """
-    self.operator: the operator token
-    self.target: expression evaluating to the operand
-    self.value_type: the type the expression evaluates to
+    This class is an AST node for a unary operator applied to an expression.
     """
 
     def __init__(self, parser):
@@ -394,9 +512,17 @@ class AstUnary:
         self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.apply_unary(self.operator, self.target)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.target.resolve(resolver)
         if (
             self.target.value_type
@@ -406,7 +532,8 @@ class AstUnary:
             }[self.operator.token_type]
         ):
             emit_error(
-                f"Incompatible type {str(self.value_type)} for unary operator {token_info(self.operator)}!"
+                f"Incompatible type {str(self.value_type)} for unary operator"
+                "{token_info(self.operator)}!"
             )()
         self.value_type = self.target.value_type
 
@@ -416,10 +543,7 @@ class AstUnary:
 
 class AstBinary:
     """
-    self.operator: the operator token
-    self.left: expression evaluating to the left operand
-    self.right: expression evaluating to the right operand
-    self.value_type: the type the expression evaluates to
+    This class is an AST node for a binary operator being applied to two expressions.
     """
 
     def __init__(self, left, parser):
@@ -448,6 +572,10 @@ class AstBinary:
         self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         if self.operator.token_type == TokenType.EQUAL:
             # TODO: Handle assignment
             print(f"Assigning {str(self.right)} to {str(self.left)}")
@@ -455,11 +583,17 @@ class AstBinary:
             compiler.apply_binary(self.operator, self.left, self.right)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.left.resolve(resolver)
         self.right.resolve(resolver)
         if self.left.value_type != self.right.value_type:
             emit_error(
-                f"Incompatible operand types {str(self.left.value_type)} and {str(self.right.value_type)} for binary operator {token_info(self.operator)}!"
+                f"Incompatible operand types"
+                "{str(self.left.value_type)} and {str(self.right.value_type)}"
+                "for binary operator {token_info(self.operator)}!"
             )()
         if (
             self.left.value_type
@@ -478,7 +612,8 @@ class AstBinary:
             }[self.operator.token_type]
         ):
             emit_error(
-                f"Incompatible type {str(self.value_type)} for binary operator {token_info(self.operator)}!"
+                f"Incompatible type {str(self.value_type)} for binary operator"
+                "{token_info(self.operator)}!"
             )()
         self.value_type = self.left.value_type
 
@@ -488,8 +623,7 @@ class AstBinary:
 
 class AstNumber:
     """
-    self.value: the literal value, either ClrInt or ClrNum
-    self.value_type: the type of the value
+    This class is an AST node for a number or integer literal in Clear.
     """
 
     def __init__(self, parser):
@@ -510,10 +644,19 @@ class AstNumber:
                 parse_error("Number literal must be a number!", parser)()
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.load_constant(self.value)
 
     def resolve(self, resolver):
-        pass
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+
+        Since this is a leaf node that isn't a variable/value it does nothing.
+        """
 
     def __str__(self):
         return str(self.value)
@@ -521,8 +664,7 @@ class AstNumber:
 
 class AstString:
     """
-    self.value: the literal value, a ClrStr
-    self.value_type: the type of the value
+    This class is an AST node for a string literal in Clear.
     """
 
     def __init__(self, parser):
@@ -537,10 +679,19 @@ class AstString:
         self.value_type = ValueType.STR
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.load_constant(self.value)
 
     def resolve(self, resolver):
-        pass
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+
+        Since this is a leaf node that isn't a variable/value it does nothing.
+        """
 
     def __str__(self):
         return '"' + str(self.value) + '"'
@@ -548,8 +699,7 @@ class AstString:
 
 class AstBoolean:
     """
-    self.value: the boolean token
-    self.value_type: the type of the value
+    This class is an AST node for a boolean literal in Clear.
     """
 
     def __init__(self, parser):
@@ -562,10 +712,19 @@ class AstBoolean:
         self.value_type = ValueType.BOOL
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.load_boolean(self.value)
 
     def resolve(self, resolver):
-        pass
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+
+        Since this is a leaf node that isn't a variable/value it does nothing.
+        """
 
     def __str__(self):
         return str(self.value.token_type)
@@ -573,9 +732,7 @@ class AstBoolean:
 
 class AstIdent:
     """
-    self.name: the variable name token
-    self.value_type: the type of the variable
-    self.resolved_name: resolution info about the variable referred to; unresolved by default
+    This class is an AST node for an identifier reference within an expression.
     """
 
     def __init__(self, parser):
@@ -587,9 +744,19 @@ class AstIdent:
         self.value_type = self.resolved_name.value_type
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.load_variable(self.resolved_name)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+
+        Since this is a leaf node it just resolves the identifier of this node.
+        """
         self.resolved_name = resolver.lookup_name(self.name.lexeme)
         if self.resolved_name.value_type == ValueType.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {token_info(self.name)}")()
@@ -601,9 +768,7 @@ class AstIdent:
 
 class AstBuiltin:
     """
-    self.function: the builtin function name token
-    self.target: the parameter grouping
-    self.value_type: the type the function evaluates to
+    This class is an AST node for applying a built-in Clear function to an expression.
     """
 
     def __init__(self, parser):
@@ -628,9 +793,17 @@ class AstBuiltin:
         }[self.function.token_type]
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.apply_builtin(self.function, self.target)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.target.resolve(resolver)
         if (
             self.target.value_type
@@ -643,7 +816,8 @@ class AstBuiltin:
             }[self.function.token_type]
         ):
             emit_error(
-                f"Incompatible parameter type {str(self.target.value_type)} for built-in function {token_info(self.function)}!"
+                f"Incompatible parameter type {str(self.target.value_type)} for"
+                "built-in function {token_info(self.function)}!"
             )()
 
     def __str__(self):
@@ -652,10 +826,7 @@ class AstBuiltin:
 
 class AstAnd:
     """
-    self.left: expression evaluating to the left operand
-    self.operator: the operator token
-    self.right: expression evaluating to the right operand
-    self.value_type: the type the expression evaluates to
+    This class is an AST node for applying the logic "and" operator to two expressions.
     """
 
     def __init__(self, left, parser):
@@ -666,18 +837,28 @@ class AstAnd:
         self.value_type = ValueType.BOOL
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.apply_and(self.left, self.right)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.left.resolve(resolver)
         self.right.resolve(resolver)
         if self.left.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(self.left.value_type)} for left operand to logic operator {token_info(self.operator)}!"
+                f"Incompatible type {str(self.left.value_type)} for left operand to"
+                "logic operator {token_info(self.operator)}!"
             )()
         if self.right.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
+                f"Incompatible type {str(self.right.value_type)} for right operand to"
+                "logic operator {token_info(self.operator)}!"
             )()
 
     def __str__(self):
@@ -686,10 +867,7 @@ class AstAnd:
 
 class AstOr:
     """
-    self.left: expression evaluating to the left operand
-    self.operator: the operator token
-    self.right: expression evaluating to the right operand
-    self.value_type: the type the expression evaluates to
+    This class is an AST node for applying the logic operator "or" to two expressions.
     """
 
     def __init__(self, left, parser):
@@ -700,18 +878,28 @@ class AstOr:
         self.value_type = ValueType.BOOL
 
     def gen_code(self, compiler):
+        """
+        This method is a code generation method that accepts a compiler
+        instance to visit this node.
+        """
         compiler.apply_or(self.left, self.right)
 
     def resolve(self, resolver):
+        """
+        This method resolves the types and indices of any variables/values
+        as children of the node given a resolver instance.
+        """
         self.left.resolve(resolver)
         self.right.resolve(resolver)
         if self.left.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(self.left.value_type)} for left operand to logic operator {token_info(self.operator)}!"
+                f"Incompatible type {str(self.left.value_type)} for left operand to"
+                "logic operator {token_info(self.operator)}!"
             )()
         if self.right.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
+                f"Incompatible type {str(self.right.value_type)} for right operand to"
+                "logic operator {token_info(self.operator)}!"
             )()
 
     def __str__(self):

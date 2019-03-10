@@ -1,3 +1,7 @@
+"""
+This module provides the assemble function for converting a list of Clear bytecode
+as objects like OpCode or ClrNum into actual bytes, as a bytearray.
+"""
 import struct
 from clr.values import OpCode, DEBUG_ASSEMBLE
 from clr.errors import emit_error
@@ -51,6 +55,10 @@ def _assemble_op(opcode, accum):
 
 
 def assembled_size(code_list):
+    """
+    This function takes a list of Clear bytecode as objects like OpCode or ClrNum
+    and returns the number of bytes it would be once assembled.
+    """
     size = 0
     for code in code_list:
         size += {
@@ -67,6 +75,11 @@ def assembled_size(code_list):
 
 
 def assemble(code_list):
+    """
+    This function takes a list of Clear bytecode as objects like OpCode or ClrNum
+    and converts it to a bytearray storing that data as it would be on disk to be
+    read by the vm.
+    """
 
     if DEBUG_ASSEMBLE:
         print("Byte code to assemble:")

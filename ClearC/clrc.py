@@ -1,4 +1,7 @@
-import struct
+"""
+This module provides a cli tool for compiling Clear source files
+to bytecode files.
+"""
 import sys
 from clr.errors import ClrCompileError
 from clr.values import DEBUG
@@ -7,6 +10,12 @@ from clr.assemble import assemble
 
 
 def main():
+
+    """
+    The main entry point takes a command-line argument for the name of the
+    source file, and reads it as source, compiles, and writes the bytecode to a .clr.b file
+    using the given name.
+    """
 
     if len(sys.argv) < 2:
         print("Please provide a file to compile")
@@ -25,9 +34,9 @@ def main():
         # TODO: Gen debug symbols
         code = ast.compile()
         byte_code = assemble(code)
-    except ClrCompileError as e:
+    except ClrCompileError as compile_error:
         print("Could not compile:")
-        print(e)
+        print(compile_error)
     else:
         print("Compiled successfully")
         with open(dest_file_name, "wb") as dest_file:
