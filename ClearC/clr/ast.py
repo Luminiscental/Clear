@@ -191,7 +191,7 @@ class AstValDecl:
 
     def resolve(self, resolver):
         self.value.resolve(resolver)
-        resolver.set_type(self.name.lexeme, self.value.value_type)
+        resolver.add_name(self.name.lexeme, self.value.value_type)
 
 
 class AstStat:
@@ -353,6 +353,9 @@ class AstExpr:
         self.value.resolve(resolver)
         self.value_type = self.value.value_type
 
+    def __str__(self):
+        return str(self.value)
+
 
 class AstGrouping:
     """
@@ -374,6 +377,9 @@ class AstGrouping:
     def resolve(self, resolver):
         self.value.resolve(resolver)
         self.value_type = self.value.value_type
+
+    def __str__(self):
+        return "(" + str(self.value) + ")"
 
 
 class AstUnary:
@@ -409,6 +415,9 @@ class AstUnary:
             )()
         self.value_type = self.target.value_type
 
+    def __str__(self):
+        return str(self.operator.token_type) + str(self.target)
+
 
 class AstBinary:
     """
@@ -432,6 +441,7 @@ class AstBinary:
                 TokenType.GREATER_EQUAL,
                 TokenType.GREATER,
                 TokenType.LESS_EQUAL,
+                TokenType.EQUAL,
             ],
             parse_error("Expected binary operator!", parser),
         )
@@ -443,7 +453,12 @@ class AstBinary:
         self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
-        compiler.apply_binary(self.operator, self.left, self.right)
+        if self.operator.token_type == TokenType.EQUAL:
+            # TODO: Handle assignment
+            print(f"Assigning {str(self.right)} to {str(self.left)}")
+            pass
+        else:
+            compiler.apply_binary(self.operator, self.left, self.right)
 
     def resolve(self, resolver):
         self.left.resolve(resolver)
@@ -465,12 +480,16 @@ class AstBinary:
                 TokenType.GREATER_EQUAL: [ValueType.NUM, ValueType.INT],
                 TokenType.GREATER: [ValueType.NUM, ValueType.INT],
                 TokenType.LESS_EQUAL: [ValueType.NUM, ValueType.INT],
+                TokenType.EQUAL: ValueType,
             }[self.operator.token_type]
         ):
             emit_error(
                 f"Incompatible type {str(self.value_type)} for binary operator {token_info(self.operator)}!"
             )()
         self.value_type = self.left.value_type
+
+    def __str__(self):
+        return str(self.left) + str(self.operator.token_type) + str(self.right)
 
 
 class AstNumber:
@@ -502,6 +521,9 @@ class AstNumber:
     def resolve(self, resolver):
         pass
 
+    def __str__(self):
+        return str(self.value)
+
 
 class AstString:
     """
@@ -526,6 +548,9 @@ class AstString:
     def resolve(self, resolver):
         pass
 
+    def __str__(self):
+        return '"' + str(self.value) + '"'
+
 
 class AstBoolean:
     """
@@ -548,6 +573,9 @@ class AstBoolean:
     def resolve(self, resolver):
         pass
 
+    def __str__(self):
+        return str(self.value.token_type)
+
 
 class AstIdent:
     """
@@ -566,7 +594,14 @@ class AstIdent:
         compiler.load_variable(self.name)
 
     def resolve(self, resolver):
-        self.value_type = resolver.lookup_type(self.name.lexeme)
+        resolved = resolver.lookup_name(self.name.lexeme)
+        print(f"Resolved {self.name}: {resolved}")
+        self.value_type = resolved.value_type
+        if self.value_type == ValueType.UNRESOLVED:
+            emit_error(f"Reference to undefined identifier! {token_info(self.name)}")()
+
+    def __str__(self):
+        return self.name.lexeme
 
 
 class AstBuiltin:
@@ -616,6 +651,9 @@ class AstBuiltin:
                 f"Incompatible parameter type {str(self.target.value_type)} for built-in function {token_info(self.function)}!"
             )()
 
+    def __str__(self):
+        return str(self.function.token_type) + str(self.target)
+
 
 class AstAnd:
     """
@@ -646,6 +684,9 @@ class AstAnd:
             emit_error(
                 f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
             )()
+
+    def __str__(self):
+        return str(self.left) + " and " + str(self.right)
 
 
 class AstOr:
@@ -678,10 +719,11 @@ class AstOr:
                 f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
             )()
 
-LEFT_ASSOC_OPS = {
-    # TokenType.SLASH,
-    # TokenType.MINUS,
-}
+    def __str__(self):
+        return str(self.left) + " or " + str(self.right)
+
+
+LEFT_ASSOC_OPS = {TokenType.EQUAL}
 
 
 PRATT_TABLE = defaultdict(
@@ -721,5 +763,6 @@ PRATT_TABLE = defaultdict(
         TokenType.STR: ParseRule(prefix=AstBuiltin, precedence=Precedence.CALL),
         TokenType.AND: ParseRule(infix=AstAnd, precedence=Precedence.AND),
         TokenType.OR: ParseRule(infix=AstOr, precedence=Precedence.OR),
+        TokenType.EQUAL: ParseRule(infix=AstBinary, precedence=Precedence.ASSIGNMENT),
     },
 )
