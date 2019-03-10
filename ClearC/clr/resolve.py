@@ -61,7 +61,9 @@ class Resolver:
                 self.global_index += 1
         else:
             idx = prev.index
-        self._current_scope()[name] = ResolvedName(value_type, idx, self.level == 0)
+        result = ResolvedName(value_type, idx, self.level == 0)
+        self._current_scope()[name] = result
+        return result
 
     def lookup_name(self, name):
         result = ResolvedName()

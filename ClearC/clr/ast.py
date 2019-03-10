@@ -5,7 +5,7 @@ from clr.errors import parse_error, emit_error
 from clr.values import DEBUG
 from clr.constants import ClrInt, ClrNum, ClrStr
 from clr.compile import Compiler
-from clr.resolve import Resolver, ValueType
+from clr.resolve import Resolver, ValueType, ResolvedName
 
 
 class Parser:
@@ -46,18 +46,6 @@ class Parser:
             err()
         elif not self.match(possibilities[0]):
             self.consume_one(possibilities[1:], err)
-
-
-def parse_source(source):
-
-    tokens = tokenize(source)
-    if DEBUG:
-        print("Tokens:")
-        print(" ".join([token.lexeme for token in tokens]))
-    parser = Parser(tokens)
-    ast = Ast(parser)
-    ast.resolve()
-    return ast
 
 
 class Precedence(Enum):
@@ -122,21 +110,27 @@ class Ast:
     def __init__(self, parser):
         self.children = []
         while not parser.match(TokenType.EOF):
-            self.add_child(AstDecl(parser))
+            self.children.append(AstDecl(parser))
+        resolver = Resolver()
+        for child in self.children:
+            child.resolve(resolver)
 
-    def add_child(self, child):
-        self.children.append(child)
-
-    def gen_code(self):
+    def compile(self):
         compiler = Compiler()
         for child in self.children:
             child.gen_code(compiler)
         return compiler.flush_code()
 
-    def resolve(self):
-        resolver = Resolver()
-        for child in self.children:
-            child.resolve(resolver)
+    @staticmethod
+    def from_source(source):
+
+        tokens = tokenize(source)
+        if DEBUG:
+            print("Tokens:")
+            print(" ".join([token.lexeme for token in tokens]))
+        parser = Parser(tokens)
+        ast = Ast(parser)
+        return ast
 
 
 # TODO: VarDecl and assignment
@@ -170,6 +164,7 @@ class AstValDecl:
 
     self.name: the identifier token
     self.value: expression evaluating to the intializer of the value
+    self.resolved_name: resolution info about this value; unresolved by default
     """
 
     def __init__(self, parser):
@@ -185,13 +180,14 @@ class AstValDecl:
             TokenType.SEMICOLON,
             parse_error("Expected semicolon after value declaration!", parser),
         )
+        self.resolved_name = ResolvedName()
 
     def gen_code(self, compiler):
-        compiler.init_value(self.name, self.value)
+        compiler.init_value(self.resolved_name, self.value)
 
     def resolve(self, resolver):
         self.value.resolve(resolver)
-        resolver.add_name(self.name.lexeme, self.value.value_type)
+        self.resolved_name = resolver.add_name(self.name.lexeme, self.value.value_type)
 
 
 class AstStat:
@@ -317,7 +313,6 @@ class AstBlock:
                 emit_error(f"Unclosed block! {token_info(opener)}")()
             decl = AstDecl(parser)
             self.declarations.append(decl)
-            pass
 
     def gen_code(self, compiler):
         compiler.push_scope()
@@ -456,7 +451,6 @@ class AstBinary:
         if self.operator.token_type == TokenType.EQUAL:
             # TODO: Handle assignment
             print(f"Assigning {str(self.right)} to {str(self.left)}")
-            pass
         else:
             compiler.apply_binary(self.operator, self.left, self.right)
 
@@ -581,6 +575,7 @@ class AstIdent:
     """
     self.name: the variable name token
     self.value_type: the type of the variable
+    self.resolved_name: resolution info about the variable referred to; unresolved by default
     """
 
     def __init__(self, parser):
@@ -588,17 +583,17 @@ class AstIdent:
             parse_error("Expected variable!", parser)()
         token = parser.get_prev()
         self.name = token
-        self.value_type = ValueType.UNRESOLVED
+        self.resolved_name = ResolvedName()
+        self.value_type = self.resolved_name.value_type
 
     def gen_code(self, compiler):
-        compiler.load_variable(self.name)
+        compiler.load_variable(self.resolved_name)
 
     def resolve(self, resolver):
-        resolved = resolver.lookup_name(self.name.lexeme)
-        print(f"Resolved {self.name}: {resolved}")
-        self.value_type = resolved.value_type
-        if self.value_type == ValueType.UNRESOLVED:
+        self.resolved_name = resolver.lookup_name(self.name.lexeme)
+        if self.resolved_name.value_type == ValueType.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {token_info(self.name)}")()
+        self.value_type = self.resolved_name.value_type
 
     def __str__(self):
         return self.name.lexeme
