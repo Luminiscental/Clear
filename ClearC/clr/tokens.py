@@ -9,56 +9,59 @@ from clr.values import DEBUG
 class TokenType(Enum):
 
     # symbols
-    LEFT_PAREN = 0
-    RIGHT_PAREN = 1
-    LEFT_BRACE = 2
-    RIGHT_BRACE = 3
-    COMMA = 4
-    DOT = 5
-    MINUS = 6
-    PLUS = 7
-    SEMICOLON = 8
-    SLASH = 9
-    STAR = 10
-    BANG = 11
-    BANG_EQUAL = 12
-    EQUAL = 13
-    EQUAL_EQUAL = 14
-    GREATER = 15
-    GREATER_EQUAL = 16
-    LESS = 17
-    LESS_EQUAL = 18
+    LEFT_PAREN = "("
+    RIGHT_PAREN = ")"
+    LEFT_BRACE = "{"
+    RIGHT_BRACE = "}"
+    COMMA = ","
+    DOT = "."
+    MINUS = "-"
+    PLUS = "+"
+    SEMICOLON = ";"
+    SLASH = "/"
+    STAR = "*"
+    BANG = "!"
+    BANG_EQUAL = "!="
+    EQUAL = "="
+    EQUAL_EQUAL = "=="
+    GREATER = ">"
+    GREATER_EQUAL = ">="
+    LESS = "<"
+    LESS_EQUAL = "<="
     # values
-    IDENTIFIER = 19
-    STRING = 20
-    NUMBER = 21
-    INTEGER_SUFFIX = 22
+    IDENTIFIER = "<identifier>"
+    STRING = "<str>"
+    NUMBER = "<number>"
+    INTEGER_SUFFIX = "i"
     # keywords
-    AND = 23
-    CLASS = 24
-    ELSE = 25
-    FALSE = 26
-    FOR = 27
-    FUNC = 28
-    IF = 29
-    OR = 30
-    PRINT = 31
-    RETURN = 32
-    SUPER = 33
-    THIS = 34
-    TRUE = 35
-    VAL = 36
-    WHILE = 37
+    AND = "and"
+    CLASS = "class"
+    ELSE = "else"
+    FALSE = "false"
+    FOR = "for"
+    FUNC = "func"
+    IF = "if"
+    OR = "or"
+    PRINT = "print"
+    RETURN = "return"
+    SUPER = "super"
+    THIS = "this"
+    TRUE = "true"
+    VAL = "val"
+    WHILE = "while"
     # built-ins
-    TYPE = 38
-    INT = 39
-    BOOL = 40
-    NUM = 41
-    STR = 42
+    TYPE = "type"
+    INT = "int"
+    BOOL = "bool"
+    NUM = "num"
+    STR = "str"
     # special
-    SPACE = 43
-    EOF = 44
-    ERR = 45
+    SPACE = "<whitespace>"
+    EOF = "<eof>"
+    ERR = "<error>"
+
+    def __str__(self):
+        return self.value
 
 
 Token = namedtuple("Token", "token_type lexeme line")

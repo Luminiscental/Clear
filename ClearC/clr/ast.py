@@ -5,6 +5,7 @@ from clr.errors import parse_error, emit_error
 from clr.values import DEBUG
 from clr.constants import ClrInt, ClrNum, ClrStr
 from clr.compile import Compiler
+from clr.resolve import Resolver, ValueType, ResolvedName
 
 
 class Parser:
@@ -45,17 +46,6 @@ class Parser:
             err()
         elif not self.match(possibilities[0]):
             self.consume_one(possibilities[1:], err)
-
-
-def parse_source(source):
-
-    tokens = tokenize(source)
-    if DEBUG:
-        print("Tokens:")
-        print(" ".join([token.lexeme for token in tokens]))
-    parser = Parser(tokens)
-    ast = Ast(parser)
-    return ast
 
 
 class Precedence(Enum):
@@ -120,16 +110,30 @@ class Ast:
     def __init__(self, parser):
         self.children = []
         while not parser.match(TokenType.EOF):
-            self.add_child(AstDecl(parser))
+            self.children.append(AstDecl(parser))
+        resolver = Resolver()
+        for child in self.children:
+            child.resolve(resolver)
 
-    def add_child(self, child):
-        self.children.append(child)
-
-    def gen_code(self):
+    def compile(self):
         compiler = Compiler()
         for child in self.children:
             child.gen_code(compiler)
         return compiler.flush_code()
+
+    @staticmethod
+    def from_source(source):
+
+        tokens = tokenize(source)
+        if DEBUG:
+            print("Tokens:")
+            print(" ".join([token.lexeme for token in tokens]))
+        parser = Parser(tokens)
+        ast = Ast(parser)
+        return ast
+
+
+# TODO: VarDecl and assignment
 
 
 class AstDecl:
@@ -150,6 +154,9 @@ class AstDecl:
     def gen_code(self, compiler):
         self.value.gen_code(compiler)
 
+    def resolve(self, resolver):
+        self.value.resolve(resolver)
+
 
 class AstValDecl:
     """
@@ -157,6 +164,7 @@ class AstValDecl:
 
     self.name: the identifier token
     self.value: expression evaluating to the intializer of the value
+    self.resolved_name: resolution info about this value; unresolved by default
     """
 
     def __init__(self, parser):
@@ -172,9 +180,14 @@ class AstValDecl:
             TokenType.SEMICOLON,
             parse_error("Expected semicolon after value declaration!", parser),
         )
+        self.resolved_name = ResolvedName()
 
     def gen_code(self, compiler):
-        compiler.init_value(self.name, self.value)
+        compiler.init_value(self.resolved_name, self.value)
+
+    def resolve(self, resolver):
+        self.value.resolve(resolver)
+        self.resolved_name = resolver.add_name(self.name.lexeme, self.value.value_type)
 
 
 class AstStat:
@@ -201,6 +214,9 @@ class AstStat:
     def gen_code(self, compiler):
         self.value.gen_code(compiler)
 
+    def resolve(self, resolver):
+        self.value.resolve(resolver)
+
 
 class AstPrintStat:
     """
@@ -221,6 +237,10 @@ class AstPrintStat:
 
     def gen_code(self, compiler):
         compiler.print_expression(self.value)
+
+    def resolve(self, resolver):
+        if self.value:
+            self.value.resolve(resolver)
 
 
 class AstIfStat:
@@ -248,6 +268,14 @@ class AstIfStat:
     def gen_code(self, compiler):
         compiler.run_if(self.checks, self.otherwise)
 
+    def resolve(self, resolver):
+        for check in self.checks:
+            cond, block = check
+            cond.resolve(resolver)
+            block.resolve(resolver)
+        if self.otherwise:
+            self.otherwise.resolve(resolver)
+
 
 class AstExprStat:
     """
@@ -263,6 +291,9 @@ class AstExprStat:
 
     def gen_code(self, compiler):
         compiler.drop_expression(self.value)
+
+    def resolve(self, resolver):
+        self.value.resolve(resolver)
 
 
 class AstBlock:
@@ -282,7 +313,6 @@ class AstBlock:
                 emit_error(f"Unclosed block! {token_info(opener)}")()
             decl = AstDecl(parser)
             self.declarations.append(decl)
-            pass
 
     def gen_code(self, compiler):
         compiler.push_scope()
@@ -290,10 +320,17 @@ class AstBlock:
             decl.gen_code(compiler)
         compiler.pop_scope()
 
+    def resolve(self, resolver):
+        resolver.push_scope()
+        for decl in self.declarations:
+            decl.resolve(resolver)
+        resolver.pop_scope()
+
 
 class AstExpr:
     """
     self.value: tree of the expression
+    self.value_type: the type the expression evaluates to
     """
 
     def __init__(self, parser, precedence=Precedence.ASSIGNMENT):
@@ -302,14 +339,23 @@ class AstExpr:
         while get_rule(parser.get_current()).precedence >= precedence:
             rule = get_rule(parser.get_current())
             self.value = rule.infix(self.value, parser)
+        self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
         self.value.gen_code(compiler)
+
+    def resolve(self, resolver):
+        self.value.resolve(resolver)
+        self.value_type = self.value.value_type
+
+    def __str__(self):
+        return str(self.value)
 
 
 class AstGrouping:
     """
     self.value: the enclosed expression
+    self.value_type: the type the expression evaluates to
     """
 
     def __init__(self, parser):
@@ -318,15 +364,24 @@ class AstGrouping:
         self.value = AstExpr(parser)
         if not parser.match(TokenType.RIGHT_PAREN):
             parse_error("Expected ')' after expression!", parser)()
+        self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
         self.value.gen_code(compiler)
+
+    def resolve(self, resolver):
+        self.value.resolve(resolver)
+        self.value_type = self.value.value_type
+
+    def __str__(self):
+        return "(" + str(self.value) + ")"
 
 
 class AstUnary:
     """
     self.operator: the operator token
     self.target: expression evaluating to the operand
+    self.value_type: the type the expression evaluates to
     """
 
     def __init__(self, parser):
@@ -336,9 +391,27 @@ class AstUnary:
         )
         self.operator = parser.get_prev()
         self.target = AstExpr(parser, precedence=Precedence.UNARY)
+        self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
         compiler.apply_unary(self.operator, self.target)
+
+    def resolve(self, resolver):
+        self.target.resolve(resolver)
+        if (
+            self.target.value_type
+            not in {
+                TokenType.MINUS: [ValueType.NUM, ValueType.INT],
+                TokenType.BANG: [ValueType.BOOL],
+            }[self.operator.token_type]
+        ):
+            emit_error(
+                f"Incompatible type {str(self.value_type)} for unary operator {token_info(self.operator)}!"
+            )()
+        self.value_type = self.target.value_type
+
+    def __str__(self):
+        return str(self.operator.token_type) + str(self.target)
 
 
 class AstBinary:
@@ -346,6 +419,7 @@ class AstBinary:
     self.operator: the operator token
     self.left: expression evaluating to the left operand
     self.right: expression evaluating to the right operand
+    self.value_type: the type the expression evaluates to
     """
 
     def __init__(self, left, parser):
@@ -362,20 +436,60 @@ class AstBinary:
                 TokenType.GREATER_EQUAL,
                 TokenType.GREATER,
                 TokenType.LESS_EQUAL,
+                TokenType.EQUAL,
             ],
             parse_error("Expected binary operator!", parser),
         )
         self.operator = parser.get_prev()
         prec = get_rule(self.operator).precedence
-        self.right = AstExpr(parser, precedence=prec.next())
+        if self.operator.token_type not in LEFT_ASSOC_OPS:
+            prec = prec.next()
+        self.right = AstExpr(parser, precedence=prec)
+        self.value_type = ValueType.UNRESOLVED
 
     def gen_code(self, compiler):
-        compiler.apply_binary(self.operator, self.left, self.right)
+        if self.operator.token_type == TokenType.EQUAL:
+            # TODO: Handle assignment
+            print(f"Assigning {str(self.right)} to {str(self.left)}")
+        else:
+            compiler.apply_binary(self.operator, self.left, self.right)
+
+    def resolve(self, resolver):
+        self.left.resolve(resolver)
+        self.right.resolve(resolver)
+        if self.left.value_type != self.right.value_type:
+            emit_error(
+                f"Incompatible operand types {str(self.left.value_type)} and {str(self.right.value_type)} for binary operator {token_info(self.operator)}!"
+            )()
+        if (
+            self.left.value_type
+            not in {
+                TokenType.PLUS: [ValueType.NUM, ValueType.INT, ValueType.STR],
+                TokenType.MINUS: [ValueType.NUM, ValueType.INT],
+                TokenType.STAR: [ValueType.NUM, ValueType.INT],
+                TokenType.SLASH: [ValueType.NUM],
+                TokenType.EQUAL_EQUAL: ValueType,
+                TokenType.BANG_EQUAL: ValueType,
+                TokenType.LESS: [ValueType.NUM, ValueType.INT],
+                TokenType.GREATER_EQUAL: [ValueType.NUM, ValueType.INT],
+                TokenType.GREATER: [ValueType.NUM, ValueType.INT],
+                TokenType.LESS_EQUAL: [ValueType.NUM, ValueType.INT],
+                TokenType.EQUAL: ValueType,
+            }[self.operator.token_type]
+        ):
+            emit_error(
+                f"Incompatible type {str(self.value_type)} for binary operator {token_info(self.operator)}!"
+            )()
+        self.value_type = self.left.value_type
+
+    def __str__(self):
+        return str(self.left) + str(self.operator.token_type) + str(self.right)
 
 
 class AstNumber:
     """
     self.value: the literal value, either ClrInt or ClrNum
+    self.value_type: the type of the value
     """
 
     def __init__(self, parser):
@@ -385,21 +499,30 @@ class AstNumber:
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
                 self.value = ClrInt(token.lexeme)
+                self.value_type = ValueType.INT
             except ValueError:
                 parse_error("Integer literal must be an integer!", parser)()
         else:
             try:
                 self.value = ClrNum(token.lexeme)
+                self.value_type = ValueType.NUM
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
 
     def gen_code(self, compiler):
         compiler.load_constant(self.value)
 
+    def resolve(self, resolver):
+        pass
+
+    def __str__(self):
+        return str(self.value)
+
 
 class AstString:
     """
     self.value: the literal value, a ClrStr
+    self.value_type: the type of the value
     """
 
     def __init__(self, parser):
@@ -411,14 +534,22 @@ class AstString:
             total.append(parser.get_prev())
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
         self.value = ClrStr(joined)
+        self.value_type = ValueType.STR
 
     def gen_code(self, compiler):
         compiler.load_constant(self.value)
+
+    def resolve(self, resolver):
+        pass
+
+    def __str__(self):
+        return '"' + str(self.value) + '"'
 
 
 class AstBoolean:
     """
     self.value: the boolean token
+    self.value_type: the type of the value
     """
 
     def __init__(self, parser):
@@ -427,14 +558,24 @@ class AstBoolean:
             parse_error("Expected boolean literal!", parser),
         )
         self.value = parser.get_prev()
+        self.value_type = ValueType.UNRESOLVED
+        self.value_type = ValueType.BOOL
 
     def gen_code(self, compiler):
         compiler.load_boolean(self.value)
+
+    def resolve(self, resolver):
+        pass
+
+    def __str__(self):
+        return str(self.value.token_type)
 
 
 class AstIdent:
     """
     self.name: the variable name token
+    self.value_type: the type of the variable
+    self.resolved_name: resolution info about the variable referred to; unresolved by default
     """
 
     def __init__(self, parser):
@@ -442,15 +583,27 @@ class AstIdent:
             parse_error("Expected variable!", parser)()
         token = parser.get_prev()
         self.name = token
+        self.resolved_name = ResolvedName()
+        self.value_type = self.resolved_name.value_type
 
     def gen_code(self, compiler):
-        compiler.load_variable(self.name)
+        compiler.load_variable(self.resolved_name)
+
+    def resolve(self, resolver):
+        self.resolved_name = resolver.lookup_name(self.name.lexeme)
+        if self.resolved_name.value_type == ValueType.UNRESOLVED:
+            emit_error(f"Reference to undefined identifier! {token_info(self.name)}")()
+        self.value_type = self.resolved_name.value_type
+
+    def __str__(self):
+        return self.name.lexeme
 
 
 class AstBuiltin:
     """
     self.function: the builtin function name token
     self.target: the parameter grouping
+    self.value_type: the type the function evaluates to
     """
 
     def __init__(self, parser):
@@ -466,39 +619,106 @@ class AstBuiltin:
         )
         self.function = parser.get_prev()
         self.target = AstGrouping(parser)
+        self.value_type = {
+            TokenType.TYPE: ValueType.STR,
+            TokenType.INT: ValueType.INT,
+            TokenType.BOOL: ValueType.BOOL,
+            TokenType.NUM: ValueType.NUM,
+            TokenType.STR: ValueType.STR,
+        }[self.function.token_type]
 
     def gen_code(self, compiler):
         compiler.apply_builtin(self.function, self.target)
+
+    def resolve(self, resolver):
+        self.target.resolve(resolver)
+        if (
+            self.target.value_type
+            not in {
+                TokenType.TYPE: ValueType,
+                TokenType.INT: [ValueType.NUM, ValueType.INT, ValueType.BOOL],
+                TokenType.BOOL: ValueType,
+                TokenType.NUM: [ValueType.NUM, ValueType.INT, ValueType.BOOL],
+                TokenType.STR: ValueType,
+            }[self.function.token_type]
+        ):
+            emit_error(
+                f"Incompatible parameter type {str(self.target.value_type)} for built-in function {token_info(self.function)}!"
+            )()
+
+    def __str__(self):
+        return str(self.function.token_type) + str(self.target)
 
 
 class AstAnd:
     """
     self.left: expression evaluating to the left operand
+    self.operator: the operator token
     self.right: expression evaluating to the right operand
+    self.value_type: the type the expression evaluates to
     """
 
     def __init__(self, left, parser):
         self.left = left
         parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
+        self.operator = parser.get_prev()
         self.right = AstExpr(parser, precedence=Precedence.AND)
+        self.value_type = ValueType.BOOL
 
     def gen_code(self, compiler):
         compiler.apply_and(self.left, self.right)
+
+    def resolve(self, resolver):
+        self.left.resolve(resolver)
+        self.right.resolve(resolver)
+        if self.left.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(self.left.value_type)} for left operand to logic operator {token_info(self.operator)}!"
+            )()
+        if self.right.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
+            )()
+
+    def __str__(self):
+        return str(self.left) + " and " + str(self.right)
 
 
 class AstOr:
     """
     self.left: expression evaluating to the left operand
+    self.operator: the operator token
     self.right: expression evaluating to the right operand
+    self.value_type: the type the expression evaluates to
     """
 
     def __init__(self, left, parser):
         self.left = left
         parser.consume(TokenType.OR, parse_error("Expected and operator!", parser))
+        self.operator = parser.get_prev()
         self.right = AstExpr(parser, precedence=Precedence.OR)
+        self.value_type = ValueType.BOOL
 
     def gen_code(self, compiler):
         compiler.apply_or(self.left, self.right)
+
+    def resolve(self, resolver):
+        self.left.resolve(resolver)
+        self.right.resolve(resolver)
+        if self.left.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(self.left.value_type)} for left operand to logic operator {token_info(self.operator)}!"
+            )()
+        if self.right.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(self.right.value_type)} for right operand to logic operator {token_info(self.operator)}!"
+            )()
+
+    def __str__(self):
+        return str(self.left) + " or " + str(self.right)
+
+
+LEFT_ASSOC_OPS = {TokenType.EQUAL}
 
 
 PRATT_TABLE = defaultdict(
@@ -538,5 +758,6 @@ PRATT_TABLE = defaultdict(
         TokenType.STR: ParseRule(prefix=AstBuiltin, precedence=Precedence.CALL),
         TokenType.AND: ParseRule(infix=AstAnd, precedence=Precedence.AND),
         TokenType.OR: ParseRule(infix=AstOr, precedence=Precedence.OR),
+        TokenType.EQUAL: ParseRule(infix=AstBinary, precedence=Precedence.ASSIGNMENT),
     },
 )

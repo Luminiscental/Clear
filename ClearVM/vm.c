@@ -945,6 +945,8 @@ InterpretResult run(VM *vm) {
             } break;
         }
     }
+
+    return INTERPRET_OK;
 }
 
 #undef OBJ_TYPED_BINARY

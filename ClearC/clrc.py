@@ -2,7 +2,7 @@ import struct
 import sys
 from clr.errors import ClrCompileError
 from clr.values import DEBUG
-from clr.ast import Ast, parse_source
+from clr.ast import Ast
 from clr.assemble import assemble
 
 
@@ -21,9 +21,9 @@ def main():
     try:
         if DEBUG:
             print("Compiling:")
-        ast = parse_source(source)
+        ast = Ast.from_source(source)
         # TODO: Gen debug symbols
-        code = ast.gen_code()
+        code = ast.compile()
         byte_code = assemble(code)
     except ClrCompileError as e:
         print("Could not compile:")

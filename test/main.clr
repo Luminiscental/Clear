@@ -3,11 +3,19 @@
 
 val cond = false or true;
 
+// val maltyped = 1 + "cake";
+// val weird = 2 or false;
+
 if true or false {
 
     print "true or false = true";
 
-    val a = "!!~~~";
+    val a = !!false;
+    print "a = " + str(a);
+
+    // TODO: disallow repeated unary operators? i.e. force -(-(-3)) instead of ---3
+    val a = -----------7 + ----------------------------13;
+    print "a = " + str(a);
 
     if true and true {
 
@@ -30,6 +38,10 @@ if true or false {
 } else {
 
     print "neither";
+}
+
+{
+    // empty scope
 }
 
 {
