@@ -13,7 +13,7 @@ from clr.visitor import AstVisitable
 
 
 def _indent(string):
-    return "\n".join(map(lambda line: "\t" + line, string.splitlines()))
+    return "\n".join(map(lambda line: "    " + line, string.splitlines()))
 
 
 class Parser:
@@ -333,7 +333,7 @@ class AstIfStmt(AstVisitable):
                 first = False
             else:
                 result += "else if "
-            result += str(cond) + str(block) + " "
+            result += str(cond) + " " + str(block) + " "
         if self.otherwise:
             result += "else " + str(self.otherwise)
         return result + "\n"
@@ -490,7 +490,9 @@ class AstBinary(AstVisitable):
         self.value_type = ValueType.UNRESOLVED
 
     def __str__(self):
-        return str(self.left) + str(self.operator.token_type) + str(self.right)
+        return (
+            str(self.left) + " " + str(self.operator.token_type) + " " + str(self.right)
+        )
 
     def accept(self, visitor):
         self.left.accept(visitor)
