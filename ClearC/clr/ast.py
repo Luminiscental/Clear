@@ -202,7 +202,7 @@ class AstDecl(AstVisitable):
     """
 
     def __init__(self, parser):
-        if parser.check(TokenType.VAL):
+        if parser.check(TokenType.VAL) or parser.check(TokenType.VAR):
             self.value = AstValDecl(parser)
         else:
             self.value = AstStmt(parser)
@@ -219,12 +219,16 @@ class AstValDecl(AstVisitable):
     This class is an AST node for a value declaration. It represents
     the following grammar rule:
 
-    AstValDecl : 'val' id '=' AstExpr ';' ;
+    AstValDecl : ('val' | 'var') id '=' AstExpr ';' ;
     """
 
     def __init__(self, parser):
+        mutable = False
         if not parser.match(TokenType.VAL):
-            parse_error("Expected value declaration!", parser)()
+            if parser.match(TokenType.VAR):
+                mutable = True
+            else:
+                parse_error("Expected value declaration!", parser)()
         if not parser.match(TokenType.IDENTIFIER):
             parse_error("Expected value name!", parser)()
         self.name = parser.get_prev()
@@ -235,10 +239,14 @@ class AstValDecl(AstVisitable):
             TokenType.SEMICOLON,
             parse_error("Expected semicolon after value declaration!", parser),
         )
-        self.resolved_name = ResolvedName()
+        self.resolved_name = ResolvedName(is_mutable=mutable)
 
     def __str__(self):
-        return "val " + self.name.lexeme + " = " + str(self.value) + ";"
+        return (
+            "var "
+            if self.resolved_name.is_mutable
+            else "val " + self.name.lexeme + " = " + str(self.value) + ";"
+        )
 
     def accept(self, visitor):
         self.value.accept(visitor)
@@ -406,6 +414,7 @@ class AstExpr(AstVisitable):
             rule = get_rule(parser.get_current())
             self.value = rule.infix(self.value, parser)
         self.value_type = ValueType.UNRESOLVED
+        self.is_assignable = self.value.is_assignable
 
     def __str__(self):
         return str(self.value)
@@ -428,6 +437,7 @@ class AstGrouping(AstVisitable):
         if not parser.match(TokenType.RIGHT_PAREN):
             parse_error("Expected ')' after expression!", parser)()
         self.value_type = ValueType.UNRESOLVED
+        self.is_assignable = self.value.is_assignable
 
     def __str__(self):
         return "(" + str(self.value) + ")"
@@ -450,6 +460,7 @@ class AstUnary(AstVisitable):
         self.operator = parser.get_prev()
         self.target = AstExpr(parser, precedence=Precedence.UNARY)
         self.value_type = ValueType.UNRESOLVED
+        self.is_assignable = False
 
     def __str__(self):
         return str(self.operator.token_type) + str(self.target)
@@ -488,6 +499,7 @@ class AstBinary(AstVisitable):
             prec = prec.next()
         self.right = AstExpr(parser, precedence=prec)
         self.value_type = ValueType.UNRESOLVED
+        self.is_assignable = False
 
     def __str__(self):
         return (
@@ -521,6 +533,7 @@ class AstNumber(AstVisitable):
                 self.value_type = ValueType.NUM
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
+        self.is_assignable = False
 
     def __str__(self):
         return str(self.value)
@@ -544,6 +557,7 @@ class AstString(AstVisitable):
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
         self.value = ClrStr(joined)
         self.value_type = ValueType.STR
+        self.is_assignable = False
 
     def __str__(self):
         return '"' + str(self.value) + '"'
@@ -564,6 +578,7 @@ class AstBoolean(AstVisitable):
         )
         self.value = parser.get_prev().token_type == TokenType.TRUE
         self.value_type = ValueType.BOOL
+        self.is_assignable = False
 
     def __str__(self):
         return str("true" if self.value else "false")
@@ -584,6 +599,7 @@ class AstIdent(AstVisitable):
         self.name = token
         self.resolved_name = ResolvedName()
         self.value_type = self.resolved_name.value_type
+        self.is_assignable = self.resolved_name.is_mutable
 
     def __str__(self):
         return self.name.lexeme
@@ -617,6 +633,7 @@ class AstBuiltin(AstVisitable):
             TokenType.NUM: ValueType.NUM,
             TokenType.STR: ValueType.STR,
         }[self.function.token_type]
+        self.is_assignable = False
 
     def __str__(self):
         return str(self.function.token_type) + str(self.target)
@@ -637,6 +654,7 @@ class AstAnd(AstVisitable):
         self.operator = parser.get_prev()
         self.right = AstExpr(parser, precedence=Precedence.AND)
         self.value_type = ValueType.BOOL
+        self.is_assignable = False
 
     def __str__(self):
         return str(self.left) + " and " + str(self.right)
@@ -656,6 +674,7 @@ class AstOr(AstVisitable):
         self.operator = parser.get_prev()
         self.right = AstExpr(parser, precedence=Precedence.OR)
         self.value_type = ValueType.BOOL
+        self.is_assignable = False
 
     def __str__(self):
         return str(self.left) + " or " + str(self.right)

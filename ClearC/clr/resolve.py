@@ -27,8 +27,8 @@ class ValueType(Enum):
 
 ResolvedName = namedtuple(
     "ResolvedName",
-    ("value_type", "index", "is_global"),
-    defaults=(ValueType.UNRESOLVED, -1, False),
+    ("value_type", "index", "is_global", "is_mutable"),
+    defaults=(ValueType.UNRESOLVED, -1, False, False),
 )
 
 
@@ -101,7 +101,9 @@ class Resolver(AstVisitor):
                 self.global_index += 1
         else:
             idx = prev.index
-        result = ResolvedName(node.value.value_type, idx, self.level == 0)
+        result = ResolvedName(
+            node.value.value_type, idx, self.level == 0, node.resolved_name.is_mutable
+        )
         self._current_scope()[node.name.lexeme] = result
         node.resolved_name = result
 
@@ -152,6 +154,10 @@ class Resolver(AstVisitor):
             emit_error(
                 f"Incompatible type {str(node.left.value_type)} for binary operator {token_info(node.operator)}!"
             )()
+        if node.operator.token_type == TokenType.EQUAL and not node.left.is_assignable:
+            emit_error(
+                f"Unassignable expression {str(node.left)}! Attempt to assign at {token_info(node.operator)}"
+            )()
         node.value_type = node.left.value_type
 
     def visit_ident_expr(self, node):
@@ -159,6 +165,7 @@ class Resolver(AstVisitor):
         if node.resolved_name.value_type == ValueType.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
         node.value_type = node.resolved_name.value_type
+        node.is_assignable = node.resolved_name.is_mutable
 
     def visit_builtin_expr(self, node):
         if (

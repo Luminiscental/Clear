@@ -56,6 +56,7 @@ class TokenType(Enum):
     THIS = "this"
     TRUE = "true"
     VAL = "val"
+    VAR = "var"
     WHILE = "while"
     # built-ins
     TYPE = "type"
@@ -90,6 +91,7 @@ KEYWORD_TYPES = {
     "this": TokenType.THIS,
     "true": TokenType.TRUE,
     "val": TokenType.VAL,
+    "var": TokenType.VAR,
     "while": TokenType.WHILE,
     "type": TokenType.TYPE,
     "int": TokenType.INT,

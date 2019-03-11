@@ -43,6 +43,16 @@ class Program:
             self.code_list.append(OpCode.DEFINE_LOCAL)
         self.code_list.append(resolved_name.index)
 
+    def set_name(self, resolved_name):
+        """
+        This function emits bytecode to update the value of a given name that has been resolved.
+        """
+        if resolved_name.is_global:
+            self.code_list.append(OpCode.DEFINE_GLOBAL)
+        else:
+            self.code_list.append(OpCode.DEFINE_LOCAL)
+        self.code_list.append(resolved_name.index)
+
     def load_name(self, resolved_name):
         """
         This function emits bytecode to load a given name that has been resolved.
@@ -175,10 +185,9 @@ class Compiler(AstVisitor):
         of two expressions.
         """
         if node.operator.token_type == TokenType.EQUAL:
-            # TODO: Handle assignment
-            print(f"Assigning {str(node.right)} to {str(node.left)}")
-            # placeholder to avoid stack underflow since the assigned value is expected
-            self.program.simple_op(OpCode.TRUE)
+            self.program.set_name(node.left.resolved_name)
+            self.program.simple_op(OpCode.POP)
+            self.program.load_name(node.left.resolved_name)
         else:
             {
                 TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
