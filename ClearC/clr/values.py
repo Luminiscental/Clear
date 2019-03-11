@@ -6,7 +6,7 @@ from enum import Enum
 
 DEBUG = False
 DEBUG_ASSEMBLE = False
-DEBUG_PPRINT = True
+DEBUG_PPRINT = False
 
 
 class OpCode(Enum):
