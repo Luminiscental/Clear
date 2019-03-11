@@ -54,11 +54,6 @@ class Resolver(AstVisitor):
         return self.scopes[self.level - lookback]
 
     def _lookup_name(self, name):
-        """
-        This function resolves the given name to a previously resolved
-        declaration, returning the resolved information set as unresolved
-        if no such declaration was found.
-        """
         result = ResolvedName()
         lookback = 0
         while lookback < self.level:
@@ -71,16 +66,10 @@ class Resolver(AstVisitor):
         return result
 
     def start_block_stmt(self, node):
-        """
-        This function pushes a new scope to resolve within.
-        """
         self.scopes.append(defaultdict(ResolvedName))
         self.level += 1
 
     def end_block_stmt(self, node):
-        """
-        This function pops the current resolution scope.
-        """
         if self.level > 0:
             popped = self._current_scope()
             if popped:
