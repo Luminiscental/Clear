@@ -17,6 +17,9 @@ class ClrInt:
     def __repr__(self):
         return f"ClrInt({self.value})"
 
+    def __str__(self):
+        return str(self.value)
+
     def __hash__(self):
         return hash(self.value) ^ 7
 
@@ -38,6 +41,9 @@ class ClrUint:
     def __repr__(self):
         return f"ClrUint({self.value})"
 
+    def __str__(self):
+        return str(self.value)
+
     def __hash__(self):
         return hash(self.value) ^ 73
 
@@ -57,6 +63,9 @@ class ClrNum:
     def __repr__(self):
         return f"ClrNum({self.value})"
 
+    def __str__(self):
+        return str(self.value)
+
     def __hash__(self):
         return hash(self.value) ^ 43
 
@@ -75,6 +84,9 @@ class ClrStr:
 
     def __repr__(self):
         return f"ClrStr({self.value})"
+
+    def __str__(self):
+        return str(self.value).replace('"', '""')
 
     def __hash__(self):
         return hash(self.value) ^ 19

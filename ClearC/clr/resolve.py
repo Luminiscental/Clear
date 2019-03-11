@@ -4,6 +4,9 @@ identifiers to find their types and variable indices.
 """
 from enum import Enum
 from collections import namedtuple, defaultdict
+from clr.tokens import TokenType, token_info
+from clr.errors import emit_error
+from clr.visitor import AstVisitor
 
 
 class ValueType(Enum):
@@ -29,7 +32,7 @@ ResolvedName = namedtuple(
 )
 
 
-class Resolver:
+class Resolver(AstVisitor):
     """
     This class provides functionality for visiting AST nodes to resolve
     the type and variable index of identifiers / declarations thereof.
@@ -50,46 +53,7 @@ class Resolver:
     def _get_scope(self, lookback):
         return self.scopes[self.level - lookback]
 
-    def push_scope(self):
-        """
-        This function pushes a new scope to resolve within.
-        """
-        self.scopes.append(defaultdict(ResolvedName))
-        self.level += 1
-
-    def pop_scope(self):
-        """
-        This function pops the current resolution scope.
-        """
-        if self.level > 0:
-            popped = self._current_scope()
-            if popped:
-                self.local_index = min(
-                    [r.index for r in popped.values() if r.index != -1]
-                )
-        del self.scopes[self.level]
-        self.level -= 1
-
-    def add_name(self, name, value_type):
-        """
-        This function resolves the given name as a new variable in the current scope
-        or as a redefinition of it if it already exists, returning the resolved information.
-        """
-        prev = self.lookup_name(name)
-        if prev.value_type == ValueType.UNRESOLVED:
-            if self.level > 0:
-                idx = self.local_index
-                self.local_index += 1
-            else:
-                idx = self.global_index
-                self.global_index += 1
-        else:
-            idx = prev.index
-        result = ResolvedName(value_type, idx, self.level == 0)
-        self._current_scope()[name] = result
-        return result
-
-    def lookup_name(self, name):
+    def _lookup_name(self, name):
         """
         This function resolves the given name to a previously resolved
         declaration, returning the resolved information set as unresolved
@@ -105,3 +69,132 @@ class Resolver:
         else:
             result = self._global_scope()[name]
         return result
+
+    def start_block_stmt(self, node):
+        """
+        This function pushes a new scope to resolve within.
+        """
+        self.scopes.append(defaultdict(ResolvedName))
+        self.level += 1
+
+    def end_block_stmt(self, node):
+        """
+        This function pops the current resolution scope.
+        """
+        if self.level > 0:
+            popped = self._current_scope()
+            if popped:
+                self.local_index = min(
+                    [r.index for r in popped.values() if r.index != -1]
+                )
+        del self.scopes[self.level]
+        self.level -= 1
+
+    def visit_val_decl(self, node):
+        prev = self._lookup_name(node.name.lexeme)
+        if prev.value_type == ValueType.UNRESOLVED:
+            if self.level > 0:
+                idx = self.local_index
+                self.local_index += 1
+            else:
+                idx = self.global_index
+                self.global_index += 1
+        else:
+            idx = prev.index
+        result = ResolvedName(node.value.value_type, idx, self.level == 0)
+        self._current_scope()[node.name.lexeme] = result
+        node.resolved_name = result
+
+    def visit_if_stmt(self, node):
+        for cond, block in node.checks:
+            cond.accept(self)
+            block.accept(self)
+        if node.otherwise is not None:
+            node.otherwise.accept(self)
+
+    def visit_expr(self, node):
+        node.value_type = node.value.value_type
+
+    def visit_unary_expr(self, node):
+        if (
+            node.target.value_type
+            not in {
+                TokenType.MINUS: [ValueType.NUM, ValueType.INT],
+                TokenType.BANG: [ValueType.BOOL],
+            }[node.operator.token_type]
+        ):
+            emit_error(
+                f"Incompatible type {str(node.target.value_type)} for unary operator {token_info(node.operator)}!"
+            )()
+        node.value_type = node.target.value_type
+
+    def visit_binary_expr(self, node):
+        if node.left.value_type != node.right.value_type:
+            emit_error(
+                f"Incompatible operand types {str(node.left.value_type)} and {str(node.right.value_type)} for binary operator {token_info(node.operator)}!"
+            )()
+        if (
+            node.left.value_type
+            not in {
+                TokenType.PLUS: [ValueType.NUM, ValueType.INT, ValueType.STR],
+                TokenType.MINUS: [ValueType.NUM, ValueType.INT],
+                TokenType.STAR: [ValueType.NUM, ValueType.INT],
+                TokenType.SLASH: [ValueType.NUM],
+                TokenType.EQUAL_EQUAL: ValueType,
+                TokenType.BANG_EQUAL: ValueType,
+                TokenType.LESS: [ValueType.NUM, ValueType.INT],
+                TokenType.GREATER_EQUAL: [ValueType.NUM, ValueType.INT],
+                TokenType.GREATER: [ValueType.NUM, ValueType.INT],
+                TokenType.LESS_EQUAL: [ValueType.NUM, ValueType.INT],
+                TokenType.EQUAL: ValueType,
+            }[node.operator.token_type]
+        ):
+            emit_error(
+                f"Incompatible type {str(node.left.value_type)} for binary operator {token_info(node.operator)}!"
+            )()
+        node.value_type = node.left.value_type
+
+    def visit_ident_expr(self, node):
+        node.resolved_name = self._lookup_name(node.name.lexeme)
+        if node.resolved_name.value_type == ValueType.UNRESOLVED:
+            emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
+        node.value_type = node.resolved_name.value_type
+
+    def visit_builtin_expr(self, node):
+        if (
+            node.target.value_type
+            not in {
+                TokenType.TYPE: ValueType,
+                TokenType.INT: [ValueType.NUM, ValueType.INT, ValueType.BOOL],
+                TokenType.BOOL: ValueType,
+                TokenType.NUM: [ValueType.NUM, ValueType.INT, ValueType.BOOL],
+                TokenType.STR: ValueType,
+            }[node.function.token_type]
+        ):
+            emit_error(
+                f"Incompatible parameter type {str(node.target.value_type)} for built-in function {token_info(node.function)}!"
+            )()
+
+    def visit_and_expr(self, node):
+        node.left.accept(self)
+        node.right.accept(self)
+        if node.left.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {token_info(node.operator)}!"
+            )()
+        if node.right.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {token_info(node.operator)}!"
+            )()
+
+    def visit_or_expr(self, node):
+        node.left.accept(self)
+        node.right.accept(self)
+        if node.left.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {token_info(node.operator)}!"
+            )()
+        if node.right.value_type != ValueType.BOOL:
+            emit_error(
+                f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {token_info(node.operator)}!"
+            )()

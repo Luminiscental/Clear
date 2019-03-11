@@ -8,6 +8,7 @@ from clr.assemble import assembled_size
 from clr.constants import Constants, ClrUint
 from clr.values import OpCode, DEBUG
 from clr.tokens import TokenType, token_info
+from clr.visitor import AstVisitor
 
 
 class Program:
@@ -87,7 +88,7 @@ class Program:
         return self.code_list
 
 
-class Compiler:
+class Compiler(AstVisitor):
     """
     This class provides functionality used for visiting AST nodes to generate bytecode.
     """
@@ -103,128 +104,121 @@ class Compiler:
         """
         return self.constants.flush() + self.program.flush()
 
-    def init_value(self, resolved_name, initializer):
+    def visit_val_decl(self, node):
         """
         This function emits bytecode to initialize a resolved name with
         the value of a given expression.
         """
-        initializer.gen_code(self)
-        self.program.define_name(resolved_name)
+        self.program.define_name(node.resolved_name)
 
-    def print_expression(self, expression):
+    def visit_print_stmt(self, node):
         """
         This function emits bytecode to print the value of an expression;
         or print a blank line if the expression is None.
         """
-        if expression is None:
+        if node.value is None:
             self.program.simple_op(OpCode.PRINT_BLANK)
         else:
-            expression.gen_code(self)
             self.program.simple_op(OpCode.PRINT)
 
-    def run_if(self, checks, otherwise):
+    def visit_if_stmt(self, node):
         """
         This function takes a list of condition expressions and blocks to execute
         for each condition and emits bytecode to execute the first block with a
         satisified condition or a final block otherwise.
         """
         final_jumps = []
-        for check in checks:
-            check_cond, check_block = check
-            check_cond.gen_code(self)
-            check_jump = self.program.begin_jump(conditional=True)
-            check_block.gen_code(self)
+        for cond, block in node.checks:
+            cond.accept(self)
+            jump = self.program.begin_jump(conditional=True)
+            block.accept(self)
             final_jumps.append(self.program.begin_jump())
-            self.program.end_jump(check_jump)
-        if otherwise is not None:
-            otherwise.gen_code(self)
+            self.program.end_jump(jump)
+        if node.otherwise is not None:
+            node.otherwise.accept(self)
         for final_jump in final_jumps:
             self.program.end_jump(final_jump)
 
-    def drop_expression(self, expression):
+    def visit_expr_stmt(self, node):
         """
         This function emits bytecode to evaluate and then drop the result of an expression.
         """
-        expression.gen_code(self)
         self.program.simple_op(OpCode.POP)
 
-    def push_scope(self):
+    def start_block_stmt(self, node):
         """
         This function emits bytecode to push a new scope.
         """
         self.program.simple_op(OpCode.PUSH_SCOPE)
 
-    def pop_scope(self):
+    def end_block_stmt(self, node):
         """
         This function emits bytecode to pop the current scope.
         """
         self.program.simple_op(OpCode.POP_SCOPE)
 
-    def apply_unary(self, operator, expression):
+    def visit_unary_expr(self, node):
         """
         This function emits bytecode to apply a unary operator to the result of an expression.
         """
-        expression.gen_code(self)
         {
             TokenType.MINUS: lambda: self.program.simple_op(OpCode.NEGATE),
             TokenType.BANG: lambda: self.program.simple_op(OpCode.NOT),
         }.get(
-            operator.token_type,
-            emit_error(f"Unknown unary operator! {token_info(operator)}"),
+            node.operator.token_type,
+            emit_error(f"Unknown unary operator! {token_info(node.operator)}"),
         )()
 
-    def apply_binary(self, operator, left_expr, right_expr):
+    def visit_binary_expr(self, node):
         """
         This function emits bytecode to apply a binary operator to the result
         of two expressions.
         """
-        left_expr.gen_code(self)
-        right_expr.gen_code(self)
-        {
-            TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
-            TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
-            TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
-            TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
-            TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
-            TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
-            TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
-            TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
-            TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
-            TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
-        }.get(
-            operator.token_type,
-            emit_error(f"Unknown binary operator! {token_info(operator)}"),
-        )()
+        if node.operator.token_type == TokenType.EQUAL:
+            # TODO: Handle assignment
+            print(f"Assigning {str(node.right)} to {str(node.left)}")
+            # placeholder to avoid stack underflow since the assigned value is expected
+            self.program.simple_op(OpCode.TRUE)
+        else:
+            {
+                TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
+                TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
+                TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
+                TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
+                TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
+                TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
+                TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
+                TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
+                TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
+                TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
+            }.get(
+                node.operator.token_type,
+                emit_error(f"Unknown binary operator! {token_info(node.operator)}"),
+            )()
 
-    def load_constant(self, value):
+    def visit_constant_expr(self, node):
         """
         This function emits bytecode to load a value as a constant.
         """
-        const_index = self.constants.add(value)
+        const_index = self.constants.add(node.value)
         self.program.load_constant(const_index)
 
-    def load_boolean(self, token):
+    def visit_boolean_expr(self, node):
         """
         This function emits bytecode to load a boolean value.
         """
-        {
-            TokenType.TRUE: lambda: self.program.simple_op(OpCode.TRUE),
-            TokenType.FALSE: lambda: self.program.simple_op(OpCode.FALSE),
-        }.get(
-            token.token_type, emit_error(f"Expected boolean token! {token_info(token)}")
-        )()
+        self.program.simple_op(OpCode.TRUE if node.value else OpCode.FALSE)
 
-    def load_variable(self, resolved_name):
+    def visit_ident_expr(self, node):
         """
         This function emits bytecode to load the value of a resolved identifier.
         """
-        self.program.load_name(resolved_name)
+        self.program.load_name(node.resolved_name)
 
-    def apply_builtin(self, builtin, target):
+    def visit_builtin_expr(self, node):
         """
         This function emits bytecode to apply a builtin function to the value of an expression.
         """
-        target.gen_code(self)
         {
             TokenType.TYPE: lambda: self.program.simple_op(OpCode.TYPE),
             TokenType.INT: lambda: self.program.simple_op(OpCode.INT),
@@ -232,28 +226,28 @@ class Compiler:
             TokenType.NUM: lambda: self.program.simple_op(OpCode.NUM),
             TokenType.STR: lambda: self.program.simple_op(OpCode.STR),
         }.get(
-            builtin.token_type,
-            emit_error(f"Expected built-in function! {token_info(builtin)}"),
+            node.function.token_type,
+            emit_error(f"Expected built-in function! {token_info(node.function)}"),
         )()
 
-    def apply_and(self, left_expr, right_expr):
+    def visit_and_expr(self, node):
         """
         This funcction emits bytecode to apply the logical "and" operator to the result of
         two expressions.
         """
-        left_expr.gen_code(self)
+        node.left.accept(self)
         short_circuit = self.program.begin_jump(conditional=True)
-        right_expr.gen_code(self)
+        node.right.accept(self)
         self.program.end_jump(short_circuit, leave_value=True)
 
-    def apply_or(self, left_expr, right_expr):
+    def visit_or_expr(self, node):
         """
         This funcction emits bytecode to apply the logical "or" operator to the result of
         two expressions.
         """
-        left_expr.gen_code(self)
+        node.left.accept(self)
         long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
         short_circuit = self.program.begin_jump()
         self.program.end_jump(long_circuit)
-        right_expr.gen_code(self)
+        node.right.accept(self)
         self.program.end_jump(short_circuit, leave_value=True)
