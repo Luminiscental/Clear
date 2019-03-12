@@ -252,7 +252,6 @@ class AstValDecl(AstVisitable):
         )
 
     def accept(self, visitor):
-        self.value.accept(visitor)
         visitor.visit_val_decl(self)
 
 
@@ -311,8 +310,6 @@ class AstPrintStmt(AstVisitable):
         return "print " + str(self.value) + ";"
 
     def accept(self, visitor):
-        if self.value:
-            self.value.accept(visitor)
         visitor.visit_print_stmt(self)
 
 
@@ -374,7 +371,6 @@ class AstExprStmt(AstVisitable):
         return str(self.value) + ";"
 
     def accept(self, visitor):
-        self.value.accept(visitor)
         visitor.visit_expr_stmt(self)
 
 
@@ -426,7 +422,6 @@ class AstExpr(AstVisitable):
         return str(self.value)
 
     def accept(self, visitor):
-        self.value.accept(visitor)
         visitor.visit_expr(self)
 
 
@@ -451,7 +446,6 @@ class AstGrouping(AstVisitable):
         return "(" + str(self.value) + ")"
 
     def accept(self, visitor):
-        self.value.accept(visitor)
         visitor.visit_expr(self)
 
 
@@ -474,7 +468,6 @@ class AstUnary(AstVisitable):
         return str(self.operator.token_type) + str(self.target)
 
     def accept(self, visitor):
-        self.target.accept(visitor)
         visitor.visit_unary_expr(self)
 
 
@@ -515,8 +508,6 @@ class AstBinary(AstVisitable):
         )
 
     def accept(self, visitor):
-        self.left.accept(visitor)
-        self.right.accept(visitor)
         visitor.visit_binary_expr(self)
 
 
@@ -644,7 +635,6 @@ class AstBuiltin(AstVisitable):
         return str(self.function.token_type) + str(self.target)
 
     def accept(self, visitor):
-        self.target.accept(visitor)
         visitor.visit_builtin_expr(self)
 
 
