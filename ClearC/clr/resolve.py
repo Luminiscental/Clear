@@ -5,7 +5,7 @@ identifiers to find their types and variable indices.
 from enum import Enum
 from collections import namedtuple, defaultdict
 from clr.tokens import TokenType, token_info
-from clr.errors import emit_error
+from clr.errors import emit_error, ClrCompileError
 from clr.visitor import AstVisitor
 
 
@@ -35,22 +35,16 @@ ResolvedName = namedtuple(
 
 class Resolver(AstVisitor):
     """
-    This class provides functionality for visiting AST nodes to resolve
-    the type and variable index of identifiers / declarations thereof.
+    This class provides functionality for visiting AST nodes in the global scope
+    to resolve the type and variable index of identifiers / declarations thereof.
     """
 
-    def __init__(self, func_name=None):
+    def __init__(self):
         self.scopes = [defaultdict(ResolvedName)]
         self.level = 0
-        if func_name is not None:
-            self.scopes.append(defaultdict(ResolvedName))
-            self.level += 1
         self.local_index = 0
         self.global_index = 0
-        self.params = []
-        self.children = []
-        self.return_type = None
-        self.func_name = func_name
+        self.is_function = False
 
     def _current_scope(self):
         return self.scopes[self.level]
@@ -102,12 +96,6 @@ class Resolver(AstVisitor):
             idx = prev.index
         return ResolvedName(value_type, idx, self.level == 0, is_mutable)
 
-    def add_param(self, name, value_type):
-        """
-        This function adds a given parameter to the context of this resolver.
-        """
-        self.params.append((name, value_type))
-
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
         result = self._declare_name(
@@ -117,32 +105,22 @@ class Resolver(AstVisitor):
         node.resolved_name = result
 
     def visit_func_decl(self, node):
-        # TODO: Check that every node returns if we are a function
-        func_name = self._declare_name(node.name.lexeme, ValueType.FUNCTION, False)
-        child = Resolver(func_name=func_name)
+        self._declare_name(node.name.lexeme, ValueType.FUNCTION, False)
+        function = FunctionResolver()
         for typename, name in node.params.pairs:
-            child.add_param(name.lexeme, typename.value_type)
+            function.add_param(name.lexeme, typename.value_type)
         for decl in node.block.declarations:
-            decl.accept(child)
-        self.children.append(child)
-        node.return_type = child.return_type
+            decl.accept(function)
+        node.return_type = function.return_type
         if node.return_type == ValueType.UNRESOLVED:
             node.return_type = None
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
-        if not self.func_name:
+        if not self.is_function:
             emit_error(
                 f"Invalid return statement; must be inside a function! {token_info(node.token)}"
             )()
-        return_type = self.return_type
-        if return_type is None:
-            self.return_type = node.value.value_type
-        else:
-            if return_type != node.value.value_type:
-                emit_error(
-                    f"Invalid return type! previously had {str(return_type)} but was given {str(node.value)} which is {str(node.value.value_type)}! {token_info(node.token)}"
-                )()
 
     def visit_expr(self, node):
         super().visit_expr(node)
@@ -197,14 +175,7 @@ class Resolver(AstVisitor):
         super().visit_ident_expr(node)
         node.resolved_name = self._lookup_name(node.name.lexeme)
         if node.resolved_name.value_type == ValueType.UNRESOLVED:
-            for param_name, param_type in self.params:
-                if param_name == node.name.lexeme:
-                    node.resolved_name = ResolvedName(value_type=param_type)
-                    break
-            else:
-                emit_error(
-                    f"Reference to undefined identifier! {token_info(node.name)}"
-                )()
+            emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
         node.value_type = node.resolved_name.value_type
         node.is_assignable = node.resolved_name.is_mutable
 
@@ -245,3 +216,50 @@ class Resolver(AstVisitor):
             emit_error(
                 f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {token_info(node.operator)}!"
             )()
+
+
+class FunctionResolver(Resolver):
+    """
+    This class provides functionality for visiting AST nodes within a function
+    to resolve the type and variable index of identifiers / declarations thereof.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.scopes.append(defaultdict(ResolvedName))
+        self.level += 1
+        self.params = []
+        self.return_type = None
+        self.is_function = True
+
+    def add_param(self, name, value_type):
+        """
+        This function adds a given parameter to the context of this resolver.
+        """
+        self.params.append((name, value_type))
+
+    def visit_ret_stmt(self, node):
+        super().visit_ret_stmt(node)
+        return_type = self.return_type
+        if return_type is None:
+            self.return_type = node.value.value_type
+        else:
+            if return_type != node.value.value_type:
+                emit_error(
+                    f"Invalid return type! previously had {str(return_type)} but was given {str(node.value)} which is {str(node.value.value_type)}! {token_info(node.token)}"
+                )()
+
+    def visit_ident_expr(self, node):
+        try:
+            super().visit_ident_expr(node)
+        except ClrCompileError:
+            for param_name, param_type in self.params:
+                if param_name == node.name.lexeme:
+                    node.resolved_name = ResolvedName(value_type=param_type)
+                    break
+            else:
+                emit_error(
+                    f"Reference to undefined identifier! {token_info(node.name)}"
+                )()
+        node.value_type = node.resolved_name.value_type
+        node.is_assignable = node.resolved_name.is_mutable
