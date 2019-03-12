@@ -4,9 +4,10 @@ identifiers to find their types and variable indices.
 """
 from enum import Enum
 from collections import namedtuple, defaultdict
-from clr.tokens import TokenType, token_info
+from clr.tokens import TokenType
 from clr.errors import emit_error, ClrCompileError
 from clr.visitor import AstVisitor
+from clr.values import DEBUG
 
 
 class ValueType(Enum):
@@ -82,6 +83,11 @@ class Resolver(AstVisitor):
                 )
         del self.scopes[self.level]
         self.level -= 1
+        for decl in node.declarations:
+            if node.returns:
+                emit_error(f"Unreachable code! {decl.get_info()}")()
+            elif decl.returns:
+                node.returns = True
 
     def _declare_name(self, name, value_type, is_mutable):
         prev = self._lookup_name(name)
@@ -109,18 +115,48 @@ class Resolver(AstVisitor):
         function = FunctionResolver()
         for typename, name in node.params.pairs:
             function.add_param(name.lexeme, typename.value_type)
+        returned = False
         for decl in node.block.declarations:
             decl.accept(function)
+            if decl.returns:
+                if returned:
+                    emit_error(f"Unreachable code! {decl.get_info()}")()
+                else:
+                    returned = True
+        if not returned:
+            emit_error(f"Function may not return! {node.get_info()}")()
+        node.block.returns = True
         node.return_type = function.return_type
+        if DEBUG:
+            print(f"Function {node.get_info()} returns with {node.return_type}")
         if node.return_type == ValueType.UNRESOLVED:
             node.return_type = None
+
+    def visit_if_stmt(self, node):
+        super().visit_if_stmt(node)
+        for _, block in node.checks:
+            if block.returns:
+                node.returns = True
+            elif node.returns and not block.returns:
+                node.returns = False
+        node.returns = (
+            node.returns and node.otherwise is not None and node.otherwise.returns
+        )
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
         if not self.is_function:
             emit_error(
-                f"Invalid return statement; must be inside a function! {token_info(node.token)}"
+                f"Invalid return statement; must be inside a function! {node.get_info()}"
             )()
+
+    def visit_decl(self, node):
+        super().visit_decl(node)
+        node.returns = node.value.returns
+
+    def visit_stmt(self, node):
+        super().visit_decl(node)
+        node.returns = node.value.returns
 
     def visit_expr(self, node):
         super().visit_expr(node)
@@ -136,7 +172,7 @@ class Resolver(AstVisitor):
             }[node.operator.token_type]
         ):
             emit_error(
-                f"Incompatible type {str(node.target.value_type)} for unary operator {token_info(node.operator)}!"
+                f"Incompatible type {str(node.target.value_type)} for unary operator {node.get_info()}!"
             )()
         node.value_type = node.target.value_type
 
@@ -144,7 +180,7 @@ class Resolver(AstVisitor):
         super().visit_binary_expr(node)
         if node.left.value_type != node.right.value_type:
             emit_error(
-                f"Incompatible operand types {str(node.left.value_type)} and {str(node.right.value_type)} for binary operator {token_info(node.operator)}!"
+                f"Incompatible operand types {str(node.left.value_type)} and {str(node.right.value_type)} for binary operator {node.get_info()}!"
             )()
         if (
             node.left.value_type
@@ -163,11 +199,11 @@ class Resolver(AstVisitor):
             }[node.operator.token_type]
         ):
             emit_error(
-                f"Incompatible type {str(node.left.value_type)} for binary operator {token_info(node.operator)}!"
+                f"Incompatible type {str(node.left.value_type)} for binary operator {node.get_info()}!"
             )()
         if node.operator.token_type == TokenType.EQUAL and not node.left.is_assignable:
             emit_error(
-                f"Unassignable expression {str(node.left)}! Attempt to assign at {token_info(node.operator)}"
+                f"Unassignable expression {str(node.left)}! Attempt to assign at {node.get_info()}"
             )()
         node.value_type = node.left.value_type
 
@@ -175,9 +211,11 @@ class Resolver(AstVisitor):
         super().visit_ident_expr(node)
         node.resolved_name = self._lookup_name(node.name.lexeme)
         if node.resolved_name.value_type == ValueType.UNRESOLVED:
-            emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
+            emit_error(f"Reference to undefined identifier! {node.get_info()}")()
         node.value_type = node.resolved_name.value_type
         node.is_assignable = node.resolved_name.is_mutable
+        if DEBUG:
+            print(f"Value {node.get_info()} is found with type {node.value_type}")
 
     def visit_builtin_expr(self, node):
         super().visit_builtin_expr(node)
@@ -192,29 +230,29 @@ class Resolver(AstVisitor):
             }[node.function.token_type]
         ):
             emit_error(
-                f"Incompatible parameter type {str(node.target.value_type)} for built-in function {token_info(node.function)}!"
+                f"Incompatible parameter type {str(node.target.value_type)} for built-in function {node.get_info()}!"
             )()
 
     def visit_and_expr(self, node):
         super().visit_and_expr(node)
         if node.left.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {token_info(node.operator)}!"
+                f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {node.get_info()}!"
             )()
         if node.right.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {token_info(node.operator)}!"
+                f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {node.get_info()}!"
             )()
 
     def visit_or_expr(self, node):
         super().visit_or_expr(node)
         if node.left.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {token_info(node.operator)}!"
+                f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {node.get_info()}!"
             )()
         if node.right.value_type != ValueType.BOOL:
             emit_error(
-                f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {token_info(node.operator)}!"
+                f"Incompatible type {str(node.right.value_type)} for right operand to logic operator {node.get_info()}!"
             )()
 
 
@@ -246,8 +284,9 @@ class FunctionResolver(Resolver):
         else:
             if return_type != node.value.value_type:
                 emit_error(
-                    f"Invalid return type! previously had {str(return_type)} but was given {str(node.value)} which is {str(node.value.value_type)}! {token_info(node.token)}"
+                    f"Invalid return type! previously had {str(return_type)} but was given {str(node.value)} which is {str(node.value.value_type)}! {node.get_info()}"
                 )()
+        node.returns = True
 
     def visit_ident_expr(self, node):
         try:
@@ -258,8 +297,6 @@ class FunctionResolver(Resolver):
                     node.resolved_name = ResolvedName(value_type=param_type)
                     break
             else:
-                emit_error(
-                    f"Reference to undefined identifier! {token_info(node.name)}"
-                )()
+                emit_error(f"Reference to undefined identifier! {node.get_info()}")()
         node.value_type = node.resolved_name.value_type
         node.is_assignable = node.resolved_name.is_mutable

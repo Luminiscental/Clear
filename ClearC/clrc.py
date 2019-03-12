@@ -28,14 +28,14 @@ def main():
     with open(source_file_name, "r") as source_file:
         source = source_file.read()
     try:
-        if DEBUG:
-            print("Compiling:")
         ast = Ast.from_source(source)
         # TODO: Gen debug symbols
         if DONT_COMPILE:
             print("Didn't compile")
             return
         code = ast.compile()
+        if DEBUG:
+            print("Assembling:")
         byte_code = assemble(code)
     except ClrCompileError as compile_error:
         print("Could not compile:")

@@ -142,7 +142,24 @@ def get_rule(token):
     return PRATT_TABLE[token.token_type]
 
 
-class Ast(AstVisitable):
+class AstNode:
+    """
+    This class provides default behaviour for AST nodes to give general info about the node.
+    """
+
+    def __init__(self, parser):
+        self.token = parser.get_current()
+        self.returns = False
+        self.value_type = ValueType.UNRESOLVED
+
+    def get_info(self):
+        """
+        This method returns info about the start of this node.
+        """
+        return token_info(self.token)
+
+
+class Ast(AstVisitable, AstNode):
     """
     This class is the root node for a Clear program's AST.
     It representes the following grammar rule:
@@ -151,10 +168,13 @@ class Ast(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         self.children = []
         while not parser.match(TokenType.EOF):
             self.children.append(AstDecl(parser))
         if not DONT_RESOLVE:
+            if DEBUG:
+                print("Resolving:")
             resolver = Resolver()
             self.accept(resolver)
         if DEBUG_PPRINT:
@@ -166,6 +186,8 @@ class Ast(AstVisitable):
 
     def compile(self):
         """This function walks over the AST and produces bytecode for the program."""
+        if DEBUG:
+            print("Compiling:")
         compiler = Compiler()
         self.accept(compiler)
         return compiler.flush_code()
@@ -189,10 +211,7 @@ class Ast(AstVisitable):
         return ast
 
 
-# TODO: VarDecl and assignment
-
-
-class AstDecl(AstVisitable):
+class AstDecl(AstVisitable, AstNode):
     """
     This class is an AST node for a declaration; either a value declaration
     or a statement. It represents the following grammar rule:
@@ -204,21 +223,23 @@ class AstDecl(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         if parser.check(TokenType.VAL) or parser.check(TokenType.VAR):
             self.value = AstValDecl(parser)
         elif parser.check(TokenType.FUNC):
             self.value = AstFuncDecl(parser)
         else:
             self.value = AstStmt(parser)
+        self.token = self.value.token
 
     def __str__(self):
         return str(self.value)
 
     def accept(self, visitor):
-        self.value.accept(visitor)
+        visitor.visit_decl(self)
 
 
-class AstValDecl(AstVisitable):
+class AstValDecl(AstVisitable, AstNode):
     """
     This class is an AST node for a value declaration. It represents
     the following grammar rule:
@@ -227,6 +248,7 @@ class AstValDecl(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume_one(
             [TokenType.VAL, TokenType.VAR],
             parse_error("Expected value declaration!", parser),
@@ -236,6 +258,7 @@ class AstValDecl(AstVisitable):
             TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
         )
         self.name = parser.get_prev()
+        self.token = self.name
         parser.consume(
             TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
         )
@@ -259,7 +282,7 @@ class AstValDecl(AstVisitable):
         visitor.visit_val_decl(self)
 
 
-class AstParams(AstVisitable):
+class AstParams(AstNode):
     """
     This class is an AST node for the parameter list of a function. It represents
     the following grammar rule:
@@ -268,6 +291,7 @@ class AstParams(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(
             TokenType.LEFT_PAREN, parse_error("Expected parameter list!", parser)
         )
@@ -292,11 +316,8 @@ class AstParams(AstVisitable):
             + ")"
         )
 
-    def accept(self, visitor):
-        visitor.visit_param_list(self)
 
-
-class AstFuncDecl(AstVisitable):
+class AstFuncDecl(AstVisitable, AstNode):
     """
     This class is an AST node for a function delcaration. It represents
     the following grammar rule:
@@ -305,6 +326,7 @@ class AstFuncDecl(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(
             TokenType.FUNC, parse_error("Expected function declaration!", parser)
         )
@@ -312,6 +334,7 @@ class AstFuncDecl(AstVisitable):
             TokenType.IDENTIFIER, parse_error("Expected function name!", parser)
         )
         self.name = parser.get_prev()
+        self.token = self.name
         self.params = AstParams(parser)
         self.block = AstBlock(parser)
         self.resolved_name = ResolvedName()
@@ -324,7 +347,7 @@ class AstFuncDecl(AstVisitable):
         visitor.visit_func_decl(self)
 
 
-class AstStmt(AstVisitable):
+class AstStmt(AstVisitable, AstNode):
     """
     This class is an AST node for a statement. Either a print statement,
     a simple block, an if statement or an expression statement. It represents
@@ -339,6 +362,7 @@ class AstStmt(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         if parser.check(TokenType.PRINT):
             self.value = AstPrintStmt(parser)
         elif parser.check(TokenType.LEFT_BRACE):
@@ -349,15 +373,16 @@ class AstStmt(AstVisitable):
             self.value = AstRetStmt(parser)
         else:
             self.value = AstExprStmt(parser)
+        self.token = self.value.token
 
     def __str__(self):
         return str(self.value)
 
     def accept(self, visitor):
-        self.value.accept(visitor)
+        visitor.visit_stmt(self)
 
 
-class AstPrintStmt(AstVisitable):
+class AstPrintStmt(AstVisitable, AstNode):
     """
     This class is an AST node for a print statement. It represents
     the following grammar rule:
@@ -366,6 +391,7 @@ class AstPrintStmt(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(
             TokenType.PRINT, parse_error("Expected print statement!", parser)
         )
@@ -385,7 +411,7 @@ class AstPrintStmt(AstVisitable):
         visitor.visit_print_stmt(self)
 
 
-class AstIfStmt(AstVisitable):
+class AstIfStmt(AstVisitable, AstNode):
     """
     This class is an AST node for an if statement with optional else-if and
     else branches. It represents the following grammar rule:
@@ -394,6 +420,7 @@ class AstIfStmt(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
         self.checks = [(AstExpr(parser), AstBlock(parser))]
         self.otherwise = None
@@ -424,7 +451,7 @@ class AstIfStmt(AstVisitable):
         visitor.visit_if_stmt(self)
 
 
-class AstRetStmt(AstVisitable):
+class AstRetStmt(AstVisitable, AstNode):
     """
     This class is an AST node for a return statement within a function. It represents
     the following grammar rule:
@@ -433,10 +460,10 @@ class AstRetStmt(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(
             TokenType.RETURN, parse_error("Expected return statement!", parser)
         )
-        self.token = parser.get_prev()
         self.value = AstExpr(parser)
         parser.consume(
             TokenType.SEMICOLON,
@@ -450,7 +477,7 @@ class AstRetStmt(AstVisitable):
         visitor.visit_ret_stmt(self)
 
 
-class AstExprStmt(AstVisitable):
+class AstExprStmt(AstVisitable, AstNode):
     """
     This class is an AST node for an expression statement where the result of
     the expression is discarded. It represents the following grammar rule:
@@ -459,7 +486,9 @@ class AstExprStmt(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         self.value = AstExpr(parser)
+        self.token = self.value.token
         parser.consume(
             TokenType.SEMICOLON,
             parse_error("Expected semicolon to end expression statement!", parser),
@@ -472,7 +501,7 @@ class AstExprStmt(AstVisitable):
         visitor.visit_expr_stmt(self)
 
 
-class AstBlock(AstVisitable):
+class AstBlock(AstVisitable, AstNode):
     """
     This class is an AST node for a simple block scoping a list of declarations.
     It represents the following grammar rule:
@@ -481,6 +510,7 @@ class AstBlock(AstVisitable):
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
         opener = parser.get_prev()
         self.declarations = []
@@ -500,7 +530,7 @@ class AstBlock(AstVisitable):
         visitor.end_block_stmt(self)
 
 
-class AstExpr(AstVisitable):
+class AstExpr(AstVisitable, AstNode):
     """
     This class is an AST node representing an expression in the Clear language.
     This involves literals, arithmetic operators with precedence, and the logic
@@ -508,13 +538,14 @@ class AstExpr(AstVisitable):
     """
 
     def __init__(self, parser, precedence=Precedence.ASSIGNMENT):
+        super().__init__(parser)
         first_rule = get_rule(parser.get_current())
         self.value = first_rule.prefix(parser)
         while get_rule(parser.get_current()).precedence >= precedence:
             rule = get_rule(parser.get_current())
             self.value = rule.infix(self.value, parser)
-        self.value_type = ValueType.UNRESOLVED
         self.is_assignable = self.value.is_assignable
+        self.token = self.value.token
 
     def __str__(self):
         return str(self.value)
@@ -523,13 +554,14 @@ class AstExpr(AstVisitable):
         visitor.visit_expr(self)
 
 
-class AstGrouping(AstVisitable):
+class AstGrouping(AstVisitable, AstNode):
     """
     This class is an AST node for a grouped expression, surrounded with parentheses
     to prioritize the expression's precedence.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(
             TokenType.LEFT_PAREN, parse_error("Expected '(' before expression!", parser)
         )
@@ -537,7 +569,6 @@ class AstGrouping(AstVisitable):
         parser.consume(
             TokenType.RIGHT_PAREN, parse_error("Expected ')' after expression!", parser)
         )
-        self.value_type = ValueType.UNRESOLVED
         self.is_assignable = self.value.is_assignable
 
     def __str__(self):
@@ -547,19 +578,19 @@ class AstGrouping(AstVisitable):
         visitor.visit_expr(self)
 
 
-class AstUnary(AstVisitable):
+class AstUnary(AstVisitable, AstNode):
     """
     This class is an AST node for a unary operator applied to an expression.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume_one(
             [TokenType.MINUS, TokenType.BANG],
             parse_error("Expected unary operator!", parser),
         )
         self.operator = parser.get_prev()
         self.target = AstExpr(parser, precedence=Precedence.UNARY)
-        self.value_type = ValueType.UNRESOLVED
         self.is_assignable = False
 
     def __str__(self):
@@ -569,12 +600,13 @@ class AstUnary(AstVisitable):
         visitor.visit_unary_expr(self)
 
 
-class AstBinary(AstVisitable):
+class AstBinary(AstVisitable, AstNode):
     """
     This class is an AST node for a binary operator being applied to two expressions.
     """
 
     def __init__(self, left, parser):
+        super().__init__(parser)
         self.left = left
         parser.consume_one(
             [
@@ -593,11 +625,11 @@ class AstBinary(AstVisitable):
             parse_error("Expected binary operator!", parser),
         )
         self.operator = parser.get_prev()
+        self.token = self.operator
         prec = get_rule(self.operator).precedence
         if self.operator.token_type not in LEFT_ASSOC_OPS:
             prec = prec.next()
         self.right = AstExpr(parser, precedence=prec)
-        self.value_type = ValueType.UNRESOLVED
         self.is_assignable = False
 
     def __str__(self):
@@ -609,23 +641,23 @@ class AstBinary(AstVisitable):
         visitor.visit_binary_expr(self)
 
 
-class AstNumber(AstVisitable):
+class AstNumber(AstVisitable, AstNode):
     """
     This class is an AST node for a number or integer literal in Clear.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
-        token = parser.get_prev()
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
-                self.value = ClrInt(token.lexeme)
+                self.value = ClrInt(self.token.lexeme)
                 self.value_type = ValueType.INT
             except ValueError:
                 parse_error("Integer literal must be an integer!", parser)()
         else:
             try:
-                self.value = ClrNum(token.lexeme)
+                self.value = ClrNum(self.token.lexeme)
                 self.value_type = ValueType.NUM
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
@@ -638,15 +670,15 @@ class AstNumber(AstVisitable):
         visitor.visit_constant_expr(self)
 
 
-class AstString(AstVisitable):
+class AstString(AstVisitable, AstNode):
     """
     This class is an AST node for a string literal in Clear.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
-        token = parser.get_prev()
-        total = [token]
+        total = [self.token]
         while parser.match(TokenType.STRING):
             total.append(parser.get_prev())
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
@@ -661,12 +693,13 @@ class AstString(AstVisitable):
         visitor.visit_constant_expr(self)
 
 
-class AstBoolean(AstVisitable):
+class AstBoolean(AstVisitable, AstNode):
     """
     This class is an AST node for a boolean literal in Clear.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume_one(
             [TokenType.TRUE, TokenType.FALSE],
             parse_error("Expected boolean literal!", parser),
@@ -682,15 +715,15 @@ class AstBoolean(AstVisitable):
         visitor.visit_boolean_expr(self)
 
 
-class AstIdent(AstVisitable):
+class AstIdent(AstVisitable, AstNode):
     """
     This class is an AST node for an identifier reference within an expression.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
-        token = parser.get_prev()
-        self.name = token
+        self.name = self.token
         self.resolved_name = ResolvedName()
         self.value_type = self.resolved_name.value_type
         self.is_assignable = self.resolved_name.is_mutable
@@ -702,12 +735,13 @@ class AstIdent(AstVisitable):
         visitor.visit_ident_expr(self)
 
 
-class AstType(AstVisitable):
+class AstType(AstVisitable, AstNode):
     """
     This class is an AST node for a built-in type.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume_one(
             [TokenType.INT, TokenType.BOOL, TokenType.NUM, TokenType.STR],
             parse_error("Expected builtin function!", parser),
@@ -728,12 +762,13 @@ class AstType(AstVisitable):
         visitor.visit_type(self)
 
 
-class AstBuiltin(AstVisitable):
+class AstBuiltin(AstVisitable, AstNode):
     """
     This class is an AST node for applying a built-in Clear function to an expression.
     """
 
     def __init__(self, parser):
+        super().__init__(parser)
         parser.consume_one(
             [
                 TokenType.TYPE,
@@ -762,15 +797,17 @@ class AstBuiltin(AstVisitable):
         visitor.visit_builtin_expr(self)
 
 
-class AstAnd(AstVisitable):
+class AstAnd(AstVisitable, AstNode):
     """
     This class is an AST node for applying the logic "and" operator to two expressions.
     """
 
     def __init__(self, left, parser):
+        super().__init__(parser)
         self.left = left
         parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
         self.operator = parser.get_prev()
+        self.token = self.operator
         self.right = AstExpr(parser, precedence=Precedence.AND)
         self.value_type = ValueType.BOOL
         self.is_assignable = False
@@ -782,15 +819,17 @@ class AstAnd(AstVisitable):
         visitor.visit_and_expr(self)
 
 
-class AstOr(AstVisitable):
+class AstOr(AstVisitable, AstNode):
     """
     This class is an AST node for applying the logic operator "or" to two expressions.
     """
 
     def __init__(self, left, parser):
+        super().__init__(parser)
         self.left = left
         parser.consume(TokenType.OR, parse_error("Expected and operator!", parser))
         self.operator = parser.get_prev()
+        self.token = self.operator
         self.right = AstExpr(parser, precedence=Precedence.OR)
         self.value_type = ValueType.BOOL
         self.is_assignable = False

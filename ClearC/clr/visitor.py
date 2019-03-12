@@ -26,14 +26,6 @@ class AstVisitor:
         """
         node.value.accept(self)
 
-    def visit_param_list(self, node):
-        """
-        This function is called when visiting the parameters of a function, and by default does nothing, iterating onto the children.
-        """
-        for type_id, name in node.pairs:
-            type_id.accept(self)
-            name.accept(self)
-
     def visit_func_decl(self, node):
         """
         This function is called when visiting a function declaration, and by default does nothing, iterating onto the child.
@@ -81,6 +73,18 @@ class AstVisitor:
         This function is called after visiting the contents of a block, and by default does
         nothing.
         """
+
+    def visit_decl(self, node):
+        """
+        This function is called after visiting a declaration root, and by default does nothing, iterating onto the child.
+        """
+        node.value.accept(self)
+
+    def visit_stmt(self, node):
+        """
+        This function is called after visiting a statement root, and by default does nothing, iterating onto the child.
+        """
+        node.value.accept(self)
 
     def visit_expr(self, node):
         """
