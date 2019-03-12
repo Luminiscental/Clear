@@ -191,12 +191,13 @@ class Compiler(AstVisitor):
         This function emits bytecode to apply a binary operator to the result
         of two expressions.
         """
-        super().visit_binary_expr(node)
         if node.operator.token_type == TokenType.EQUAL:
+            # If it's an assignment don't call super as we don't want to evaluate the left hand side
+            node.right.accept(self)
             self.program.set_name(node.left.resolved_name)
-            self.program.simple_op(OpCode.POP)
             self.program.load_name(node.left.resolved_name)
         else:
+            super().visit_binary_expr(node)
             {
                 TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
                 TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
