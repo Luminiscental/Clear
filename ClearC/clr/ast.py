@@ -223,17 +223,18 @@ class AstValDecl(AstVisitable):
     """
 
     def __init__(self, parser):
-        mutable = False
-        if not parser.match(TokenType.VAL):
-            if parser.match(TokenType.VAR):
-                mutable = True
-            else:
-                parse_error("Expected value declaration!", parser)()
-        if not parser.match(TokenType.IDENTIFIER):
-            parse_error("Expected value name!", parser)()
+        parser.consume_one(
+            [TokenType.VAL, TokenType.VAR],
+            parse_error("Expected value declaration!", parser),
+        )
+        mutable = parser.get_prev().token_type == TokenType.VAR
+        parser.consume(
+            TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
+        )
         self.name = parser.get_prev()
-        if not parser.match(TokenType.EQUAL):
-            parse_error("Expected '=' for value initializer!", parser)()
+        parser.consume(
+            TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
+        )
         self.value = AstExpr(parser)
         parser.consume(
             TokenType.SEMICOLON,
@@ -243,9 +244,11 @@ class AstValDecl(AstVisitable):
 
     def __str__(self):
         return (
-            "var "
-            if self.resolved_name.is_mutable
-            else "val " + self.name.lexeme + " = " + str(self.value) + ";"
+            ("var " if self.resolved_name.is_mutable else "val ")
+            + self.name.lexeme
+            + " = "
+            + str(self.value)
+            + ";"
         )
 
     def accept(self, visitor):
@@ -292,12 +295,15 @@ class AstPrintStmt(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.PRINT):
-            parse_error("Expected print statement!", parser)()
+        parser.consume(
+            TokenType.PRINT, parse_error("Expected print statement!", parser)
+        )
         if not parser.match(TokenType.SEMICOLON):
             self.value = AstExpr(parser)
-            if not parser.match(TokenType.SEMICOLON):
-                parse_error("Expected semicolon for print statement!", parser)()
+            parser.consume(
+                TokenType.SEMICOLON,
+                parse_error("Expected semicolon for print statement!", parser),
+            )
         else:
             self.value = None
 
@@ -319,8 +325,7 @@ class AstIfStmt(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.IF):
-            parse_error("Expected if statement!", parser)()
+        parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
         self.checks = [(AstExpr(parser), AstBlock(parser))]
         self.otherwise = None
         while parser.match(TokenType.ELSE):
@@ -360,8 +365,10 @@ class AstExprStmt(AstVisitable):
 
     def __init__(self, parser):
         self.value = AstExpr(parser)
-        if not parser.match(TokenType.SEMICOLON):
-            parse_error("Expected semicolon to end expression statement!", parser)()
+        parser.consume(
+            TokenType.SEMICOLON,
+            parse_error("Expected semicolon to end expression statement!", parser),
+        )
 
     def __str__(self):
         return str(self.value) + ";"
@@ -380,8 +387,7 @@ class AstBlock(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.LEFT_BRACE):
-            parse_error("Expected block!", parser)()
+        parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
         opener = parser.get_prev()
         self.declarations = []
         while not parser.match(TokenType.RIGHT_BRACE):
@@ -431,11 +437,13 @@ class AstGrouping(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.LEFT_PAREN):
-            parse_error("Expected '(' before expression!", parser)()
+        parser.consume(
+            TokenType.LEFT_PAREN, parse_error("Expected '(' before expression!", parser)
+        )
         self.value = AstExpr(parser)
-        if not parser.match(TokenType.RIGHT_PAREN):
-            parse_error("Expected ')' after expression!", parser)()
+        parser.consume(
+            TokenType.RIGHT_PAREN, parse_error("Expected ')' after expression!", parser)
+        )
         self.value_type = ValueType.UNRESOLVED
         self.is_assignable = self.value.is_assignable
 
@@ -518,8 +526,7 @@ class AstNumber(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.NUMBER):
-            parse_error("Expected number!", parser)()
+        parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
         token = parser.get_prev()
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
@@ -548,8 +555,7 @@ class AstString(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.STRING):
-            parse_error("Expected string!", parser)()
+        parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
         token = parser.get_prev()
         total = [token]
         while parser.match(TokenType.STRING):
@@ -593,8 +599,7 @@ class AstIdent(AstVisitable):
     """
 
     def __init__(self, parser):
-        if not parser.match(TokenType.IDENTIFIER):
-            parse_error("Expected variable!", parser)()
+        parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
         token = parser.get_prev()
         self.name = token
         self.resolved_name = ResolvedName()
