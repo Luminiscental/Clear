@@ -39,12 +39,18 @@ class Resolver(AstVisitor):
     the type and variable index of identifiers / declarations thereof.
     """
 
-    def __init__(self):
+    def __init__(self, func_name=None):
         self.scopes = [defaultdict(ResolvedName)]
         self.level = 0
+        if func_name is not None:
+            self.scopes.append(defaultdict(ResolvedName))
+            self.level += 1
         self.local_index = 0
         self.global_index = 0
-        self.functions = []
+        self.params = []
+        self.children = []
+        self.return_type = None
+        self.func_name = func_name
 
     def _current_scope(self):
         return self.scopes[self.level]
@@ -96,6 +102,12 @@ class Resolver(AstVisitor):
             idx = prev.index
         return ResolvedName(value_type, idx, self.level == 0, is_mutable)
 
+    def add_param(self, name, value_type):
+        """
+        This function adds a given parameter to the context of this resolver.
+        """
+        self.params.append((name, value_type))
+
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
         result = self._declare_name(
@@ -105,30 +117,27 @@ class Resolver(AstVisitor):
         node.resolved_name = result
 
     def visit_func_decl(self, node):
-        # TODO: Check all paths return or all paths don't return
+        # TODO: Check that every node returns if we are a function
         func_name = self._declare_name(node.name.lexeme, ValueType.FUNCTION, False)
-        self.functions.append([func_name, ValueType.UNRESOLVED])
-        self.start_block_stmt(node.block)
+        child = Resolver(func_name=func_name)
         for typename, name in node.params.pairs:
-            # TODO: Parameters should not be indexed as local variables
-            param = self._declare_name(name.lexeme, typename.value_type, False)
-            self._current_scope()[name.lexeme] = param
+            child.add_param(name.lexeme, typename.value_type)
         for decl in node.block.declarations:
-            decl.accept(self)
-        self.end_block_stmt(node.block)
-        node.return_type = self.functions.pop()[1]
+            decl.accept(child)
+        self.children.append(child)
+        node.return_type = child.return_type
         if node.return_type == ValueType.UNRESOLVED:
             node.return_type = None
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
-        if not self.functions:
+        if not self.func_name:
             emit_error(
                 f"Invalid return statement; must be inside a function! {token_info(node.token)}"
             )()
-        return_type = self.functions[-1][1]
-        if return_type == ValueType.UNRESOLVED:
-            self.functions[-1][1] = node.value.value_type
+        return_type = self.return_type
+        if return_type is None:
+            self.return_type = node.value.value_type
         else:
             if return_type != node.value.value_type:
                 emit_error(
@@ -188,7 +197,14 @@ class Resolver(AstVisitor):
         super().visit_ident_expr(node)
         node.resolved_name = self._lookup_name(node.name.lexeme)
         if node.resolved_name.value_type == ValueType.UNRESOLVED:
-            emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
+            for param_name, param_type in self.params:
+                if param_name == node.name.lexeme:
+                    node.resolved_name = ResolvedName(value_type=param_type)
+                    break
+            else:
+                emit_error(
+                    f"Reference to undefined identifier! {token_info(node.name)}"
+                )()
         node.value_type = node.resolved_name.value_type
         node.is_assignable = node.resolved_name.is_mutable
 
