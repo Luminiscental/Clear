@@ -1,7 +1,11 @@
 
 // Simple test program:
 
-val cond = false or true;
+var cond = false or true;
+print "cond = " + str(cond);
+
+cond = false;
+print "cond = " + str(cond);
 
 // val maltyped = 1 + "cake";
 // val weird = 2 or false;

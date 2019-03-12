@@ -22,23 +22,32 @@ class AstVisitor:
 
     def visit_val_decl(self, node):
         """
-        This function is called when visiting a value declaration, and by default does nothing.
+        This function is called when visiting a value declaration, and by default does nothing, iterating onto the child.
         """
+        node.value.accept(self)
 
     def visit_print_stmt(self, node):
         """
-        This function is called when visiting a print statement, and by default does nothing.
+        This function is called when visiting a print statement, and by default does nothing, iterating onto a child if it exists.
         """
+        if node.value:
+            node.value.accept(self)
 
     def visit_if_stmt(self, node):
         """
-        This function is called when visiting an if statement, and by default does nothing.
+        This function is called when visiting an if statement, and by default does nothing, iterating onto the children.
         """
+        for cond, block in node.checks:
+            cond.accept(self)
+            block.accept(self)
+        if node.otherwise is not None:
+            node.otherwise.accept(self)
 
     def visit_expr_stmt(self, node):
         """
-        This function is called when visiting an expression statement, and by default does nothing.
+        This function is called when visiting an expression statement, and by default does nothing, iterating onto the child.
         """
+        node.value.accept(self)
 
     def start_block_stmt(self, node):
         """
@@ -54,18 +63,22 @@ class AstVisitor:
 
     def visit_expr(self, node):
         """
-        This function is called after visiting an expression, and by default does nothing.
+        This function is called after visiting an expression root, and by default does nothing, iterating onto the child.
         """
+        node.value.accept(self)
 
     def visit_unary_expr(self, node):
         """
-        This function is called when visiting a unary expression, and by default does nothing.
+        This function is called when visiting a unary expression, and by default does nothing, iterating onto the child.
         """
+        node.target.accept(self)
 
     def visit_binary_expr(self, node):
         """
-        This function is called when visiting a binary expression, and by default does nothing.
+        This function is called when visiting a binary expression, and by default does nothing, iterating onto the children.
         """
+        node.left.accept(self)
+        node.right.accept(self)
 
     def visit_constant_expr(self, node):
         """
@@ -85,17 +98,22 @@ class AstVisitor:
     def visit_builtin_expr(self, node):
         """
         This function is called when visiting a call to a built-in function, and by default does
-        nothing.
+        nothing, iterating onto the child.
         """
+        node.target.accept(self)
 
     def visit_and_expr(self, node):
         """
         This function is called when visiting an application of the "and" operator, and by default
-        does nothing.
+        does nothing, iterating onto the children.
         """
+        node.left.accept(self)
+        node.right.accept(self)
 
     def visit_or_expr(self, node):
         """
         This function is called when visiting an application of the "or" operator, and by default
-        does nothing.
+        does nothing, iterating onto the children.
         """
+        node.left.accept(self)
+        node.right.accept(self)

@@ -27,8 +27,8 @@ class ValueType(Enum):
 
 ResolvedName = namedtuple(
     "ResolvedName",
-    ("value_type", "index", "is_global"),
-    defaults=(ValueType.UNRESOLVED, -1, False),
+    ("value_type", "index", "is_global", "is_mutable"),
+    defaults=(ValueType.UNRESOLVED, -1, False, False),
 )
 
 
@@ -66,10 +66,12 @@ class Resolver(AstVisitor):
         return result
 
     def start_block_stmt(self, node):
+        super().start_block_stmt(node)
         self.scopes.append(defaultdict(ResolvedName))
         self.level += 1
 
     def end_block_stmt(self, node):
+        super().end_block_stmt(node)
         if self.level > 0:
             popped = self._current_scope()
             if popped:
@@ -80,6 +82,7 @@ class Resolver(AstVisitor):
         self.level -= 1
 
     def visit_val_decl(self, node):
+        super().visit_val_decl(node)
         prev = self._lookup_name(node.name.lexeme)
         if prev.value_type == ValueType.UNRESOLVED:
             if self.level > 0:
@@ -90,21 +93,18 @@ class Resolver(AstVisitor):
                 self.global_index += 1
         else:
             idx = prev.index
-        result = ResolvedName(node.value.value_type, idx, self.level == 0)
+        result = ResolvedName(
+            node.value.value_type, idx, self.level == 0, node.resolved_name.is_mutable
+        )
         self._current_scope()[node.name.lexeme] = result
         node.resolved_name = result
 
-    def visit_if_stmt(self, node):
-        for cond, block in node.checks:
-            cond.accept(self)
-            block.accept(self)
-        if node.otherwise is not None:
-            node.otherwise.accept(self)
-
     def visit_expr(self, node):
+        super().visit_expr(node)
         node.value_type = node.value.value_type
 
     def visit_unary_expr(self, node):
+        super().visit_unary_expr(node)
         if (
             node.target.value_type
             not in {
@@ -118,6 +118,7 @@ class Resolver(AstVisitor):
         node.value_type = node.target.value_type
 
     def visit_binary_expr(self, node):
+        super().visit_binary_expr(node)
         if node.left.value_type != node.right.value_type:
             emit_error(
                 f"Incompatible operand types {str(node.left.value_type)} and {str(node.right.value_type)} for binary operator {token_info(node.operator)}!"
@@ -141,15 +142,22 @@ class Resolver(AstVisitor):
             emit_error(
                 f"Incompatible type {str(node.left.value_type)} for binary operator {token_info(node.operator)}!"
             )()
+        if node.operator.token_type == TokenType.EQUAL and not node.left.is_assignable:
+            emit_error(
+                f"Unassignable expression {str(node.left)}! Attempt to assign at {token_info(node.operator)}"
+            )()
         node.value_type = node.left.value_type
 
     def visit_ident_expr(self, node):
+        super().visit_ident_expr(node)
         node.resolved_name = self._lookup_name(node.name.lexeme)
         if node.resolved_name.value_type == ValueType.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
         node.value_type = node.resolved_name.value_type
+        node.is_assignable = node.resolved_name.is_mutable
 
     def visit_builtin_expr(self, node):
+        super().visit_builtin_expr(node)
         if (
             node.target.value_type
             not in {
@@ -165,8 +173,7 @@ class Resolver(AstVisitor):
             )()
 
     def visit_and_expr(self, node):
-        node.left.accept(self)
-        node.right.accept(self)
+        super().visit_and_expr(node)
         if node.left.value_type != ValueType.BOOL:
             emit_error(
                 f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {token_info(node.operator)}!"
@@ -177,8 +184,7 @@ class Resolver(AstVisitor):
             )()
 
     def visit_or_expr(self, node):
-        node.left.accept(self)
-        node.right.accept(self)
+        super().visit_or_expr(node)
         if node.left.value_type != ValueType.BOOL:
             emit_error(
                 f"Incompatible type {str(node.left.value_type)} for left operand to logic operator {token_info(node.operator)}!"
