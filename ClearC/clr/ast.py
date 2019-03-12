@@ -5,7 +5,7 @@ from enum import Enum
 from collections import namedtuple, defaultdict
 from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import parse_error, emit_error
-from clr.values import DEBUG, DEBUG_PPRINT
+from clr.values import DEBUG, DEBUG_PPRINT, DONT_RESOLVE
 from clr.constants import ClrInt, ClrNum, ClrStr
 from clr.compile import Compiler
 from clr.resolve import Resolver, ValueType, ResolvedName
@@ -154,8 +154,9 @@ class Ast(AstVisitable):
         self.children = []
         while not parser.match(TokenType.EOF):
             self.children.append(AstDecl(parser))
-        resolver = Resolver()
-        self.accept(resolver)
+        if not DONT_RESOLVE:
+            resolver = Resolver()
+            self.accept(resolver)
         if DEBUG_PPRINT:
             print("AST pretty print:")
             print(str(self))
@@ -197,6 +198,7 @@ class AstDecl(AstVisitable):
     or a statement. It represents the following grammar rule:
 
     AstDecl : AstValDecl
+            | AstFuncDecl
             | AstStmt
             ;
     """
@@ -204,6 +206,8 @@ class AstDecl(AstVisitable):
     def __init__(self, parser):
         if parser.check(TokenType.VAL) or parser.check(TokenType.VAR):
             self.value = AstValDecl(parser)
+        elif parser.check(TokenType.FUNC):
+            self.value = AstFuncDecl(parser)
         else:
             self.value = AstStmt(parser)
 
@@ -219,7 +223,7 @@ class AstValDecl(AstVisitable):
     This class is an AST node for a value declaration. It represents
     the following grammar rule:
 
-    AstValDecl : ('val' | 'var') id '=' AstExpr ';' ;
+    AstValDecl : ('val' | 'var') AstIdent '=' AstExpr ';' ;
     """
 
     def __init__(self, parser):
@@ -255,6 +259,71 @@ class AstValDecl(AstVisitable):
         visitor.visit_val_decl(self)
 
 
+class AstParams(AstVisitable):
+    """
+    This class is an AST node for the parameter list of a function. It represents
+    the following grammar rule:
+
+    AstParams : '(' ( AstType AstIdent ( ',' AstType AstIdent )* )? ')' ;
+    """
+
+    def __init__(self, parser):
+        parser.consume(
+            TokenType.LEFT_PAREN, parse_error("Expected parameter list!", parser)
+        )
+        self.pairs = []
+        while not parser.match(TokenType.RIGHT_PAREN):
+            type_id = AstType(parser)
+            parser.consume(
+                TokenType.IDENTIFIER, parse_error("Expected parameter name!", parser)
+            )
+            name_id = parser.get_prev()
+            self.pairs.append((type_id, name_id))
+            if not parser.check(TokenType.RIGHT_PAREN):
+                parser.consume(
+                    TokenType.COMMA,
+                    parse_error("Expected comma to delimit parameters!", parser),
+                )
+
+    def __str__(self):
+        return (
+            "("
+            + ", ".join(map(lambda pair: " ".join(map(str, pair)), self.pairs))
+            + ")"
+        )
+
+    def accept(self, visitor):
+        visitor.visit_param_list(self)
+
+
+class AstFuncDecl(AstVisitable):
+    """
+    This class is an AST node for a function delcaration. It represents
+    the following grammar rule:
+
+    AstFuncDecl : 'func' AstIdent '(' params? ')' AstBlock ;
+    """
+
+    def __init__(self, parser):
+        parser.consume(
+            TokenType.FUNC, parse_error("Expected function declaration!", parser)
+        )
+        parser.consume(
+            TokenType.IDENTIFIER, parse_error("Expected function name!", parser)
+        )
+        self.name = parser.get_prev()
+        self.params = AstParams(parser)
+        self.block = AstBlock(parser)
+        self.resolved_name = ResolvedName()
+        self.return_type = ValueType.UNRESOLVED
+
+    def __str__(self):
+        return "func " + str(self.name) + str(self.params) + " " + str(self.block)
+
+    def accept(self, visitor):
+        visitor.visit_func_decl(self)
+
+
 class AstStmt(AstVisitable):
     """
     This class is an AST node for a statement. Either a print statement,
@@ -265,6 +334,7 @@ class AstStmt(AstVisitable):
             | AstBlock
             | AstIfStmt
             | AstExprStmt
+            | AstRetStmt
             ;
     """
 
@@ -275,6 +345,8 @@ class AstStmt(AstVisitable):
             self.value = AstBlock(parser)
         elif parser.check(TokenType.IF):
             self.value = AstIfStmt(parser)
+        elif parser.check(TokenType.RETURN):
+            self.value = AstRetStmt(parser)
         else:
             self.value = AstExprStmt(parser)
 
@@ -350,6 +422,32 @@ class AstIfStmt(AstVisitable):
 
     def accept(self, visitor):
         visitor.visit_if_stmt(self)
+
+
+class AstRetStmt(AstVisitable):
+    """
+    This class is an AST node for a return statement within a function. It represents
+    the following grammar rule:
+
+    AstRetStmt : 'return' AstExpr ';' ;
+    """
+
+    def __init__(self, parser):
+        parser.consume(
+            TokenType.RETURN, parse_error("Expected return statement!", parser)
+        )
+        self.token = parser.get_prev()
+        self.value = AstExpr(parser)
+        parser.consume(
+            TokenType.SEMICOLON,
+            parse_error("Expected semicolon after return statement!", parser),
+        )
+
+    def __str__(self):
+        return "return " + str(self.value) + ";"
+
+    def accept(self, visitor):
+        visitor.visit_ret_stmt(self)
 
 
 class AstExprStmt(AstVisitable):
@@ -602,6 +700,32 @@ class AstIdent(AstVisitable):
 
     def accept(self, visitor):
         visitor.visit_ident_expr(self)
+
+
+class AstType(AstVisitable):
+    """
+    This class is an AST node for a built-in type.
+    """
+
+    def __init__(self, parser):
+        parser.consume_one(
+            [TokenType.INT, TokenType.BOOL, TokenType.NUM, TokenType.STR],
+            parse_error("Expected builtin function!", parser),
+        )
+        self.value = parser.get_prev()
+        self.value_type = {
+            TokenType.INT: ValueType.INT,
+            TokenType.BOOL: ValueType.BOOL,
+            TokenType.NUM: ValueType.NUM,
+            TokenType.STR: ValueType.STR,
+        }[self.value.token_type]
+        self.is_assignable = False
+
+    def __str__(self):
+        return str(self.value.token_type)
+
+    def accept(self, visitor):
+        visitor.visit_type(self)
 
 
 class AstBuiltin(AstVisitable):

@@ -19,6 +19,7 @@ class ValueType(Enum):
     NUM = "num"
     STR = "str"
     BOOL = "bool"
+    FUNCTION = "<function>"
     UNRESOLVED = "<unresolved>"
 
     def __str__(self):
@@ -43,6 +44,7 @@ class Resolver(AstVisitor):
         self.level = 0
         self.local_index = 0
         self.global_index = 0
+        self.functions = []
 
     def _current_scope(self):
         return self.scopes[self.level]
@@ -81,9 +83,8 @@ class Resolver(AstVisitor):
         del self.scopes[self.level]
         self.level -= 1
 
-    def visit_val_decl(self, node):
-        super().visit_val_decl(node)
-        prev = self._lookup_name(node.name.lexeme)
+    def _declare_name(self, name, value_type, is_mutable):
+        prev = self._lookup_name(name)
         if prev.value_type == ValueType.UNRESOLVED:
             if self.level > 0:
                 idx = self.local_index
@@ -93,11 +94,46 @@ class Resolver(AstVisitor):
                 self.global_index += 1
         else:
             idx = prev.index
-        result = ResolvedName(
-            node.value.value_type, idx, self.level == 0, node.resolved_name.is_mutable
+        return ResolvedName(value_type, idx, self.level == 0, is_mutable)
+
+    def visit_val_decl(self, node):
+        super().visit_val_decl(node)
+        result = self._declare_name(
+            node.name.lexeme, node.value.value_type, node.resolved_name.is_mutable
         )
         self._current_scope()[node.name.lexeme] = result
         node.resolved_name = result
+
+    def visit_func_decl(self, node):
+        # TODO: Check all paths return or all paths don't return
+        func_name = self._declare_name(node.name.lexeme, ValueType.FUNCTION, False)
+        self.functions.append([func_name, ValueType.UNRESOLVED])
+        self.start_block_stmt(node.block)
+        for typename, name in node.params.pairs:
+            # TODO: Parameters should not be indexed as local variables
+            param = self._declare_name(name.lexeme, typename.value_type, False)
+            self._current_scope()[name.lexeme] = param
+        for decl in node.block.declarations:
+            decl.accept(self)
+        self.end_block_stmt(node.block)
+        node.return_type = self.functions.pop()[1]
+        if node.return_type == ValueType.UNRESOLVED:
+            node.return_type = None
+
+    def visit_ret_stmt(self, node):
+        super().visit_ret_stmt(node)
+        if not self.functions:
+            emit_error(
+                f"Invalid return statement; must be inside a function! {token_info(node.token)}"
+            )()
+        return_type = self.functions[-1][1]
+        if return_type == ValueType.UNRESOLVED:
+            self.functions[-1][1] = node.value.value_type
+        else:
+            if return_type != node.value.value_type:
+                emit_error(
+                    f"Invalid return type! previously had {str(return_type)} but was given {str(node.value)} which is {str(node.value.value_type)}! {token_info(node.token)}"
+                )()
 
     def visit_expr(self, node):
         super().visit_expr(node)

@@ -4,6 +4,12 @@
 var cond = false or true;
 print "cond = " + str(cond);
 
+func testFunc(num a, str b) {
+
+    print str(a) + ", " + b;
+    return a + 1;
+}
+
 cond = false;
 print "cond = " + str(cond);
 

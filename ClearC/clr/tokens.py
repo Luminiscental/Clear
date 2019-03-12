@@ -73,7 +73,13 @@ class TokenType(Enum):
         return self.value
 
 
-Token = namedtuple("Token", "token_type lexeme line")
+class Token(namedtuple("Token", "token_type lexeme line")):
+    """
+    This class wraps a namedtuple to store information about a single token.
+    """
+
+    def __str__(self):
+        return self.lexeme
 
 
 KEYWORD_TYPES = {

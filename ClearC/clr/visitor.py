@@ -26,6 +26,21 @@ class AstVisitor:
         """
         node.value.accept(self)
 
+    def visit_param_list(self, node):
+        """
+        This function is called when visiting the parameters of a function, and by default does nothing, iterating onto the children.
+        """
+        for type_id, name in node.pairs:
+            type_id.accept(self)
+            name.accept(self)
+
+    def visit_func_decl(self, node):
+        """
+        This function is called when visiting a function declaration, and by default does nothing, iterating onto the child.
+        """
+        node.params.accept(self)
+        node.block.accept(self)
+
     def visit_print_stmt(self, node):
         """
         This function is called when visiting a print statement, and by default does nothing, iterating onto a child if it exists.
@@ -42,6 +57,12 @@ class AstVisitor:
             block.accept(self)
         if node.otherwise is not None:
             node.otherwise.accept(self)
+
+    def visit_ret_stmt(self, node):
+        """
+        This function is called when visiting a return statement, and by default does nothing, iterating onto the child.
+        """
+        node.value.accept(self)
 
     def visit_expr_stmt(self, node):
         """
@@ -93,6 +114,11 @@ class AstVisitor:
     def visit_ident_expr(self, node):
         """
         This function is called when visiting an identifier reference, and by default does nothing.
+        """
+
+    def visit_type(self, node):
+        """
+        This function is called when visiting a type reference, and by default does nothing.
         """
 
     def visit_builtin_expr(self, node):
