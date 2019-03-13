@@ -122,6 +122,16 @@ class Compiler(AstVisitor):
         super().visit_val_decl(node)
         self.program.define_name(node.resolved_name)
 
+    def visit_func_decl(self, node):
+        """
+        This function emits bytecode to define a function within the program.
+        """
+        super().visit_func_decl(node)
+        emit_error(
+            "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!smhhhhhhhhhhhhhhhhhhhh.......!!!!!!\n"
+            "(you didn't implement this)"
+        )()
+
     def visit_print_stmt(self, node):
         """
         This function emits bytecode to print the value of an expression;

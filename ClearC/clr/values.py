@@ -6,8 +6,8 @@ from enum import Enum
 
 DEBUG = False
 DEBUG_ASSEMBLE = False
-DEBUG_PPRINT = True
-DONT_COMPILE = True
+DEBUG_PPRINT = False
+DONT_COMPILE = False
 DONT_RESOLVE = False
 
 

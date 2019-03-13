@@ -7,10 +7,12 @@ print "cond = " + str(cond);
 func testFunc(num a, str b) {
 
     print str(a) + ", " + b;
-    if true {
+    if false {
         return "apple";
-    } else {
+    } else if true {
         return "pear";
+    } else {
+        return "banana";
     }
 }
 

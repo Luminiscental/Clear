@@ -28,9 +28,9 @@ class AstVisitor:
 
     def visit_func_decl(self, node):
         """
-        This function is called when visiting a function declaration, and by default does nothing, iterating onto the child.
+        This function is called when visiting a function declaration, and by default does nothing,
+        iterating onto the child.
         """
-        node.params.accept(self)
         node.block.accept(self)
 
     def visit_print_stmt(self, node):

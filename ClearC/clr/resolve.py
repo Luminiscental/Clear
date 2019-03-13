@@ -115,32 +115,24 @@ class Resolver(AstVisitor):
         function = FunctionResolver()
         for typename, name in node.params.pairs:
             function.add_param(name.lexeme, typename.value_type)
-        returned = False
         for decl in node.block.declarations:
             decl.accept(function)
-            if decl.returns:
-                if returned:
-                    emit_error(f"Unreachable code! {decl.get_info()}")()
-                else:
-                    returned = True
-        if not returned:
+            if node.block.returns:
+                emit_error(f"Unreachable code! {decl.get_info()}")()
+            elif decl.returns:
+                node.block.returns = True
+        if not node.block.returns:
             emit_error(f"Function may not return! {node.get_info()}")()
-        node.block.returns = True
         node.return_type = function.return_type
         if DEBUG:
             print(f"Function {node.get_info()} returns with {node.return_type}")
-        if node.return_type == ValueType.UNRESOLVED:
-            node.return_type = None
 
     def visit_if_stmt(self, node):
         super().visit_if_stmt(node)
-        for _, block in node.checks:
-            if block.returns:
-                node.returns = True
-            elif node.returns and not block.returns:
-                node.returns = False
         node.returns = (
-            node.returns and node.otherwise is not None and node.otherwise.returns
+            node.otherwise is not None
+            and node.otherwise.returns
+            and all(list(map(lambda check: check[1].returns, node.checks)))
         )
 
     def visit_ret_stmt(self, node):
