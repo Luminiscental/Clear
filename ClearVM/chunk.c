@@ -428,6 +428,24 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         } break;
 
+        case OP_BIND_PARAM: {
+
+            return indexInstruction("OP_BIND_PARAM", chunk, offset);
+
+        } break;
+
+        case OP_LOAD_PARAM: {
+
+            return indexInstruction("OP_LOAD_PARAM", chunk, offset);
+
+        } break;
+
+        case OP_START_FUNCTION: {
+
+            return uintInstruction("OP_START_FUNCTION", chunk, offset);
+
+        } break;
+
         default: {
 
             printf("\n");

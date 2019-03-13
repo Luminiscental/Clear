@@ -571,6 +571,48 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+            case OP_LOAD_PARAM: {
+
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index of constant to load!\n");
+                    return INTERPRET_ERR;
+                }
+
+                printf("|| Loading param %d\n", index);
+                return INTERPRET_ERR;
+
+            } break;
+
+            case OP_BIND_PARAM: {
+
+                uint8_t index;
+                if (readByte(vm, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index of param to load!\n");
+                    return INTERPRET_ERR;
+                }
+
+                printf("Binding param %d\n", index);
+                return INTERPRET_ERR;
+
+            } break;
+
+            case OP_START_FUNCTION: {
+
+                uint32_t size;
+                if (readUint(vm, &size) != INTERPRET_OK) {
+
+                    printf("|| Expected function size!\n");
+                    return INTERPRET_ERR;
+                }
+
+                printf("|| Writing function of size %d\n", size);
+                return INTERPRET_ERR;
+
+            } break;
+
                 // clang can't appreciate artistic preproc defs smh
                 /* clang-format off */
 
