@@ -5,7 +5,7 @@ or file format specification values.
 from enum import Enum
 
 DEBUG = False
-DEBUG_ASSEMBLE = False
+DEBUG_ASSEMBLE = True
 DEBUG_PPRINT = False
 DONT_COMPILE = False
 DONT_RESOLVE = False
@@ -67,7 +67,6 @@ class OpCode(Enum):
     LOAD_PARAM = 36
     BIND_PARAM = 37
     START_FUNCTION = 38
-    END_FUNCTION = 39
 
     def __str__(self):
         return "OP_" + self.name

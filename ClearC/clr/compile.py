@@ -67,9 +67,28 @@ class Program:
         self.code_list.append(opcode)
         self.code_list.append(resolved_name.index)
 
+    def begin_function(self):
+        """
+        This function emits bytecode for a function definition, returning
+        an index to later patch the length of the function.
+        """
+        self.code_list.append(OpCode.START_FUNCTION)
+        index = len(self.code_list)
+        self.code_list.append(ClrUint(0))
+        return index
+
+    def end_function(self, index):
+        """
+        This function accepts an index to the start of a function to patch
+        its length to end at the current position.
+        """
+        contained = self.code_list[index + 1 :]
+        offset = assembled_size(contained)
+        self.code_list[index] = ClrUint(offset)
+
     def begin_jump(self, conditional=False, leave_value=False):
         """
-        This function emits bytecode to emit an optionally conditional jump,
+        This function emits bytecode for an optionally conditional jump,
         returning an index to later patch the offset to jump by.
         """
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
@@ -125,10 +144,10 @@ class Compiler(AstVisitor):
 
     def visit_func_decl(self, node):
         # No super as we control loading param -> compiling block pipeline
-        function = FunctionCompiler(self.constants)
+        function = self.program.begin_function()
         for decl in node.block.declarations:
-            decl.accept(function)
-        self.program.code_list.extend(function.flush_code())
+            decl.accept(self)
+        self.program.end_function(function)
         self.program.define_name(node.resolved_name)
 
     def visit_print_stmt(self, node):
@@ -243,14 +262,3 @@ class Compiler(AstVisitor):
         self.program.end_jump(long_circuit)
         node.right.accept(self)
         self.program.end_jump(short_circuit, leave_value=True)
-
-
-class FunctionCompiler(Compiler):
-    def __init__(self, super_constants):
-        super().__init__()
-        self.constants = super_constants
-        self.program.simple_op(OpCode.START_FUNCTION)
-
-    def flush_code(self):
-        self.program.simple_op(OpCode.END_FUNCTION)
-        return self.program.flush()
