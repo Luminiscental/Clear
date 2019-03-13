@@ -115,18 +115,10 @@ class Compiler(AstVisitor):
         return self.constants.flush() + self.program.flush()
 
     def visit_val_decl(self, node):
-        """
-        This function emits bytecode to initialize a resolved name with
-        the value of a given expression.
-        """
         super().visit_val_decl(node)
         self.program.define_name(node.resolved_name)
 
     def visit_print_stmt(self, node):
-        """
-        This function emits bytecode to print the value of an expression;
-        or print a blank line if the expression is None.
-        """
         super().visit_print_stmt(node)
         if node.value is None:
             self.program.simple_op(OpCode.PRINT_BLANK)
@@ -134,11 +126,6 @@ class Compiler(AstVisitor):
             self.program.simple_op(OpCode.PRINT)
 
     def visit_if_stmt(self, node):
-        """
-        This function takes a list of condition expressions and blocks to execute
-        for each condition and emits bytecode to execute the first block with a
-        satisified condition or a final block otherwise.
-        """
         # No super because we manually iterate to put the jumps in the right place
         final_jumps = []
         for cond, block in node.checks:
@@ -153,30 +140,18 @@ class Compiler(AstVisitor):
             self.program.end_jump(final_jump)
 
     def visit_expr_stmt(self, node):
-        """
-        This function emits bytecode to evaluate and then drop the result of an expression.
-        """
         super().visit_expr_stmt(node)
         self.program.simple_op(OpCode.POP)
 
     def start_block_stmt(self, node):
-        """
-        This function emits bytecode to push a new scope.
-        """
         super().start_block_stmt(node)
         self.program.simple_op(OpCode.PUSH_SCOPE)
 
     def end_block_stmt(self, node):
-        """
-        This function emits bytecode to pop the current scope.
-        """
         super().end_block_stmt(node)
         self.program.simple_op(OpCode.POP_SCOPE)
 
     def visit_unary_expr(self, node):
-        """
-        This function emits bytecode to apply a unary operator to the result of an expression.
-        """
         super().visit_unary_expr(node)
         {
             TokenType.MINUS: lambda: self.program.simple_op(OpCode.NEGATE),
@@ -187,10 +162,6 @@ class Compiler(AstVisitor):
         )()
 
     def visit_binary_expr(self, node):
-        """
-        This function emits bytecode to apply a binary operator to the result
-        of two expressions.
-        """
         if node.operator.token_type == TokenType.EQUAL:
             # If it's an assignment don't call super as we don't want to evaluate the left hand side
             node.right.accept(self)
@@ -215,31 +186,19 @@ class Compiler(AstVisitor):
             )()
 
     def visit_constant_expr(self, node):
-        """
-        This function emits bytecode to load a value as a constant.
-        """
         super().visit_constant_expr(node)
         const_index = self.constants.add(node.value)
         self.program.load_constant(const_index)
 
     def visit_boolean_expr(self, node):
-        """
-        This function emits bytecode to load a boolean value.
-        """
         super().visit_boolean_expr(node)
         self.program.simple_op(OpCode.TRUE if node.value else OpCode.FALSE)
 
     def visit_ident_expr(self, node):
-        """
-        This function emits bytecode to load the value of a resolved identifier.
-        """
         super().visit_ident_expr(node)
         self.program.load_name(node.resolved_name)
 
     def visit_builtin_expr(self, node):
-        """
-        This function emits bytecode to apply a builtin function to the value of an expression.
-        """
         super().visit_builtin_expr(node)
         {
             TokenType.TYPE: lambda: self.program.simple_op(OpCode.TYPE),
@@ -253,10 +212,6 @@ class Compiler(AstVisitor):
         )()
 
     def visit_and_expr(self, node):
-        """
-        This funcction emits bytecode to apply the logical "and" operator to the result of
-        two expressions.
-        """
         # No super because we manually evaluate the sides to put the jumps in the right place
         node.left.accept(self)
         short_circuit = self.program.begin_jump(conditional=True)
@@ -264,10 +219,6 @@ class Compiler(AstVisitor):
         self.program.end_jump(short_circuit, leave_value=True)
 
     def visit_or_expr(self, node):
-        """
-        This funcction emits bytecode to apply the logical "or" operator to the result of
-        two expressions.
-        """
         # No super because we manually evaluate the sides to put the jumps in the right place
         node.left.accept(self)
         long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
