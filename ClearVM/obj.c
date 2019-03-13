@@ -189,6 +189,23 @@ Value concatStrings(VM *vm, ObjString *first, ObjString *second) {
     return makeString(vm, newLength, result);
 }
 
+Value makeFunction(VM *vm, uint8_t *code, size_t size) {
+
+    ObjFunction *objFunc = ALLOCATE_OBJ(vm, ObjFunction, OBJ_FUNCTION);
+
+    objFunc->code = code;
+    objFunc->size = size;
+    objFunc->ip = code;
+
+    Value result;
+
+    result.type = VAL_OBJ;
+    result.hash = (size_t)objFunc;
+    result.as.obj = (Obj *)objFunc;
+
+    return result;
+}
+
 bool isObjType(Value a, ObjType type) {
 
     return a.type == VAL_OBJ && a.as.obj->type == type;

@@ -608,8 +608,9 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                printf("|| Writing function of size %d\n", size);
-                return INTERPRET_ERR;
+                Value function = makeFunction(vm, vm->ip, (size_t)size);
+                vm->ip += size;
+                push(vm, function);
 
             } break;
 

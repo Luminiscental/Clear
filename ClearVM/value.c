@@ -125,6 +125,12 @@ bool valuesEqual(Value a, Value b) {
                     return a.as.obj == b.as.obj;
 
                 } break;
+
+                case OBJ_FUNCTION: {
+
+                    return a.as.obj == b.as.obj;
+
+                } break;
             }
 
         } break;
@@ -187,6 +193,13 @@ void printValue(Value value, bool endLine) {
 
                     ObjString *strObj = (ObjString *)value.as.obj;
                     printf("%s", strObj->chars);
+
+                } break;
+
+                case OBJ_FUNCTION: {
+
+                    ObjFunction *funcObj = (ObjFunction *)value.as.obj;
+                    printf("%p", funcObj);
 
                 } break;
             }
