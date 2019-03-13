@@ -106,6 +106,19 @@ class Constants:
         self.count = 0
         self.code_list = []
 
+    def __iter__(self):
+        return iter(self.values)
+
+    def __next__(self):
+        return next(self.values)
+
+    def add_all(self, other):
+        """
+        This function takes an iterator and adds all of the values within it.
+        """
+        for item in other:
+            self.add(item)
+
     def add(self, value):
         """
         This function takes a constant value and returns an index to it within the list;

@@ -29,8 +29,8 @@ class ValueType(Enum):
 
 ResolvedName = namedtuple(
     "ResolvedName",
-    ("value_type", "index", "is_global", "is_mutable"),
-    defaults=(ValueType.UNRESOLVED, -1, False, False),
+    ("value_type", "index", "is_global", "is_mutable", "is_param"),
+    defaults=(ValueType.UNRESOLVED, -1, False, False, False),
 )
 
 
@@ -111,7 +111,9 @@ class Resolver(AstVisitor):
         node.resolved_name = result
 
     def visit_func_decl(self, node):
-        self._declare_name(node.name.lexeme, ValueType.FUNCTION, False)
+        node.resolved_name = self._declare_name(
+            node.name.lexeme, ValueType.FUNCTION, False
+        )
         function = FunctionResolver()
         for typename, name in node.params.pairs:
             function.add_param(name.lexeme, typename.value_type)
@@ -266,7 +268,8 @@ class FunctionResolver(Resolver):
         """
         This function adds a given parameter to the context of this resolver.
         """
-        self.params.append((name, value_type))
+        index = len(self.params)
+        self.params.append((name, value_type, index))
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
@@ -284,9 +287,11 @@ class FunctionResolver(Resolver):
         try:
             super().visit_ident_expr(node)
         except ClrCompileError:
-            for param_name, param_type in self.params:
+            for param_name, param_type, param_index in self.params:
                 if param_name == node.name.lexeme:
-                    node.resolved_name = ResolvedName(value_type=param_type)
+                    node.resolved_name = ResolvedName(
+                        value_type=param_type, index=param_index, is_param=True
+                    )
                     break
             else:
                 emit_error(f"Reference to undefined identifier! {node.get_info()}")()
