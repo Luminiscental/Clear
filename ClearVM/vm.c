@@ -97,7 +97,8 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out) {
 
 void initVM(VM *vm) {
 
-    resetStack(vm);
+    vm->frameDepth = 0;
+    resetStack(vm->frames);
 
     vm->objects = NULL;
     initTable(&vm->strings);
@@ -106,36 +107,38 @@ void initVM(VM *vm) {
     initLocalState(&vm->localState);
 }
 
-void resetStack(VM *vm) { vm->stackTop = vm->stack; }
+void resetStack(CallFrame *frame) { frame->stackTop = frame->stack; }
 
 InterpretResult push(VM *vm, Value value) {
 
-    if (vm->stackTop >= vm->stack + STACK_MAX - 1) {
+    CallFrame *frame = &vm->frames[vm->frameDepth];
+    if (frame->stackTop >= frame->stack + STACK_MAX - 1) {
 
         printf("|| Stack overflow!\n");
         return INTERPRET_ERR;
 
     } else {
 
-        *vm->stackTop = value;
-        vm->stackTop++;
+        *frame->stackTop = value;
+        frame->stackTop++;
         return INTERPRET_OK;
     }
 }
 
 InterpretResult pop(VM *vm, Value *out) {
 
-    if (vm->stackTop <= vm->stack) {
+    CallFrame *frame = &vm->frames[vm->frameDepth];
+    if (frame->stackTop <= frame->stack) {
 
         printf("|| Stack underflow!\n");
         return INTERPRET_ERR;
 
     } else {
 
-        vm->stackTop--;
+        frame->stackTop--;
 
         if (out != NULL)
-            *out = *vm->stackTop;
+            *out = *frame->stackTop;
 
         return INTERPRET_OK;
     }
@@ -143,7 +146,8 @@ InterpretResult pop(VM *vm, Value *out) {
 
 InterpretResult peek(VM *vm, Value *out) {
 
-    if (vm->stackTop <= vm->stack) {
+    CallFrame *frame = &vm->frames[vm->frameDepth];
+    if (frame->stackTop <= frame->stack) {
 
         printf("|| Stack underflow!\n");
         return INTERPRET_ERR;
@@ -151,7 +155,7 @@ InterpretResult peek(VM *vm, Value *out) {
     } else {
 
         if (out != NULL)
-            *out = vm->stackTop[-1];
+            *out = frame->stackTop[-1];
 
         return INTERPRET_OK;
     }
@@ -167,21 +171,24 @@ void freeVM(VM *vm) {
 InterpretResult interpret(VM *vm, Chunk *chunk) {
 
     vm->chunk = chunk;
-    vm->ip = vm->chunk->code + vm->chunk->start;
+    vm->frameDepth = 0;
+    CallFrame *frame = &vm->frames[0];
+    frame->ip = vm->chunk->code + vm->chunk->start;
 
     return run(vm);
 }
 
 static InterpretResult readByte(VM *vm, uint8_t *out) {
 
-    if (1 + vm->ip - vm->chunk->code > vm->chunk->count) {
+    CallFrame *frame = &vm->frames[0];
+    if (1 + frame->ip - vm->chunk->code > vm->chunk->count) {
 
         printf("|| Ran out of bytes!\n");
         return INTERPRET_ERR;
 
     } else {
 
-        *out = *vm->ip++;
+        *out = *frame->ip++;
         return INTERPRET_OK;
     }
 }
@@ -201,15 +208,16 @@ static InterpretResult readBoolean(VM *vm, Value *out) {
 
 static InterpretResult readUint(VM *vm, uint32_t *out) {
 
-    if (sizeof(uint32_t) + vm->ip - vm->chunk->code > vm->chunk->count) {
+    CallFrame *frame = &vm->frames[0];
+    if (sizeof(uint32_t) + frame->ip - vm->chunk->code > vm->chunk->count) {
 
         printf("|| Ran out of bytes!\n");
         return INTERPRET_ERR;
     }
 
-    uint32_t *read = (uint32_t *)vm->ip;
+    uint32_t *read = (uint32_t *)frame->ip;
 
-    vm->ip += sizeof(uint32_t);
+    frame->ip += sizeof(uint32_t);
 
     if (out != NULL)
         *out = *read;
@@ -262,9 +270,11 @@ static InterpretResult readUint(VM *vm, uint32_t *out) {
 
 static void printStack(VM *vm) {
 
+    CallFrame *frame = &vm->frames[vm->frameDepth];
+
     printf("          ");
 
-    for (Value *slot = vm->stack; slot < vm->stackTop; slot++) {
+    for (Value *slot = frame->stack; slot < frame->stackTop; slot++) {
 
         printf("[ ");
         printValue(*slot, false);
@@ -283,7 +293,8 @@ static InterpretResult jump(VM *vm) {
         return INTERPRET_ERR;
     }
 
-    vm->ip += offset;
+    CallFrame *frame = &vm->frames[vm->frameDepth];
+    frame->ip += offset;
 
     return INTERPRET_OK;
 }
@@ -299,7 +310,8 @@ static InterpretResult jumpIfFalse(VM *vm, bool condition) {
 
     if (!condition) {
 
-        vm->ip += offset;
+        CallFrame *frame = &vm->frames[vm->frameDepth];
+        frame->ip += offset;
     }
 
     return INTERPRET_OK;
@@ -307,7 +319,8 @@ static InterpretResult jumpIfFalse(VM *vm, bool condition) {
 
 InterpretResult run(VM *vm) {
 
-    while (vm->ip - vm->chunk->code < vm->chunk->count) {
+    CallFrame *frame = &vm->frames[vm->frameDepth];
+    while (frame->ip - vm->chunk->code < vm->chunk->count) {
 
 #ifdef DEBUG_STACK
 
@@ -478,13 +491,14 @@ InterpretResult run(VM *vm) {
 
                 addLocal(&vm->localState, index);
 
-                if (index == vm->stackTop - vm->stack) {
+                CallFrame *frame = &vm->frames[vm->frameDepth];
+                if (index == frame->stackTop - frame->stack) {
 
                     push(vm, val);
 
-                } else if (index < vm->stackTop - vm->stack) {
+                } else if (index < frame->stackTop - frame->stack) {
 
-                    vm->stack[index] = val;
+                    frame->stack[index] = val;
 
                 } else {
 
@@ -503,7 +517,8 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                Value val = vm->stack[index];
+                CallFrame *frame = &vm->frames[vm->frameDepth];
+                Value val = frame->stack[index];
 
                 if (push(vm, val) != INTERPRET_OK) {
 
@@ -521,8 +536,12 @@ InterpretResult run(VM *vm) {
 
             case OP_RETURN: {
 
-                // TODO:
-                return INTERPRET_OK;
+                if (vm->frameDepth == 0) {
+
+                    return INTERPRET_OK;
+                }
+
+                vm->frameDepth--;
 
             } break;
 
@@ -608,8 +627,9 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                Value function = makeFunction(vm, vm->ip, (size_t)size);
-                vm->ip += size;
+                CallFrame *frame = &vm->frames[vm->frameDepth];
+                Value function = makeFunction(vm, frame->ip, (size_t)size);
+                frame->ip += size;
                 push(vm, function);
 
             } break;
