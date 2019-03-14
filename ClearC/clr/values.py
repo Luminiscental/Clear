@@ -63,10 +63,11 @@ class OpCode(Enum):
     # Control flow
     JUMP = 34
     JUMP_IF_NOT = 35
+    LOOP = 36
     # Functions
-    LOAD_PARAM = 36
-    START_FUNCTION = 37
-    CALL = 38
+    LOAD_PARAM = 37
+    START_FUNCTION = 38
+    CALL = 39
 
     def __str__(self):
         return "OP_" + self.name

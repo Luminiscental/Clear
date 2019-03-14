@@ -298,12 +298,26 @@ static void printStack(CallFrame *frame) {
     printf("\n");
 }
 
+static InterpretResult loop(VM *vm, CallFrame *frame) {
+
+    uint32_t offset;
+    if (readUint(vm, frame, &offset) != INTERPRET_OK) {
+
+        printf("|| Could not read offset to loop by!\n");
+        return INTERPRET_ERR;
+    }
+
+    frame->ip -= offset;
+
+    return INTERPRET_OK;
+}
+
 static InterpretResult jump(VM *vm, CallFrame *frame) {
 
     uint32_t offset;
     if (readUint(vm, frame, &offset) != INTERPRET_OK) {
 
-        printf("|| Could not read offset to jump to!\n");
+        printf("|| Could not read offset to jump by!\n");
         return INTERPRET_ERR;
     }
 
@@ -317,7 +331,7 @@ static InterpretResult jumpIfFalse(VM *vm, CallFrame *frame, bool condition) {
     uint32_t offset;
     if (readUint(vm, frame, &offset) != INTERPRET_OK) {
 
-        printf("|| Could not read offset to jump to!\n");
+        printf("|| Could not read offset to jump by!\n");
         return INTERPRET_ERR;
     }
 
@@ -359,6 +373,16 @@ InterpretResult run(VM *vm) {
         }
 
         switch (instruction) {
+
+            case OP_LOOP: {
+
+                if (loop(vm, frame) != INTERPRET_OK) {
+
+                    printf("|| Could not loop!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
 
             case OP_JUMP: {
 

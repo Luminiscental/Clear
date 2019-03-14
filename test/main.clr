@@ -1,11 +1,28 @@
 
-func adder(num a, num b) {
-    return a + b;
+func printFac(int n) {
+    func fac(int n) {
+        var counter = n;
+        var result = 1;
+        while counter > 1i {
+            result = result * num(counter);
+            counter = counter - 1i;
+        }
+        return result;
+    }
+    return str(n) + "! = " + str(fac(n));
 }
 
-func __le__(int a, int b) {
-    return a <= b;
+val MAX = 10i;
+var i = 0i;
+while i < MAX {
+    print printFac(i);
+    i = i + 1i;
 }
 
-print "2 + 3 = " + str(adder(2, 3));
-print "5 <= 7 is " + str(__le__(5i, 7i));
+var first = true;
+while {
+    if first {
+        print "goodbye...";
+    }
+    first = false;
+}

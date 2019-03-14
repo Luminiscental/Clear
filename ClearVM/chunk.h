@@ -63,11 +63,12 @@ typedef enum {
     // Control flow
     OP_JUMP = 34,
     OP_JUMP_IF_NOT = 35,
+    OP_LOOP = 36,
 
     // Functions
-    OP_LOAD_PARAM = 36,
-    OP_START_FUNCTION = 37,
-    OP_CALL = 38
+    OP_LOAD_PARAM = 37,
+    OP_START_FUNCTION = 38,
+    OP_CALL = 39
 
 } OpCode;
 

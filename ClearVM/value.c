@@ -175,7 +175,10 @@ void printValue(Value value, bool endLine) {
 
         case VAL_NUMBER: {
 
-            printf("%g", value.as.number);
+            size_t length;
+            char *rawString = makeRawStringFromNumber(value.as.number, &length);
+            printf("%s", rawString);
+            FREE_ARRAY(char, rawString, length);
 
         } break;
 

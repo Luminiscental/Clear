@@ -76,10 +76,10 @@ class Parser:
         token types and if so advances the parser, otherwise calling the passed
         error function.
         """
-        if not possibilities:
-            err()
-        elif not self.match(possibilities[0]):
-            self.consume_one(possibilities[1:], err)
+        for possibility in possibilities:
+            if self.match(possibility):
+                return
+        err()
 
 
 class Precedence(Enum):
@@ -251,8 +251,7 @@ class AstValDecl(AstNode, AstVisitable):
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume_one(
-            [TokenType.VAL, TokenType.VAR],
-            parse_error("Expected value declaration!", parser),
+            VAL_TOKENS, parse_error("Expected value declaration!", parser)
         )
         mutable = parser.get_prev().token_type == TokenType.VAR
         parser.consume(
@@ -357,6 +356,7 @@ class AstStmt(AstNode, AstVisitable):
     AstStmt : AstPrintStmt
             | AstBlock
             | AstIfStmt
+            | AstWhileStmt
             | AstExprStmt
             | AstRetStmt
             ;
@@ -370,6 +370,8 @@ class AstStmt(AstNode, AstVisitable):
             self.value = AstBlock(parser)
         elif parser.check(TokenType.IF):
             self.value = AstIfStmt(parser)
+        elif parser.check(TokenType.WHILE):
+            self.value = AstWhileStmt(parser)
         elif parser.check(TokenType.RETURN):
             self.value = AstRetStmt(parser)
         else:
@@ -450,6 +452,33 @@ class AstIfStmt(AstNode, AstVisitable):
 
     def accept(self, visitor):
         visitor.visit_if_stmt(self)
+
+
+class AstWhileStmt(AstNode, AstVisitable):
+    """
+    This class is an AST node for a while statement with an optional condition and an executing block.
+    It represents the following grammar rule:
+
+    AstWhileStmt: 'while' AstExpr? AstBlock ;
+    """
+
+    def __init__(self, parser):
+        # TODO: Break statements
+        super().__init__(parser)
+        parser.consume(
+            TokenType.WHILE, parse_error("Expected while statement!", parser)
+        )
+        if not parser.check(TokenType.LEFT_BRACE):
+            self.condition = AstExpr(parser)
+        else:
+            self.condition = None
+        self.block = AstBlock(parser)
+
+    def __str__(self):
+        return "while " + str(self.condition) + " " + str(self.block)
+
+    def accept(self, visitor):
+        visitor.visit_while_stmt(self)
 
 
 class AstRetStmt(AstNode, AstVisitable):
@@ -586,10 +615,7 @@ class AstUnary(AstNode, AstVisitable):
 
     def __init__(self, parser):
         super().__init__(parser)
-        parser.consume_one(
-            [TokenType.MINUS, TokenType.BANG],
-            parse_error("Expected unary operator!", parser),
-        )
+        parser.consume_one(UNARY_OPS, parse_error("Expected unary operator!", parser))
         self.operator = parser.get_prev()
         self.target = AstExpr(parser, precedence=Precedence.UNARY)
 
@@ -635,22 +661,7 @@ class AstBinary(AstNode, AstVisitable):
     def __init__(self, left, parser):
         super().__init__(parser)
         self.left = left
-        parser.consume_one(
-            [
-                TokenType.PLUS,
-                TokenType.MINUS,
-                TokenType.STAR,
-                TokenType.SLASH,
-                TokenType.EQUAL_EQUAL,
-                TokenType.BANG_EQUAL,
-                TokenType.LESS,
-                TokenType.GREATER_EQUAL,
-                TokenType.GREATER,
-                TokenType.LESS_EQUAL,
-                TokenType.EQUAL,
-            ],
-            parse_error("Expected binary operator!", parser),
-        )
+        parser.consume_one(BINARY_OPS, parse_error("Expected binary operator!", parser))
         self.operator = parser.get_prev()
         self.token = self.operator
         prec = get_rule(self.operator).precedence
@@ -724,10 +735,7 @@ class AstBoolean(AstNode, AstVisitable):
 
     def __init__(self, parser):
         super().__init__(parser)
-        parser.consume_one(
-            [TokenType.TRUE, TokenType.FALSE],
-            parse_error("Expected boolean literal!", parser),
-        )
+        parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
         self.value = parser.get_prev().token_type == TokenType.TRUE
         self.value_type = ValueType.BOOL
 
@@ -765,17 +773,9 @@ class AstType(AstNode, AstVisitable):
 
     def __init__(self, parser):
         super().__init__(parser)
-        parser.consume_one(
-            [TokenType.INT, TokenType.BOOL, TokenType.NUM, TokenType.STR],
-            parse_error("Expected builtin function!", parser),
-        )
+        parser.consume_one(TYPES, parse_error("Expected type function!", parser))
         self.value = parser.get_prev()
-        self.value_type = {
-            TokenType.INT: ValueType.INT,
-            TokenType.BOOL: ValueType.BOOL,
-            TokenType.NUM: ValueType.NUM,
-            TokenType.STR: ValueType.STR,
-        }[self.value.token_type]
+        self.value_type = TYPES[self.value.token_type]
 
     def __str__(self):
         return str(self.value.token_type)
@@ -791,25 +791,10 @@ class AstBuiltin(AstNode, AstVisitable):
 
     def __init__(self, parser):
         super().__init__(parser)
-        parser.consume_one(
-            [
-                TokenType.TYPE,
-                TokenType.INT,
-                TokenType.BOOL,
-                TokenType.NUM,
-                TokenType.STR,
-            ],
-            parse_error("Expected builtin function!", parser),
-        )
+        parser.consume_one(BUILTINS, parse_error("Expected builtin function!", parser))
         self.function = parser.get_prev()
         self.target = AstGrouping(parser)
-        self.value_type = {
-            TokenType.TYPE: ValueType.STR,
-            TokenType.INT: ValueType.INT,
-            TokenType.BOOL: ValueType.BOOL,
-            TokenType.NUM: ValueType.NUM,
-            TokenType.STR: ValueType.STR,
-        }[self.function.token_type]
+        self.value_type = BUILTINS[self.function.token_type]
 
     def __str__(self):
         return str(self.function.token_type) + str(self.target)
@@ -861,6 +846,38 @@ class AstOr(AstNode, AstVisitable):
 
 
 LEFT_ASSOC_OPS = {TokenType.EQUAL}
+
+UNARY_OPS = {TokenType.MINUS, TokenType.BANG}
+
+VAL_TOKENS = {TokenType.VAL, TokenType.VAR}
+
+BOOLEANS = {TokenType.TRUE, TokenType.FALSE}
+TYPES = {
+    TokenType.INT: ValueType.INT,
+    TokenType.BOOL: ValueType.BOOL,
+    TokenType.NUM: ValueType.NUM,
+    TokenType.STR: ValueType.STR,
+}
+BINARY_OPS = {
+    TokenType.PLUS,
+    TokenType.MINUS,
+    TokenType.STAR,
+    TokenType.SLASH,
+    TokenType.EQUAL_EQUAL,
+    TokenType.BANG_EQUAL,
+    TokenType.LESS,
+    TokenType.GREATER_EQUAL,
+    TokenType.GREATER,
+    TokenType.LESS_EQUAL,
+    TokenType.EQUAL,
+}
+BUILTINS = {
+    TokenType.TYPE: ValueType.STR,
+    TokenType.INT: ValueType.INT,
+    TokenType.BOOL: ValueType.BOOL,
+    TokenType.NUM: ValueType.NUM,
+    TokenType.STR: ValueType.STR,
+}
 
 
 PRATT_TABLE = defaultdict(

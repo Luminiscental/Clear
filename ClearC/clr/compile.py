@@ -115,6 +115,28 @@ class Program:
         if conditional and not leave_value:
             self.code_list.append(OpCode.POP)
 
+    def begin_loop(self):
+        """
+        This function records an index to later loop back to.
+        """
+        index = len(self.code_list)
+        if DEBUG:
+            print(f"Loop checkpoint for {index} picked")
+        return index
+
+    def loop_back(self, index):
+        """
+        This function emits bytecode to loop back to a previously recorded index.
+        """
+        self.code_list.append(OpCode.LOOP)
+        offset_index = len(self.code_list)
+        self.code_list.append(ClrUint(0))
+        contained = self.code_list[index:]
+        offset = ClrUint(assembled_size(contained))
+        if DEBUG:
+            print(f"Loop back to {index} set with offset {offset}")
+        self.code_list[offset_index] = offset
+
     def flush(self):
         """
         This function returns the list of bytecode that has been emitted.
@@ -170,6 +192,17 @@ class Compiler(AstVisitor):
             node.otherwise.accept(self)
         for final_jump in final_jumps:
             self.program.end_jump(final_jump)
+
+    def visit_while_stmt(self, node):
+        # No super because the loop starts before checking the condition
+        loop = self.program.begin_loop()
+        if node.condition is not None:
+            node.condition.accept(self)
+            skip_jump = self.program.begin_jump(conditional=True)
+        node.block.accept(self)
+        self.program.loop_back(loop)
+        if node.condition is not None:
+            self.program.end_jump(skip_jump)
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)

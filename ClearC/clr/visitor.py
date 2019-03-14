@@ -50,6 +50,14 @@ class AstVisitor:
         if node.otherwise is not None:
             node.otherwise.accept(self)
 
+    def visit_while_stmt(self, node):
+        """
+        This function is called when visiting an if statement, and by default does nothing, iterating onto the children.
+        """
+        if node.condition is not None:
+            node.condition.accept(self)
+        node.block.accept(self)
+
     def visit_ret_stmt(self, node):
         """
         This function is called when visiting a return statement, and by default does nothing, iterating onto the child.

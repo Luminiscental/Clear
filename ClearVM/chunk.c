@@ -236,6 +236,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
     switch (instruction) {
 
+        case OP_LOOP: {
+
+            return uintInstruction("OP_LOOP", chunk, offset);
+
+        } break;
+
         case OP_JUMP: {
 
             return uintInstruction("OP_JUMP", chunk, offset);

@@ -30,6 +30,7 @@ typedef struct sObjString {
 
 } ObjString;
 
+char *makeRawStringFromNumber(double number, size_t *lengthOut);
 Value makeStringFromLiteral(VM *vm, const char *string);
 Value makeStringFromInteger(VM *vm, int32_t integer);
 Value makeStringFromNumber(VM *vm, double number);

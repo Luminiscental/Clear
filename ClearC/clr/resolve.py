@@ -77,10 +77,9 @@ class Resolver(AstVisitor):
         super().end_block_stmt(node)
         if self.level > 0:
             popped = self._current_scope()
-            if popped:
-                self.local_index = min(
-                    [r.index for r in popped.values() if r.index != -1]
-                )
+            popped_indices = [r.index for r in popped.values() if r.index != -1]
+            if popped_indices:
+                self.local_index = min(popped_indices)
         del self.scopes[self.level]
         self.level -= 1
         for decl in node.declarations:

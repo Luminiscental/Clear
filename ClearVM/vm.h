@@ -53,6 +53,8 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out);
 
 typedef struct sCallFrame {
 
+    // TODO: Upvalues
+
     Value *params;
     size_t arity;
 
@@ -71,6 +73,7 @@ typedef struct sVM {
 
     Chunk *chunk;
     Table strings;
+    // TODO: GC
     Obj *objects;
     GlobalState globalState;
 
