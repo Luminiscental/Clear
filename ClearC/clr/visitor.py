@@ -82,24 +82,6 @@ class AstVisitor:
         nothing.
         """
 
-    def visit_decl(self, node):
-        """
-        This function is called after visiting a declaration root, and by default does nothing, iterating onto the child.
-        """
-        node.value.accept(self)
-
-    def visit_stmt(self, node):
-        """
-        This function is called after visiting a statement root, and by default does nothing, iterating onto the child.
-        """
-        node.value.accept(self)
-
-    def visit_expr(self, node):
-        """
-        This function is called after visiting an expression root, and by default does nothing, iterating onto the child.
-        """
-        node.value.accept(self)
-
     def visit_unary_expr(self, node):
         """
         This function is called when visiting a unary expression, and by default does nothing, iterating onto the child.

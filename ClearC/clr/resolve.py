@@ -149,18 +149,6 @@ class Resolver(AstVisitor):
                 f"Invalid return statement; must be inside a function! {node.get_info()}"
             )()
 
-    def visit_decl(self, node):
-        super().visit_decl(node)
-        node.returns = node.value.returns
-
-    def visit_stmt(self, node):
-        super().visit_decl(node)
-        node.returns = node.value.returns
-
-    def visit_expr(self, node):
-        super().visit_expr(node)
-        node.value_type = node.value.value_type
-
     def visit_unary_expr(self, node):
         super().visit_unary_expr(node)
         if (
