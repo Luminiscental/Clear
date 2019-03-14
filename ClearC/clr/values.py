@@ -5,9 +5,9 @@ or file format specification values.
 from enum import Enum
 
 DEBUG = False
-DEBUG_ASSEMBLE = True
+DEBUG_ASSEMBLE = False
 DEBUG_PPRINT = False
-DONT_COMPILE = False
+DONT_COMPILE = True
 DONT_RESOLVE = False
 
 

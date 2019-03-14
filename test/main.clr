@@ -3,7 +3,11 @@ func testFunc(num a) {
     return 2;
 }
 
+var number = "3";
+
 {
     val x = 7i;
     func something() { return "pear"; }
+    number = something();
+    print testFunc(7.35);
 }

@@ -105,6 +105,14 @@ class AstVisitor:
         node.left.accept(self)
         node.right.accept(self)
 
+    def visit_call_expr(self, node):
+        """
+        This function is called when visiting a call expression, and by default does nothing, iterating onto the children.
+        """
+        node.target.accept(self)
+        for expr in node.arguments:
+            expr.accept(self)
+
     def visit_constant_expr(self, node):
         """
         This function is called when visiting a constant, and by default does nothing.

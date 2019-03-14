@@ -29,8 +29,8 @@ class ValueType(Enum):
 
 ResolvedName = namedtuple(
     "ResolvedName",
-    ("value_type", "index", "is_global", "is_mutable", "is_param"),
-    defaults=(ValueType.UNRESOLVED, -1, False, False, False),
+    ("value_type", "index", "is_global", "is_mutable", "is_param", "func_decl"),
+    defaults=(ValueType.UNRESOLVED, -1, False, False, False, None),
 )
 
 
@@ -89,7 +89,7 @@ class Resolver(AstVisitor):
             elif decl.returns:
                 node.returns = True
 
-    def _declare_name(self, name, value_type, is_mutable):
+    def _declare_name(self, name, value_type, is_mutable=False, func_decl=None):
         prev = self._lookup_name(name)
         if prev.value_type == ValueType.UNRESOLVED:
             if self.level > 0:
@@ -100,19 +100,25 @@ class Resolver(AstVisitor):
                 self.global_index += 1
         else:
             idx = prev.index
-        return ResolvedName(value_type, idx, self.level == 0, is_mutable)
+        result = ResolvedName(
+            value_type=value_type,
+            index=idx,
+            is_global=self.level == 0,
+            is_mutable=is_mutable,
+            func_decl=func_decl,
+        )
+        self._current_scope()[name] = result
+        return result
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
-        result = self._declare_name(
+        node.resolved_name = self._declare_name(
             node.name.lexeme, node.value.value_type, node.resolved_name.is_mutable
         )
-        self._current_scope()[node.name.lexeme] = result
-        node.resolved_name = result
 
     def visit_func_decl(self, node):
         node.resolved_name = self._declare_name(
-            node.name.lexeme, ValueType.FUNCTION, False
+            name=node.name.lexeme, value_type=ValueType.FUNCTION, func_decl=node
         )
         function = FunctionResolver()
         for typename, name in node.params.pairs:
@@ -200,6 +206,25 @@ class Resolver(AstVisitor):
                 f"Unassignable expression {str(node.left)}! Attempt to assign at {node.get_info()}"
             )()
         node.value_type = node.left.value_type
+
+    def visit_call_expr(self, node):
+        super().visit_call_expr(node)
+        if node.target.value_type != ValueType.FUNCTION:
+            emit_error(
+                f"Attempt to call a non-callable object {str(node.target)}! Must be a function {node.get_info()}"
+            )()
+        function = node.target.resolved_name.func_decl
+        if len(function.params.pairs) != len(node.arguments):
+            emit_error(
+                f"Incorrect number of parameters! Expected {len(function.params.pairs)} found {len(node.arguments)}! {node.get_info()}"
+            )()
+        for i, pair in enumerate(function.params.pairs):
+            arg = node.arguments[i]
+            if pair[0].value_type != arg.value_type:
+                emit_error(
+                    f"Incorrect argument type at position {i}! Expected {pair[0].value_type} but found {arg.value_type}! {node.get_info()}"
+                )()
+        node.value_type = function.return_type
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
