@@ -5,7 +5,7 @@ from enum import Enum
 from collections import namedtuple, defaultdict
 from clr.tokens import TokenType, token_info, tokenize
 from clr.errors import parse_error, emit_error
-from clr.values import DEBUG, DEBUG_PPRINT, DONT_RESOLVE
+from clr.values import DEBUG, DEBUG_PPRINT, DONT_RESOLVE, DEBUG_REPR
 from clr.constants import ClrInt, ClrNum, ClrStr
 from clr.compile import Compiler
 from clr.resolve import Resolver, ValueType, ResolvedName
@@ -153,6 +153,9 @@ class AstNode:
         self.value_type = ValueType.UNRESOLVED
         self.is_assignable = False
 
+    def __repr__(self):
+        return str(self)
+
     def get_info(self):
         """
         This method returns info about the start of this node.
@@ -178,9 +181,21 @@ class Ast(AstNode, AstVisitable):
                 print("Resolving:")
             resolver = Resolver()
             self.accept(resolver)
+        if DEBUG_REPR:
+            print("AST representation:")
+            representation = repr(self)
+            for line in representation.splitlines():
+                if not line.isspace():
+                    print(line)
         if DEBUG_PPRINT:
             print("AST pretty print:")
             print(str(self))
+
+    def __repr__(self):
+        result = "Ast(\n"
+        result += _indent(str(self.children).replace(",", ",\n"))
+        result += "\n)"
+        return result
 
     def __str__(self):
         return "\n".join(map(str, self.children))
@@ -259,6 +274,14 @@ class AstValDecl(AstNode, AstVisitable):
         )
         self.resolved_name = ResolvedName(is_mutable=mutable)
 
+    def __repr__(self):
+        result = "AstValDecl(\n"
+        result += _indent(f"mutable={self.resolved_name.is_mutable},\n")
+        result += _indent(f"name={self.name},\n")
+        result += _indent(f"value={repr(self.value)}\n")
+        result += ")\n"
+        return result
+
     def __str__(self):
         return (
             ("var " if self.resolved_name.is_mutable else "val ")
@@ -299,6 +322,12 @@ class AstParams(AstNode):
                     parse_error("Expected comma to delimit parameters!", parser),
                 )
 
+    def __repr__(self):
+        result = "AstParams(\n"
+        result += _indent(str(self.pairs).replace(",", ",\n"))
+        result += "\n)"
+        return result
+
     def __str__(self):
         return (
             "("
@@ -329,6 +358,14 @@ class AstFuncDecl(AstNode, AstVisitable):
         self.block = AstBlock(parser)
         self.resolved_name = ResolvedName()
         self.return_type = ValueType.UNRESOLVED
+
+    def __repr__(self):
+        result = "AstFuncDecl(\n"
+        result += _indent(f"name={self.name},\n")
+        result += _indent(f"param={self.params},\n")
+        result += _indent(f"body={repr(self.block)}\n")
+        result += ")"
+        return result
 
     def __str__(self):
         return "func " + str(self.name) + str(self.params) + " " + str(self.block)
@@ -387,6 +424,12 @@ class AstPrintStmt(AstNode, AstVisitable):
         else:
             self.value = None
 
+    def __repr__(self):
+        result = "AstPrintStmt("
+        result += _indent(f"value={repr(self.value)}\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return "print " + str(self.value) + ";"
 
@@ -415,6 +458,13 @@ class AstIfStmt(AstNode, AstVisitable):
             else:
                 self.otherwise = AstBlock(parser)
                 break
+
+    def __repr__(self):
+        result = "AstIfStmt(\n"
+        result += _indent(f"checks={self.checks},\n")
+        result += _indent(f"otherwise={self.otherwise}\n")
+        result += ")"
+        return result
 
     def __str__(self):
         result = ""
@@ -454,6 +504,13 @@ class AstWhileStmt(AstNode, AstVisitable):
             self.condition = None
         self.block = AstBlock(parser)
 
+    def __repr__(self):
+        result = "AstWhileStmt(\n"
+        result += _indent(f"cond={self.condition},\n")
+        result += _indent(f"body={repr(self.block)}\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return "while " + str(self.condition) + " " + str(self.block)
 
@@ -480,6 +537,12 @@ class AstRetStmt(AstNode, AstVisitable):
             parse_error("Expected semicolon after return statement!", parser),
         )
 
+    def __repr__(self):
+        result = "AstRetStmt(\n"
+        result += _indent(f"value={repr(self.value)}\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return "return " + str(self.value) + ";"
 
@@ -503,6 +566,12 @@ class AstExprStmt(AstNode, AstVisitable):
             TokenType.SEMICOLON,
             parse_error("Expected semicolon to end expression statement!", parser),
         )
+
+    def __repr__(self):
+        result = "AstExprStmt(\n"
+        result += _indent(f"value={repr(self.value)}\n")
+        result += ")"
+        return result
 
     def __str__(self):
         return str(self.value) + ";"
@@ -529,6 +598,12 @@ class AstBlock(AstNode, AstVisitable):
                 emit_error(f"Unclosed block! {token_info(opener)}")()
             decl = ast_decl(parser)
             self.declarations.append(decl)
+
+    def __repr__(self):
+        result = "AstBlock(\n"
+        result += _indent(str(self.declarations).replace(",", ",\n"))
+        result += "\n)"
+        return result
 
     def __str__(self):
         return "{\n" + _indent("\n".join(map(str, self.declarations))) + "\n}"
@@ -582,6 +657,13 @@ class AstUnary(AstNode, AstVisitable):
         self.operator = parser.get_prev()
         self.target = ast_expr(parser, precedence=Precedence.UNARY)
 
+    def __repr__(self):
+        result = "AstUnary(\n"
+        result += _indent(f"op={self.operator},\n")
+        result += _indent(f"target={repr(self.target)}\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return str(self.operator.token_type) + str(self.target)
 
@@ -609,6 +691,13 @@ class AstCall(AstNode, AstVisitable):
                     parse_error("Expected comma to delimit parameters!", parser),
                 )
 
+    def __repr__(self):
+        result = "AstCall(\n"
+        result += _indent(f"target={repr(self.target)},\n")
+        result += _indent(f"args={self.arguments}\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return str(self.target) + "(" + ",".join(map(str, self.arguments)) + ")"
 
@@ -631,6 +720,14 @@ class AstBinary(AstNode, AstVisitable):
         if self.operator.token_type not in LEFT_ASSOC_OPS:
             prec = prec.next()
         self.right = ast_expr(parser, precedence=prec)
+
+    def __repr__(self):
+        result = "AstBinary(\n"
+        result += _indent(f"op={self.operator},\n")
+        result += _indent(f"left={repr(self.left)},\n")
+        result += _indent(f"right={repr(self.right)},\n")
+        result += ")"
+        return result
 
     def __str__(self):
         return (
@@ -759,6 +856,13 @@ class AstBuiltin(AstNode, AstVisitable):
         self.target = ast_grouping(parser)
         self.value_type = BUILTINS[self.function.token_type]
 
+    def __repr__(self):
+        result = "AstBuiltin(\n"
+        result += _indent(f"func={self.function},\n")
+        result += _indent(f"target={self.target},\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return str(self.function.token_type) + str(self.target)
 
@@ -780,6 +884,13 @@ class AstAnd(AstNode, AstVisitable):
         self.right = ast_expr(parser, precedence=Precedence.AND)
         self.value_type = ValueType.BOOL
 
+    def __repr__(self):
+        result = "AstAnd(\n"
+        result += _indent(f"left={self.left},\n")
+        result += _indent(f"right={self.right}\n")
+        result += ")"
+        return result
+
     def __str__(self):
         return str(self.left) + " and " + str(self.right)
 
@@ -800,6 +911,13 @@ class AstOr(AstNode, AstVisitable):
         self.token = self.operator
         self.right = ast_expr(parser, precedence=Precedence.OR)
         self.value_type = ValueType.BOOL
+
+    def __repr__(self):
+        result = "AstOr(\n"
+        result += _indent(f"left={self.left},\n")
+        result += _indent(f"right={self.right}\n")
+        result += ")"
+        return result
 
     def __str__(self):
         return str(self.left) + " or " + str(self.right)
