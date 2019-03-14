@@ -864,7 +864,7 @@ class AstBuiltin(AstNode, AstVisitable):
         return result
 
     def __str__(self):
-        return str(self.function.token_type) + str(self.target)
+        return str(self.function.token_type) + "(" + str(self.target) + ")"
 
     def accept(self, visitor):
         visitor.visit_builtin_expr(self)
