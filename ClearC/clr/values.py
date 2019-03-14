@@ -7,7 +7,7 @@ from enum import Enum
 DEBUG = False
 DEBUG_ASSEMBLE = False
 DEBUG_PPRINT = False
-DONT_COMPILE = True
+DONT_COMPILE = False
 DONT_RESOLVE = False
 
 
@@ -65,8 +65,8 @@ class OpCode(Enum):
     JUMP_IF_NOT = 35
     # Functions
     LOAD_PARAM = 36
-    BIND_PARAM = 37
-    START_FUNCTION = 38
+    START_FUNCTION = 37
+    CALL = 38
 
     def __str__(self):
         return "OP_" + self.name

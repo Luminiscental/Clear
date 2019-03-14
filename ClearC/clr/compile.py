@@ -221,6 +221,11 @@ class Compiler(AstVisitor):
                 emit_error(f"Unknown binary operator! {token_info(node.operator)}"),
             )()
 
+    def visit_call_expr(self, node):
+        super().visit_call_expr(node)
+        self.program.simple_op(OpCode.CALL)
+        self.program.simple_op(len(node.arguments))
+
     def visit_constant_expr(self, node):
         super().visit_constant_expr(node)
         const_index = self.constants.add(node.value)

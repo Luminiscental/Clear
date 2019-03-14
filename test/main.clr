@@ -1,13 +1,11 @@
 
-func testFunc(num a) {
-    return 2;
+func adder(num a, num b) {
+    return a + b;
 }
 
-var number = "3";
-
-{
-    val x = 7i;
-    func something() { return "pear"; }
-    number = something();
-    print testFunc(7.35);
+func __le__(int a, int b) {
+    return a <= b;
 }
+
+print "2 + 3 = " + str(adder(2, 3));
+print "5 <= 7 is " + str(__le__(5i, 7i));
