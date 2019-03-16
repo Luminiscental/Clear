@@ -58,12 +58,6 @@ class TokenType(Enum):
     VAL = "val"
     VAR = "var"
     WHILE = "while"
-    # built-ins
-    TYPE = "type"
-    INT = "int"
-    BOOL = "bool"
-    NUM = "num"
-    STR = "str"
     # special
     SPACE = "<whitespace>"
     EOF = "<eof>"
@@ -99,11 +93,6 @@ KEYWORD_TYPES = {
     "val": TokenType.VAL,
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
-    "type": TokenType.TYPE,
-    "int": TokenType.INT,
-    "bool": TokenType.BOOL,
-    "num": TokenType.NUM,
-    "str": TokenType.STR,
 }
 
 SIMPLE_TOKENS = {

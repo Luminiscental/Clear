@@ -19,10 +19,19 @@ while i < MAX {
     i = i + 1i;
 }
 
-var first = true;
-while {
-    if first {
-        print "goodbye...";
+func kindaLoop() {
+    val BIG_MAX = 10000000i;
+    var counter = 0i;
+    while {
+        if counter == 0i {
+            print "goodbye...";
+        } else if counter > BIG_MAX {
+            print "ended!";
+            return 0i;
+        }
+        counter = counter + 1i;
     }
-    first = false;
+    return 0i;
 }
+
+kindaLoop();

@@ -8,7 +8,7 @@ DEBUG = False
 DEBUG_ASSEMBLE = False
 DEBUG_PPRINT = False
 DEBUG_REPR = False
-DONT_COMPILE = False
+DONT_COMPILE = True
 DONT_RESOLVE = False
 
 

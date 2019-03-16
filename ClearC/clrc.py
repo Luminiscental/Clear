@@ -5,7 +5,7 @@ to bytecode files.
 import sys
 from clr.errors import ClrCompileError
 from clr.values import DEBUG, DONT_COMPILE
-from clr.ast import Ast
+from clr.ast.parsing import Ast
 from clr.assemble import assemble
 
 
