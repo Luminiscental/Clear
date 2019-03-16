@@ -22,7 +22,7 @@ class Program:
     operations such as defining a name based on a resolved index or jumping to a point.
 
     Fields:
-        - code_list
+        - code_list : the list of emitted bytecode.
 
     Methods:
         - load_constant
@@ -214,11 +214,51 @@ class Program:
 
 
 class Compiler(DeclVisitor):
+    """
+    This class is a DeclVisitor for walking over the AST, compiling it to bytecode using
+    annotations from resolver and indexer passes.
+
+    Superclasses:
+        - DeclVisitor
+
+    Fields:
+        - program : the Program instance used to emit bytecode for operations.
+        - constants : the Constants instance used to store, index and compile constants used in the
+            program.
+
+    Methods:
+        - flush_code
+        - visit_val_decl (extended)
+        - visit_func_decl (overriden)
+        - visit_print_stmt (extended)
+        - visit_if_stmt (overriden)
+        - visit_while_stmt (overriden)
+        - visit_ret_stmt (extended)
+        - visit_expr_stmt (extended)
+        - start_scope (extended)
+        - end_scope (extended)
+        - visit_unary_expr (extended)
+        - visit_binary_expr (overriden)
+        - visit_call_expr (extended)
+        - visit_number_expr (extended)
+        - visit_string_expr (extended)
+        - visit_boolean_expr (extended)
+        - visit_ident_expr (extended)
+        - visit_and_expr (overriden)
+        - visit_or_expr (overriden)
+    """
+
     def __init__(self):
         self.program = Program()
         self.constants = Constants()
 
     def flush_code(self):
+        """
+        This method returns the total bytecode for the compiled program, including constant storage.
+
+        Returns:
+            the list of bytecode, unassembled.
+        """
         return self.constants.flush() + self.program.flush()
 
     def visit_val_decl(self, node):
