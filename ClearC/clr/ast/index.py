@@ -1,3 +1,13 @@
+"""
+This module provides an Indexer class for visiting AST nodes to index variable references to later
+compile as bytecode.
+
+Classes:
+    - Index
+    - IndexAnnotation
+    - Indexer
+    - FunctionIndexer
+"""
 from enum import Enum
 from collections import defaultdict
 from clr.ast.visitor import DeclVisitor
@@ -7,6 +17,13 @@ from clr.ast.resolve import BUILTINS
 
 
 class Index(Enum):
+    """
+    This class enumerates possible types of variable indices.
+
+    Superclasses:
+        - Enum
+    """
+
     UNRESOLVED = "<unresolved>"
     PARAM = "<param>"
     LOCAL = "<local>"
@@ -17,6 +34,14 @@ class Index(Enum):
 
 
 class IndexAnnotation:
+    """
+    This class stores information about the annotated index for some AST node.
+
+    Fields:
+        - kind : the type of index
+        - value : the integral value of the index
+    """
+
     def __init__(self, kind=Index.UNRESOLVED, value=-1):
         self.kind = kind
         self.value = value
@@ -26,6 +51,22 @@ class IndexAnnotation:
 
 
 class Indexer(DeclVisitor):
+    """
+    This class is a DeclVisitor for walking over the AST, indexing declarations and annotating
+    variable references with the indices they reference for use by the compiler.
+
+    Superclasses:
+        - DeclVisitor
+
+    Fields:
+        - scopes : a list of defaultdicts to annotations for looking up the annotation for a given
+            name.
+        - level : the current scope level to declare at.
+        - local_index : the index of the next local variable to declare.
+        - global_index : the index of the next global variable to declare.
+        - is_function : boolean representing whether the current scope is within a function.
+    """
+
     def __init__(self):
         self.scopes = [defaultdict(IndexAnnotation)]
         self.level = 0
@@ -110,6 +151,20 @@ class Indexer(DeclVisitor):
 
 
 class FunctionIndexer(Indexer):
+    """
+    This class is an Indexer for indexing variable references within a function definition, so
+    also allowing references to parameters.
+
+    Superclasses:
+        - Indexer
+
+    Fields:
+        - params : a list of (name, index) pairs for the parameter names and their index annotations.
+
+    Methods:
+        - add_param
+    """
+
     def __init__(self):
         super().__init__()
         self.scopes.append(defaultdict(IndexAnnotation))
@@ -118,6 +173,10 @@ class FunctionIndexer(Indexer):
         self.is_function = True
 
     def add_param(self, name):
+        """
+        This method adds a parameter of the given name to the function, with the indices of the
+        parameters inferred from the order in which this is called.
+        """
         index = len(self.params)
         pair = (name, IndexAnnotation(kind=Index.PARAM, value=index))
         self.params.append(pair)

@@ -34,6 +34,9 @@ class Precedence(Enum):
     This class enumerates the precedences of operators to parse with values to represent their
     ordering and rich comparison methods.
 
+    Superclasses:
+        - Enum
+
     Methods:
         - next
     """
