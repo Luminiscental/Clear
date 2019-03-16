@@ -1,3 +1,11 @@
+"""
+This module provides the Program class for wrapping a list of emitted bytecode with simple methods
+for simple operations, and the Compiler visitor for compiling the AST nodes.
+
+Classes:
+    - Program
+    - Compiler(DeclVisitor)
+"""
 from clr.assemble import assembled_size
 from clr.constants import Constants, ClrUint
 from clr.values import OpCode, DEBUG
@@ -9,17 +17,57 @@ from clr.ast.resolve import BUILTINS
 
 
 class Program:
+    """
+    This class wraps a list of bytecode, providing methods to append to that list for simple
+    operations such as defining a name based on a resolved index or jumping to a point.
+
+    Fields:
+        - code_list
+
+    Methods:
+        - load_constant
+        - simple_op
+        - define_name
+        - set_name
+        - load_name
+        - begin_function
+        - end_function
+        - begin_jump
+        - end_jump
+        - begin_loop
+        - loop_back
+        - flush
+    """
+
     def __init__(self):
         self.code_list = []
 
-    def load_constant(self, constant):
+    def load_constant(self, index):
+        """
+        This method emits bytecode to load a constant onto the stack.
+
+        Parameters:
+            - index : the index of the index to load.
+        """
         self.code_list.append(OpCode.LOAD_CONST)
-        self.code_list.append(constant)
+        self.code_list.append(index)
 
     def simple_op(self, opcode):
+        """
+        This method emits a single passed instruction.
+
+        Parameters:
+            - opcode : the instruction / item to append to the code list.
+        """
         self.code_list.append(opcode)
 
     def define_name(self, index):
+        """
+        This method emits bytecode to define a name with the value on top of the stack.
+
+        Parameters:
+            - index : the index annotation to define for.
+        """
         if index.kind == Index.GLOBAL:
             self.code_list.append(OpCode.DEFINE_GLOBAL)
         else:
@@ -27,6 +75,12 @@ class Program:
         self.code_list.append(index.value)
 
     def set_name(self, index):
+        """
+        This method emits bytecode to set a name with the value on top of the stack.
+
+        Parameters:
+            - index : the index annotation to set for.
+        """
         if index.kind == Index.GLOBAL:
             self.code_list.append(OpCode.DEFINE_GLOBAL)
         else:
@@ -34,6 +88,12 @@ class Program:
         self.code_list.append(index.value)
 
     def load_name(self, index):
+        """
+        This method emits bytecode to load a name and push its value onto the stack.
+
+        Parameters:
+            - index : the index annotation to load from.
+        """
         opcode = None
         if index.kind == Index.GLOBAL:
             opcode = OpCode.LOAD_GLOBAL
@@ -47,17 +107,44 @@ class Program:
         self.code_list.append(index.value)
 
     def begin_function(self):
+        """
+        This method emits bytecode to start a function, with an index to later patch the size of
+        the function with a call to end_function.
+
+        Returns:
+            index to the offset to patch.
+        """
         self.code_list.append(OpCode.START_FUNCTION)
         index = len(self.code_list)
         self.code_list.append(ClrUint(0))
         return index
 
     def end_function(self, index):
+        """
+        This method patches the offset of bytecode starting a function that has just been defined.
+
+        Parameters:
+            - index : the index of the offset to patch, e.g. returned from begin_function.
+        """
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         self.code_list[index] = ClrUint(offset)
 
     def begin_jump(self, conditional=False, leave_value=False):
+        """
+        This method emits bytecode to jump forward through the program, optionally based on whether
+        the top of the stack is false.
+
+        Parameters:
+            - conditional=False : if true the jump only happens if the top of the stack is false,
+                otherwise it is unconditional.
+            - leave_value=False : if true the value on top of the stack is left if there is no jump,
+                otherwise it is popped.
+
+        Returns:
+            Tuple of the index to later patch the jump offset, and whether the jump is conditional
+                as a boolean.
+        """
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
         index = len(self.code_list)
         if DEBUG:
@@ -69,6 +156,15 @@ class Program:
         return index, conditional
 
     def end_jump(self, jump_ref, leave_value=False):
+        """
+        This method patches the offset of a previously defined jump after the code to be jumped
+        over has been emitted.
+
+        Parameters:
+            jump_ref : the index of the offset to patch for the jump, e.g. returned from begin_jump.
+            leave_value=False : if true the value on top of the stack is left after the jump,
+                otherwise it is popped.
+        """
         index, conditional = jump_ref
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
@@ -79,12 +175,25 @@ class Program:
             self.code_list.append(OpCode.POP)
 
     def begin_loop(self):
+        """
+        This method prepares for looping back over a section of bytecode.
+
+        Returns:
+            an index to use when ending the loop as the offset to loop by, e.g. passed to loop_back.
+        """
         index = len(self.code_list)
         if DEBUG:
             print(f"Loop checkpoint for {index} picked")
         return index
 
     def loop_back(self, index):
+        """
+        This method emits bytecode for looping back over a section of bytecode to a point previously
+        marked.
+
+        Parameters:
+            - index : the index to loop back to, e.g. returned from begin_loop.
+        """
         self.code_list.append(OpCode.LOOP)
         offset_index = len(self.code_list)
         self.code_list.append(ClrUint(0))
@@ -95,6 +204,12 @@ class Program:
         self.code_list[offset_index] = offset
 
     def flush(self):
+        """
+        This method returns the total bytecode emitted as a list.
+
+        Returns:
+            The list of bytecode, unassembled.
+        """
         return self.code_list
 
 
