@@ -1,7 +1,8 @@
 from clr.tokens import TokenType
 from clr.errors import parse_error
-from clr.ast.stmt import BlockStmt, DeclNode, parse_stmt
+from clr.ast.stmt import BlockStmt, StmtNode, parse_stmt
 from clr.ast.expr import parse_expr
+from clr.ast.index import IndexAnnotation
 
 
 def parse_decl(parser):
@@ -10,6 +11,12 @@ def parse_decl(parser):
     if parser.check(TokenType.FUNC):
         return FuncDecl(parser)
     return parse_stmt(parser)
+
+
+class DeclNode(StmtNode):
+    def __init__(self, parser):
+        super().__init__(parser)
+        self.index_annotation = IndexAnnotation()
 
 
 class FuncDecl(DeclNode):

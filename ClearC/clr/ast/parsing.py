@@ -1,11 +1,11 @@
-from enum import Enum
-from collections import namedtuple
 from clr.tokens import TokenType, token_info
-from clr.errors import parse_error
 from clr.ast.decl import parse_decl
 from clr.ast.expr import AstNode
 from clr.ast.resolve import TypeResolver
+from clr.ast.index import Indexer
+from clr.ast.compile import Compiler
 from clr.tokens import tokenize
+from clr.values import DEBUG
 
 
 class Ast(AstNode):
@@ -15,10 +15,18 @@ class Ast(AstNode):
         while not parser.match(TokenType.EOF):
             self.children.append(parse_decl(parser))
         self.accept(TypeResolver())
+        if DEBUG:
+            print("Finished resolving")
+        self.accept(Indexer())
+        if DEBUG:
+            print("Finished indexing")
 
     def compile(self):
-        # TODO: Re-implement compiler
-        return []
+        compiler = Compiler()
+        self.accept(compiler)
+        if DEBUG:
+            print("Finished compiling")
+        return compiler.flush_code()
 
     def accept(self, decl_visitor):
         for child in self.children:

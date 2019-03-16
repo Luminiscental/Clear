@@ -19,13 +19,13 @@ def parse_stmt(parser):
     return ExprStmt(parser)
 
 
-class DeclNode(AstNode):
+class StmtNode(AstNode):
     def __init__(self, parser):
         super().__init__(parser)
         self.return_annotation = ReturnAnnotation()
 
 
-class BlockStmt(DeclNode):
+class BlockStmt(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
@@ -43,7 +43,7 @@ class BlockStmt(DeclNode):
         stmt_visitor.visit_block_stmt(self)
 
 
-class ExprStmt(DeclNode):
+class ExprStmt(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         self.value = parse_expr(parser)
@@ -57,7 +57,7 @@ class ExprStmt(DeclNode):
         stmt_visitor.visit_expr_stmt(self)
 
 
-class RetStmt(DeclNode):
+class RetStmt(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(
@@ -73,7 +73,7 @@ class RetStmt(DeclNode):
         stmt_visitor.visit_ret_stmt(self)
 
 
-class WhileStmt(DeclNode):
+class WhileStmt(StmtNode):
     def __init__(self, parser):
         # TODO: Break statements
         super().__init__(parser)
@@ -90,7 +90,7 @@ class WhileStmt(DeclNode):
         stmt_visitor.visit_while_stmt(self)
 
 
-class IfStmt(DeclNode):
+class IfStmt(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
@@ -109,7 +109,7 @@ class IfStmt(DeclNode):
         stmt_visitor.visit_if_stmt(self)
 
 
-class PrintStmt(DeclNode):
+class PrintStmt(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(

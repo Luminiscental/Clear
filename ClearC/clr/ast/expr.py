@@ -3,6 +3,7 @@ from collections import defaultdict, namedtuple
 from clr.tokens import TokenType, token_info
 from clr.errors import parse_error
 from clr.ast.resolve import TypeAnnotation
+from clr.ast.index import IndexAnnotation
 from clr.constants import ClrStr, ClrNum, ClrInt
 
 
@@ -170,6 +171,7 @@ class IdentExpr(ExprNode):
         super().__init__(parser)
         parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
         self.name = parser.get_prev()
+        self.index_annotation = IndexAnnotation()
 
     def accept(self, expr_visitor):
         expr_visitor.visit_ident_expr(self)

@@ -20,7 +20,7 @@ while i < MAX {
 }
 
 func kindaLoop() {
-    val BIG_MAX = 10000000i;
+    val BIG_MAX = 1000000i;
     var counter = 0i;
     while {
         if counter == 0i {

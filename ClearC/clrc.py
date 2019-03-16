@@ -4,7 +4,7 @@ to bytecode files.
 """
 import sys
 from clr.errors import ClrCompileError
-from clr.values import DEBUG, DONT_COMPILE
+from clr.values import DEBUG
 from clr.ast.parsing import Ast
 from clr.assemble import assemble
 
@@ -30,9 +30,6 @@ def main():
     try:
         ast = Ast.from_source(source)
         # TODO: Gen debug symbols
-        if DONT_COMPILE:
-            print("Didn't compile")
-            return
         code = ast.compile()
         if DEBUG:
             print("Assembling:")
