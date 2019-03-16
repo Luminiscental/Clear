@@ -4,7 +4,7 @@ for simple operations, and the Compiler visitor for compiling the AST nodes.
 
 Classes:
     - Program
-    - Compiler(DeclVisitor)
+    - Compiler
 """
 from clr.assemble import assembled_size
 from clr.constants import Constants, ClrUint

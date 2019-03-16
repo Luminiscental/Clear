@@ -1,3 +1,25 @@
+"""
+This module provides classes / functions to form expression nodes within the AST from parsing tokens.
+
+Functions:
+    - get_rule
+    - parse_expr
+    - parse_grouping
+
+Classes:
+    - Precedence
+    - AstNode
+    - ExprNode
+    - CallExpr
+    - UnaryExpr
+    - BinaryExpr
+    - AndExpr
+    - OrExpr
+    - IdentExpr
+    - StringExpr
+    - NumberExpr
+    - BooleanExpr
+"""
 from enum import Enum
 from collections import defaultdict, namedtuple
 from clr.tokens import TokenType, token_info
@@ -8,6 +30,13 @@ from clr.constants import ClrStr, ClrNum, ClrInt
 
 
 class Precedence(Enum):
+    """
+    This class enumerates the precedences of operators to parse with values to represent their
+    ordering and rich comparison methods.
+
+    Methods:
+        - next
+    """
 
     NONE = 0
     ASSIGNMENT = 1
@@ -41,6 +70,12 @@ class Precedence(Enum):
         return 1
 
     def next(self):
+        """
+        This methods returns the next highest precedence after self.
+
+        Returns:
+            The next highest precedence after self.
+        """
         return Precedence(self.value + 1)
 
 
@@ -56,10 +91,31 @@ ParseRule = namedtuple(
 
 
 def get_rule(token):
+    """
+    This function returns the ParseRule for a given operator token by looking up the pratt table.
+
+    Parameters:
+        - token : the operator token to lookup the precedence for.
+
+    Returns:
+        the parse rule for the given operator, which emits an error for invalid operators / usage.
+    """
     return PRATT_TABLE[token.token_type]
 
 
 def parse_expr(parser, precedence=Precedence.ASSIGNMENT):
+    """
+    This function parses an expression node for the AST from the parser, emitting an error if the
+    tokens don't form a valid expression.
+
+    Parameters:
+        - parser : the parser to read tokens from.
+        - precedence=Precedence.ASSIGNMENT : the precedence of expression to parse by, parsing stops
+            once an operator with precedence lower than this is reached.
+
+    Returns:
+        the expression node parsed from the parser.
+    """
     first_rule = get_rule(parser.get_current())
     value = first_rule.prefix(parser)
     while get_rule(parser.get_current()).precedence >= precedence:
@@ -69,6 +125,16 @@ def parse_expr(parser, precedence=Precedence.ASSIGNMENT):
 
 
 def parse_grouping(parser):
+    """
+    This function parses an expression grouped by parentheses, emitting an error if the tokens
+    don't form such an expression.
+
+    Parameters:
+        - parser : the parser to read tokens form.
+
+    Returns:
+        the expression node parsed from the parser.
+    """
     parser.consume(
         TokenType.LEFT_PAREN, parse_error("Expected '(' before expression!", parser)
     )
@@ -80,20 +146,59 @@ def parse_grouping(parser):
 
 
 class AstNode:
+    """
+    This class stores the representative token for an AST node, for use in referring to it by
+    position in the source.
+
+    Fields:
+        - token : the representative token; by default the first token parsed in the node.
+
+    Methods:
+        get_info
+    """
+
     def __init__(self, parser):
         self.token = parser.get_current()
 
     def get_info(self):
+        """
+        Returns information describing the representative token for this node.
+        """
         return token_info(self.token)
 
 
 class ExprNode(AstNode):
+    """
+    This class stores the type annotation for an expression node in the AST, by default annotated
+    as unresolved.
+
+    Superclasses:
+        - AstNode
+
+    Fields:
+        - type_annotation : the type annotation for this expression.
+    """
+
     def __init__(self, parser):
         super().__init__(parser)
         self.type_annotation = TypeAnnotation()
 
 
 class CallExpr(ExprNode):
+    """
+    This class represents an AST node for an expression calling a value, initialized from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - target : the expression node that is being called.
+        - arguments : a list of expressions for the arguments passed to the target when calling.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, left, parser):
         super().__init__(parser)
         self.target = left
@@ -110,10 +215,31 @@ class CallExpr(ExprNode):
                 )
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_call_expr(self)
 
 
 class UnaryExpr(ExprNode):
+    """
+    This class represents an AST node for a unary operator applied to a value, initialized from
+    a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - operator : the operator token being applied.
+        - target : the expression being applied onto.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume_one(UNARY_OPS, parse_error("Expected unary operator!", parser))
@@ -121,10 +247,32 @@ class UnaryExpr(ExprNode):
         self.target = parse_expr(parser, precedence=Precedence.UNARY)
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_unary_expr(self)
 
 
 class BinaryExpr(ExprNode):
+    """
+    This class represents an AST node for a binary operator applied to two expressions, initialized
+    from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - left : the left expression.
+        - operator : the operator token.
+        - right : the right expression.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, left, parser):
         super().__init__(parser)
         self.left = left
@@ -137,10 +285,32 @@ class BinaryExpr(ExprNode):
         self.token = self.operator
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_binary_expr(self)
 
 
 class AndExpr(ExprNode):
+    """
+    This class represents an AST node for the and operator being applied to two expressions,
+    initialized from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - left : the left expression.
+        - operator : the and token.
+        - right : the right expression.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, left, parser):
         super().__init__(parser)
         self.left = left
@@ -150,10 +320,32 @@ class AndExpr(ExprNode):
         self.token = self.operator
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_and_expr(self)
 
 
 class OrExpr(ExprNode):
+    """
+    This class represents an AST node for the or operator being applied to two expressions,
+    initialized from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - left : the left expression.
+        - operator : the or token.
+        - right : the right expression.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, left, parser):
         super().__init__(parser)
         self.left = left
@@ -163,10 +355,30 @@ class OrExpr(ExprNode):
         self.token = self.operator
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_or_expr(self)
 
 
 class IdentExpr(ExprNode):
+    """
+    This class represents an AST node for an identifier as part of an expression, initialized
+    from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - name : the token for the identifier.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
@@ -174,10 +386,29 @@ class IdentExpr(ExprNode):
         self.index_annotation = IndexAnnotation()
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_ident_expr(self)
 
 
 class StringExpr(ExprNode):
+    """
+    This class represents an AST node for a string literal, initialized from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - value : a ClrStr storing the represented string.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
@@ -188,10 +419,29 @@ class StringExpr(ExprNode):
         self.value = ClrStr(joined)
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_string_expr(self)
 
 
 class NumberExpr(ExprNode):
+    """
+    This class represents an AST node for a number/integer literal, initialized from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - value : a ClrNum or ClrInt storing the represented value.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
@@ -209,16 +459,41 @@ class NumberExpr(ExprNode):
                 parse_error("Number literal must be a number!", parser)()
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_number_expr(self)
 
 
 class BooleanExpr(ExprNode):
+    """
+    This class represents an AST node for a boolean literal, initialized from a parser.
+
+    Superclasses:
+        - ExprNode
+
+    Fields:
+        - value : a boolean storing the represented value.
+
+    Methods:
+        - accept
+    """
+
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
         self.value = parser.get_prev().token_type == TokenType.TRUE
 
     def accept(self, expr_visitor):
+        """
+        This method accepts an expression visitor to the node.
+
+        Parameters:
+            - expr_visitor : the visitor to accept.
+        """
         expr_visitor.visit_boolean_expr(self)
 
 
