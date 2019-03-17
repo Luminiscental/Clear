@@ -103,6 +103,7 @@ class Indexer(DeclVisitor):
         else:
             # If it was already declared use the old value directly
             idx = prev.value
+            kind = prev.kind
         result = IndexAnnotation(kind, idx)
         if DEBUG:
             print(f"Declared {name} as {result}")

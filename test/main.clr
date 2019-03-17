@@ -4,8 +4,41 @@ var n = 2i;
 var result = 1;
 
 while n <= MAX {
+
     result = num(n) * result;
     n = n + 1i;
 }
 
 print str(MAX) + "! = " + str(result);
+
+print "x^2 of 1 + (x-1)/2";
+
+func printValue(num x) int {
+
+    func f(num n) num {
+
+        return n * n;
+    }
+
+    func g(num n) num {
+
+        return 1 + (n - 1) / 2;
+    }
+
+    func compose(func(num) num f, func(num) num g, num n) num {
+
+        return f(g(n));
+    }
+
+    print "x=" + str(x) + " : " + str(compose(f, g, x)) " : d=" + str(compose(f, g, x) - x);
+
+    return 0i;
+}
+
+var n = 0;
+while n <= 10 {
+
+    printValue(n);
+    n = n + 1;
+}
+
