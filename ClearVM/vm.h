@@ -36,7 +36,7 @@ typedef struct {
 void initLocalState(LocalState *state);
 void addLocal(LocalState *state, size_t index);
 void pushScope(LocalState *state);
-size_t popScope(LocalState *state);
+InterpretResult popScope(LocalState *state, size_t *out);
 void freeLocalState(LocalState *state);
 
 typedef struct {

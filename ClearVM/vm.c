@@ -50,12 +50,20 @@ void pushScope(LocalState *state) {
     state->currentScope = makeScope(state->currentScope);
 }
 
-size_t popScope(LocalState *state) {
+InterpretResult popScope(LocalState *state, size_t *out) {
 
     Scope *popped = state->currentScope;
+    if (popped == NULL) {
+        printf("|| Cannot pop global scope!\n");
+        return INTERPRET_ERR;
+    }
     state->currentScope = popped->parent;
     state->localIndex -= popped->variables;
-    return popped->variables;
+    if (out != NULL) {
+
+        *out = popped->variables;
+    }
+    return INTERPRET_OK;
 }
 
 void freeLocalState(LocalState *state) { freeScope(state->currentScope); }
@@ -426,7 +434,13 @@ InterpretResult run(VM *vm) {
 
             case OP_POP_SCOPE: {
 
-                size_t popped = popScope(&frame->localState);
+                size_t popped;
+                if (popScope(&frame->localState, &popped) != INTERPRET_OK) {
+
+                    printf("|| Scope popping failed!\n");
+                    return INTERPRET_ERR;
+                }
+
                 for (size_t i = 0; i < popped; i++) {
 
                     if (pop(frame, NULL) != INTERPRET_OK) {
