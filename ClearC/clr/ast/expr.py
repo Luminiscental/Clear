@@ -22,9 +22,9 @@ Classes:
 """
 from enum import Enum
 from collections import defaultdict, namedtuple
-from clr.tokens import TokenType, token_info
+from clr.tokens import TokenType
+from clr.ast.tree import AstNode
 from clr.errors import parse_error
-from clr.ast.resolve import TypeAnnotation
 from clr.ast.index import IndexAnnotation
 from clr.constants import ClrStr, ClrNum, ClrInt
 
@@ -119,10 +119,13 @@ def parse_expr(parser, precedence=Precedence.ASSIGNMENT):
     Returns:
         the expression node parsed from the parser.
     """
+    # Consume an initial prefix expression bound by the passed precedence
     first_rule = get_rule(parser.get_current())
     value = first_rule.prefix(parser)
+    # Consume any following infix expression still bound by the passed precedence
     while get_rule(parser.get_current()).precedence >= precedence:
         rule = get_rule(parser.get_current())
+        # Update the value, pushing the old value as the left node of the infix expression
         value = rule.infix(value, parser)
     return value
 
@@ -148,28 +151,6 @@ def parse_grouping(parser):
     return value
 
 
-class AstNode:
-    """
-    This class stores the representative token for an AST node, for use in referring to it by
-    position in the source.
-
-    Fields:
-        - token : the representative token; by default the first token parsed in the node.
-
-    Methods:
-        get_info
-    """
-
-    def __init__(self, parser):
-        self.token = parser.get_current()
-
-    def get_info(self):
-        """
-        Returns information describing the representative token for this node.
-        """
-        return token_info(self.token)
-
-
 class ExprNode(AstNode):
     """
     This class stores the type annotation for an expression node in the AST, by default annotated
@@ -184,6 +165,8 @@ class ExprNode(AstNode):
 
     def __init__(self, parser):
         super().__init__(parser)
+        from clr.ast.type import TypeAnnotation
+
         self.type_annotation = TypeAnnotation()
 
 
@@ -209,12 +192,15 @@ class CallExpr(ExprNode):
             TokenType.LEFT_PAREN, parse_error("Expected '(' to call!", parser)
         )
         self.arguments = []
+        # Consume arguments until we hit the closing paren
         while not parser.match(TokenType.RIGHT_PAREN):
+            # Consume an expression for each argument
             self.arguments.append(parse_expr(parser))
+            # If we haven't hit the end consume a comma before the next argument
             if not parser.check(TokenType.RIGHT_PAREN):
                 parser.consume(
                     TokenType.COMMA,
-                    parse_error("Expected comma to delimit parameters!", parser),
+                    parse_error("Expected comma to delimit arguments!", parser),
                 )
 
     def accept(self, expr_visitor):
@@ -282,6 +268,8 @@ class BinaryExpr(ExprNode):
         parser.consume_one(BINARY_OPS, parse_error("Expected binary operator!", parser))
         self.operator = parser.get_prev()
         prec = get_rule(self.operator).precedence
+        # Right-associative operations bind to the right including repeated operations,
+        # left-associative operations don't
         if self.operator.token_type not in LEFT_ASSOC_OPS:
             prec = prec.next()
         self.right = parse_expr(parser, precedence=prec)
@@ -319,6 +307,7 @@ class AndExpr(ExprNode):
         self.left = left
         parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
         self.operator = parser.get_prev()
+        # and acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.AND)
         self.token = self.operator
 
@@ -354,6 +343,7 @@ class OrExpr(ExprNode):
         self.left = left
         parser.consume(TokenType.OR, parse_error("Expected or operator!", parser))
         self.operator = parser.get_prev()
+        # or acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.OR)
         self.token = self.operator
 
@@ -386,6 +376,7 @@ class IdentExpr(ExprNode):
         super().__init__(parser)
         parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
         self.name = parser.get_prev()
+        # Identifiers have indices, by default it is unresolved
         self.index_annotation = IndexAnnotation()
 
     def accept(self, expr_visitor):
@@ -416,6 +407,8 @@ class StringExpr(ExprNode):
         super().__init__(parser)
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
         total = [self.token]
+        # Adjacent string literals are combined and joined with " to allow effective escaping,
+        # don't judge me
         while parser.match(TokenType.STRING):
             total.append(parser.get_prev())
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))

@@ -33,8 +33,19 @@ class ExprVisitor:
 
 
 class StmtVisitor(ExprVisitor):
-    def visit_block_stmt(self, node):
+    def start_scope(self):
         pass
+
+    def end_scope(self):
+        pass
+
+    def visit_block_stmt(self, node):
+        self.start_scope()
+        for decl in node.declarations:
+            if not decl.is_stmt:
+                continue
+            decl.accept(self)
+        self.end_scope()
 
     def visit_expr_stmt(self, node):
         node.value.accept(self)
@@ -59,13 +70,8 @@ class StmtVisitor(ExprVisitor):
 
 
 class DeclVisitor(StmtVisitor):
-    def start_scope(self):
-        pass
-
-    def end_scope(self):
-        pass
-
     def visit_block_stmt(self, node):
+        # Override the stmt version of this to also accept the declarations
         self.start_scope()
         for decl in node.declarations:
             decl.accept(self)

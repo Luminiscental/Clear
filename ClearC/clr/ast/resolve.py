@@ -1,136 +1,20 @@
-from enum import Enum
 import itertools
 from collections import defaultdict
 from clr.tokens import TokenType
 from clr.errors import emit_error
 from clr.ast.visitor import DeclVisitor
-from clr.values import OpCode, DEBUG
-
-
-class Type(Enum):
-    INT = "int"
-    NUM = "num"
-    STR = "str"
-    BOOL = "bool"
-    FUNCTION = "<function>"
-    UNRESOLVED = "<unresolved>"
-
-    def __str__(self):
-        return self.value
-
-
-class Return(Enum):
-    NEVER = "<never>"
-    SOMETIMES = "<sometimes>"
-    ALWAYS = "<always>"
-
-    def __str__(self):
-        return self.value
-
-
-class FuncInfo:
-    def __init__(self, return_type, overloads):
-        self.return_type = return_type
-        self.overloads = overloads
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, FuncInfo)
-            and self.return_type == other.return_type
-            and self.overloads == other.overloads
-        )
-
-
-class TypeAnnotation:
-    def __init__(self, kind=Type.UNRESOLVED, assignable=False, func_info=None):
-        self.kind = kind
-        self.func_info = func_info
-        self.assignable = assignable
-
-    @staticmethod
-    def from_ident(name):
-        if name is None:
-            return None
-        return {
-            "int": INT_TYPE,
-            "num": NUM_TYPE,
-            "str": STR_TYPE,
-            "bool": BOOL_TYPE,
-        }.get(name.lexeme, TypeAnnotation())
-
-    def __repr__(self):
-        return str(self.kind)
-
-    def __eq__(self, other):
-        if not isinstance(other, TypeAnnotation):
-            return False
-        if self.kind != other.kind:
-            return False
-        if self.kind == Type.FUNCTION:
-            return self.func_info == other.func_info
-        return True
-
-
-INT_TYPE = TypeAnnotation(kind=Type.INT)
-NUM_TYPE = TypeAnnotation(kind=Type.NUM)
-STR_TYPE = TypeAnnotation(kind=Type.STR)
-BOOL_TYPE = TypeAnnotation(kind=Type.BOOL)
-
-BUILTINS = {
-    "type": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=STR_TYPE,
-                overloads=[[STR_TYPE], [INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-            ),
-        ),
-        OpCode.TYPE,
-    ),
-    "int": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=INT_TYPE, overloads=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]]
-            ),
-        ),
-        OpCode.INT,
-    ),
-    "num": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=NUM_TYPE, overloads=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]]
-            ),
-        ),
-        OpCode.NUM,
-    ),
-    "bool": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=BOOL_TYPE, overloads=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]]
-            ),
-        ),
-        OpCode.BOOL,
-    ),
-    "str": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=STR_TYPE,
-                overloads=[[STR_TYPE], [INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-            ),
-        ),
-        OpCode.STR,
-    ),
-}
-
-
-class ReturnAnnotation:
-    def __init__(self, kind=Return.NEVER, return_type=None):
-        self.kind = kind
-        self.return_type = return_type
+from clr.ast.type import (
+    TypeAnnotation,
+    FuncInfo,
+    ReturnAnnotation,
+    Type,
+    Return,
+    BUILTINS,
+    INT_TYPE,
+    NUM_TYPE,
+    STR_TYPE,
+    BOOL_TYPE,
+)
 
 
 class TypeResolver(DeclVisitor):
@@ -191,12 +75,11 @@ class TypeResolver(DeclVisitor):
             emit_error(
                 f"No signature with matching number of passed arguments, found {len(passed_signature)} which is not one of the possibilities {possible_lens}! {node.get_info()}"
             )()
+        args = "(" + ", ".join(map(str, passed_signature)) + ")"
         for overload in with_len:
-            if not overload == passed_signature:
-                continue
-            break
+            if overload == passed_signature:
+                break
         else:
-            args = "(" + ", ".join(map(str, passed_signature)) + ")"
             emit_error(
                 f"Could not find signature for function matching provided argument list {args}! {node.get_info()}"
             )()
@@ -299,6 +182,8 @@ class TypeResolver(DeclVisitor):
         for decl in node.declarations:
             if kind == Return.ALWAYS:
                 emit_error(f"Unreachable code! {decl.get_info()}")()
+            if not decl.is_stmt:
+                continue
             annotation = decl.return_annotation
             if annotation.kind in [Return.SOMETIMES, Return.ALWAYS]:
                 kind = annotation.kind
@@ -312,8 +197,6 @@ class TypeResolver(DeclVisitor):
                 f"Return statement found outside of function! {node.get_info()}"
             )()
         expected = self.expected_returns[-1]
-        if expected is None:
-            emit_error(f"Return statement found in void function! {node.get_info()}")()
         if expected != node.value.type_annotation:
             emit_error(
                 f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation}! {node.get_info()}"
@@ -355,14 +238,14 @@ class TypeResolver(DeclVisitor):
         # Iterate over the parameters and resolve to types
         arg_types = []
         for param_type, param_name in node.params:
-            resolved_type = TypeAnnotation.from_ident(param_type)
+            resolved_type = param_type.as_annotation()
             if resolved_type.kind == Type.UNRESOLVED:
                 emit_error(
                     f"Invalid parameter type {param_type} for function! {node.get_info()}"
                 )()
             arg_types.append(resolved_type)
         # Resolve the return type
-        return_type = TypeAnnotation.from_ident(node.return_type)
+        return_type = node.return_type.as_annotation()
         # Create an annotation for the function signature
         func_info = FuncInfo(return_type=return_type, overloads=[arg_types])
         type_annotation = TypeAnnotation(
@@ -374,7 +257,7 @@ class TypeResolver(DeclVisitor):
         self.start_scope()
         # Iterate over the parameters and declare them
         for param_type, param_name in node.params:
-            self._declare_name(param_name.lexeme, resolved_type)
+            self._declare_name(param_name.lexeme, param_type.as_annotation())
         # Expect return statements for the return type
         self.expected_returns.append(return_type)
         # Define the function by its block
@@ -383,11 +266,8 @@ class TypeResolver(DeclVisitor):
         self.end_scope()
         # Stop expecting return statements
         del self.expected_returns[-1]
-        if (
-            return_type is not None
-            and node.block.return_annotation.kind != Return.ALWAYS
-        ):
-            emit_error(f"Non-void function does not always return! {node.get_info()}")()
+        if node.block.return_annotation.kind != Return.ALWAYS:
+            emit_error(f"Function does not always return! {node.get_info()}")()
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)

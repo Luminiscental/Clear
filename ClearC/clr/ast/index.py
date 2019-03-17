@@ -76,21 +76,21 @@ class Indexer(DeclVisitor):
 
     def _lookup_name(self, name):
         lookback = 0
-        while lookback < self.level:
+        # Keep looking back up to the global scope
+        while lookback <= self.level:
             result = self.scopes[self.level - lookback][name]
             lookback += 1
+            # If the scope containes a resolved index for thei name we're done
             if result.kind != Index.UNRESOLVED:
                 if DEBUG:
                     print(f"Found {name} with index {result}")
                 break
-        else:
-            result = self.scopes[0][name]
-            if DEBUG and result.kind != Index.UNRESOLVED:
-                print(f"Looking for {name} in global scope results in {result}")
+        # If no resolved name was found the returned index is unresolved
         return result
 
     def _declare_name(self, name):
         prev = self._lookup_name(name)
+        # If the name already was not found as already declared make it a new index
         if prev.kind == Index.UNRESOLVED:
             if self.level > 0:
                 idx = self.local_index
@@ -101,6 +101,7 @@ class Indexer(DeclVisitor):
                 self.global_index += 1
                 kind = Index.GLOBAL
         else:
+            # If it was already declared use the old value directly
             idx = prev.value
         result = IndexAnnotation(kind, idx)
         if DEBUG:
@@ -115,15 +116,20 @@ class Indexer(DeclVisitor):
 
     def end_scope(self):
         super().end_scope()
-        if self.level > 0:
+        if self.level == 0:
+            emit_error("Cannot end the global scope!")()
+        else:
             popped = self.scopes[self.level]
             popped_indices = [
                 index for index in popped.values() if index.kind != Index.UNRESOLVED
             ]
+            # If there are resolved indices that went out of scope, reset back so that they can be
+            # re-used
             if popped_indices:
                 self.local_index = min(map(lambda index: index.value, popped_indices))
                 if DEBUG:
                     print(f"After popping local index is {self.local_index}")
+        # Remove the popped scope
         del self.scopes[self.level]
         self.level -= 1
 
@@ -183,8 +189,10 @@ class FunctionIndexer(Indexer):
 
     def visit_ident_expr(self, node):
         try:
+            # Try to index the name normally by delegating to super()
             super().visit_ident_expr(node)
         except ClrCompileError as undef_err:
+            # If it wasn't found look for it as a param
             for param_name, param_index in self.params:
                 if param_name == node.name.lexeme:
                     node.index_annotation = param_index
@@ -194,4 +202,5 @@ class FunctionIndexer(Indexer):
                         )
                     break
             else:
+                # If it still wasn't found raise the error again
                 raise undef_err

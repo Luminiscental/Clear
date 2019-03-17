@@ -1,4 +1,4 @@
-from clr.ast.expr import AstNode
+from clr.ast.tree import AstNode
 from clr.tokens import TokenType, token_info
 from clr.errors import parse_error, emit_error
 from clr.ast.expr import parse_expr
@@ -23,6 +23,7 @@ class StmtNode(AstNode):
     def __init__(self, parser):
         super().__init__(parser)
         self.return_annotation = ReturnAnnotation()
+        self.is_stmt = True
 
 
 class BlockStmt(StmtNode):

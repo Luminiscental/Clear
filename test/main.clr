@@ -1,39 +1,11 @@
 
-func printFac(int n) str {
-    func fac(int n)  num {
-        var counter = n;
-        var result = 1;
-        while counter > 1i {
-            result = result * num(counter);
-            counter = counter - 1i;
-        }
-        return result;
-    }
-    return str(n) + "! = " + str(fac(n));
+val MAX = 21i;
+var n = 2i;
+var result = 1;
+
+while n <= MAX {
+    result = num(n) * result;
+    n = n + 1i;
 }
 
-print printFac(100i);
-
-val MAX = 10i;
-var i = 0i;
-while i < MAX {
-    print printFac(i);
-    i = i + 1i;
-}
-
-func kindaLoop() int {
-    val BIG_MAX = 1000000i;
-    var counter = 0i;
-    while {
-        if counter == 0i {
-            print "goodbye...";
-        } else if counter > BIG_MAX {
-            print "ended!";
-            return 0i;
-        }
-        counter = counter + 1i;
-    }
-    return 0i;
-}
-
-kindaLoop();
+print str(MAX) + "! = " + str(result);

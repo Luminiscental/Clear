@@ -11,9 +11,11 @@ Classes:
 """
 from clr.tokens import TokenType
 from clr.errors import parse_error
-from clr.ast.stmt import BlockStmt, StmtNode, parse_stmt
+from clr.ast.stmt import BlockStmt, parse_stmt
+from clr.ast.tree import AstNode
 from clr.ast.expr import parse_expr
 from clr.ast.index import IndexAnnotation
+from clr.ast.type import parse_type
 
 
 def parse_decl(parser):
@@ -37,7 +39,7 @@ def parse_decl(parser):
     return parse_stmt(parser)
 
 
-class DeclNode(StmtNode):
+class DeclNode(AstNode):
     """
     This class stores the index annotation for an AST node of a declaration, inheriting from
     StmtNode and to be inherited in any declaration node classes.
@@ -52,6 +54,7 @@ class DeclNode(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         self.index_annotation = IndexAnnotation()
+        self.is_stmt = False
 
 
 class FuncDecl(DeclNode):
@@ -59,7 +62,7 @@ class FuncDecl(DeclNode):
     This class represents an AST node for a function declaration, initialized from a parser.
 
     It follows the grammar rule
-    FuncDecl : 'func' identifier '(' ( identifier identifier ( ',' identifier identifier )* )? ')' identifier? BlockStmt
+    FuncDecl : 'func' identifier '(' ( type identifier ( ',' type identifier )* )? ')' type BlockStmt
 
     Superclasses:
         - DeclNode
@@ -67,7 +70,7 @@ class FuncDecl(DeclNode):
     Fields:
         - name : the identifier token naming the declared function.
         - params : a list of (identifier, identifier) tuples for the parameters of the declared function.
-        - return_type : the identifier token naming the return type, or None if omitted.
+        - return_type : the identifier token naming the return type.
         - block : the BlockStmt of code defining the function.
 
     Methods:
@@ -79,6 +82,7 @@ class FuncDecl(DeclNode):
         parser.consume(
             TokenType.FUNC, parse_error("Expected function declaration!", parser)
         )
+        # Consume the name token
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected function name!", parser)
         )
@@ -88,26 +92,27 @@ class FuncDecl(DeclNode):
             parse_error("Expected '(' to start function parameters!", parser),
         )
         self.params = []
+        # Consume parameters until we hit the closing paren
         while not parser.match(TokenType.RIGHT_PAREN):
-            parser.consume(
-                TokenType.IDENTIFIER, parse_error("Expected parameter type!", parser)
-            )
-            param_type = parser.get_prev()
+            # Consume a type for the parameter
+            param_type = parse_type(parser)
+            # And then a name for the parameter
             parser.consume(
                 TokenType.IDENTIFIER, parse_error("Expected parameter name!", parser)
             )
             param_name = parser.get_prev()
+            # Append the parameters as (type, name) tuples
             pair = (param_type, param_name)
             self.params.append(pair)
+            # If we haven't hit the end there must be a comma before the next parameter
             if not parser.check(TokenType.RIGHT_PAREN):
                 parser.consume(
                     TokenType.COMMA,
-                    parse_error("Expected comma to delimit arguments!", parser),
+                    parse_error("Expected comma to delimit parameters!", parser),
                 )
-        if parser.match(TokenType.IDENTIFIER):
-            self.return_type = parser.get_prev()
-        else:
-            self.return_type = None
+        # Consume the return type
+        self.return_type = parse_type(parser)
+        # Consume the definition block
         self.block = BlockStmt(parser)
         self.token = self.name
 
@@ -146,6 +151,7 @@ class ValDecl(DeclNode):
             VAL_TOKENS, parse_error("Expected value declaration!", parser)
         )
         self.mutable = parser.get_prev().token_type == TokenType.VAR
+        # Consume the variable name
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
         )
@@ -153,6 +159,7 @@ class ValDecl(DeclNode):
         parser.consume(
             TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
         )
+        # Consume the expression to initialize with
         self.value = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
