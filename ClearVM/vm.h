@@ -5,6 +5,7 @@
 #include "table.h"
 #include "value.h"
 
+#define FRAMES_MAX 64
 // TODO: Multiple-byte indices
 #define STACK_MAX 256
 
@@ -35,7 +36,7 @@ typedef struct {
 void initLocalState(LocalState *state);
 void addLocal(LocalState *state, size_t index);
 void pushScope(LocalState *state);
-size_t popScope(LocalState *state);
+InterpretResult popScope(LocalState *state, size_t *out);
 void freeLocalState(LocalState *state);
 
 typedef struct {
@@ -50,24 +51,43 @@ void initGlobalState(GlobalState *state);
 void addGlobal(GlobalState *state, size_t index, Value value);
 InterpretResult getGlobal(GlobalState *state, size_t index, Value *out);
 
-typedef struct sVM {
+typedef struct sCallFrame {
 
-    Chunk *chunk;
+    // TODO: Upvalues
+
+    Value *params;
+    size_t arity;
+
     uint8_t *ip;
     Value stack[STACK_MAX];
     Value *stackTop;
+    LocalState localState;
+
+    VM *vm;
+
+} CallFrame;
+
+void initFrame(VM *vm, CallFrame *caller, size_t arity, CallFrame *frame);
+
+typedef struct sVM {
+
+    Chunk *chunk;
     Table strings;
+    // TODO: GC
     Obj *objects;
     GlobalState globalState;
-    LocalState localState;
+
+    CallFrame frames[FRAMES_MAX];
+    size_t frameDepth;
 
 } VM;
 
 void initVM(VM *vm);
-void resetStack(VM *vm);
-InterpretResult push(VM *vm, Value value);
-InterpretResult pop(VM *vm, Value *out);
-InterpretResult peek(VM *vm, Value *out);
+void resetStack(CallFrame *frame);
+InterpretResult push(CallFrame *frame, Value value);
+InterpretResult pop(CallFrame *frame, Value *out);
+InterpretResult peek(CallFrame *frame, Value *out);
+InterpretResult peekDistance(CallFrame *frame, int32_t lookback, Value *out);
 void freeVM(VM *vm);
 
 InterpretResult interpret(VM *vm, Chunk *chunk);

@@ -50,12 +50,20 @@ void pushScope(LocalState *state) {
     state->currentScope = makeScope(state->currentScope);
 }
 
-size_t popScope(LocalState *state) {
+InterpretResult popScope(LocalState *state, size_t *out) {
 
     Scope *popped = state->currentScope;
+    if (popped == NULL) {
+        printf("|| Cannot pop global scope!\n");
+        return INTERPRET_ERR;
+    }
     state->currentScope = popped->parent;
     state->localIndex -= popped->variables;
-    return popped->variables;
+    if (out != NULL) {
+
+        *out = popped->variables;
+    }
+    return INTERPRET_OK;
 }
 
 void freeLocalState(LocalState *state) { freeScope(state->currentScope); }
@@ -95,55 +103,87 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out) {
     return INTERPRET_ERR;
 }
 
+void initFrame(VM *vm, CallFrame *caller, size_t arity, CallFrame *frame) {
+
+    initLocalState(&frame->localState);
+    resetStack(frame);
+    frame->vm = vm;
+    frame->arity = arity;
+
+    if (caller != NULL) {
+
+        frame->params = caller->stackTop - arity;
+
+    } else {
+
+        frame->ip = vm->chunk->code;
+    }
+}
+
+static InterpretResult call(VM *vm, ObjFunction *function, uint8_t arity) {
+
+    if (vm->frameDepth >= FRAMES_MAX - 1) {
+
+        printf("|| Stack overflow!\n");
+        return INTERPRET_ERR;
+    }
+
+    CallFrame *caller = &vm->frames[vm->frameDepth];
+    CallFrame *callee = &vm->frames[vm->frameDepth + 1];
+
+    initFrame(vm, caller, arity, callee);
+    callee->ip = function->code;
+
+    vm->frameDepth++;
+
+    return INTERPRET_OK;
+}
+
 void initVM(VM *vm) {
-
-    resetStack(vm);
-
     vm->objects = NULL;
     initTable(&vm->strings);
 
     initGlobalState(&vm->globalState);
-    initLocalState(&vm->localState);
 }
 
-void resetStack(VM *vm) { vm->stackTop = vm->stack; }
+void resetStack(CallFrame *frame) { frame->stackTop = frame->stack; }
 
-InterpretResult push(VM *vm, Value value) {
+InterpretResult push(CallFrame *frame, Value value) {
 
-    if (vm->stackTop >= vm->stack + STACK_MAX - 1) {
+    if (frame->stackTop >= frame->stack + STACK_MAX - 1) {
 
         printf("|| Stack overflow!\n");
         return INTERPRET_ERR;
 
     } else {
 
-        *vm->stackTop = value;
-        vm->stackTop++;
+        *frame->stackTop = value;
+        frame->stackTop++;
         return INTERPRET_OK;
     }
 }
 
-InterpretResult pop(VM *vm, Value *out) {
+InterpretResult pop(CallFrame *frame, Value *out) {
 
-    if (vm->stackTop <= vm->stack) {
+    if (frame->stackTop <= frame->stack) {
 
         printf("|| Stack underflow!\n");
         return INTERPRET_ERR;
 
     } else {
 
-        vm->stackTop--;
+        frame->stackTop--;
 
         if (out != NULL)
-            *out = *vm->stackTop;
+            *out = *frame->stackTop;
 
         return INTERPRET_OK;
     }
 }
 
-InterpretResult peek(VM *vm, Value *out) {
+InterpretResult peekDistance(CallFrame *frame, int32_t lookback, Value *out) {
 
-    if (vm->stackTop <= vm->stack) {
+    if (frame->stackTop - lookback <= frame->stack) {
 
         printf("|| Stack underflow!\n");
         return INTERPRET_ERR;
@@ -151,65 +191,57 @@ InterpretResult peek(VM *vm, Value *out) {
     } else {
 
         if (out != NULL)
-            *out = vm->stackTop[-1];
+            *out = frame->stackTop[-lookback - 1];
 
         return INTERPRET_OK;
     }
 }
+
+InterpretResult peek(CallFrame *frame, Value *out) {
+
+    return peekDistance(frame, 0, out);
+}
+
+void freeFrame(CallFrame *frame) { freeLocalState(&frame->localState); }
 
 void freeVM(VM *vm) {
 
     freeTable(&vm->strings);
-    freeLocalState(&vm->localState);
     freeObjects(vm);
 }
 
 InterpretResult interpret(VM *vm, Chunk *chunk) {
 
     vm->chunk = chunk;
-    vm->ip = vm->chunk->code + vm->chunk->start;
 
     return run(vm);
 }
 
-static InterpretResult readByte(VM *vm, uint8_t *out) {
+static InterpretResult readByte(VM *vm, CallFrame *frame, uint8_t *out) {
 
-    if (1 + vm->ip - vm->chunk->code > vm->chunk->count) {
+    if (1 + frame->ip - vm->chunk->code > vm->chunk->count) {
 
         printf("|| Ran out of bytes!\n");
         return INTERPRET_ERR;
 
     } else {
 
-        *out = *vm->ip++;
+        *out = *frame->ip++;
         return INTERPRET_OK;
     }
 }
 
-static InterpretResult readBoolean(VM *vm, Value *out) {
+static InterpretResult readUint(VM *vm, CallFrame *frame, uint32_t *out) {
 
-    uint8_t val;
-    if (readByte(vm, &val) != INTERPRET_OK) {
-
-        printf("|| Could not read boolean!\n");
-        return INTERPRET_ERR;
-    }
-
-    *out = makeBoolean((bool)val);
-    return INTERPRET_OK;
-}
-
-static InterpretResult readUint(VM *vm, uint32_t *out) {
-
-    if (sizeof(uint32_t) + vm->ip - vm->chunk->code > vm->chunk->count) {
+    if (sizeof(uint32_t) + frame->ip - vm->chunk->code > vm->chunk->count) {
 
         printf("|| Ran out of bytes!\n");
         return INTERPRET_ERR;
     }
 
-    uint32_t *read = (uint32_t *)vm->ip;
+    uint32_t *read = (uint32_t *)frame->ip;
 
-    vm->ip += sizeof(uint32_t);
+    frame->ip += sizeof(uint32_t);
 
     if (out != NULL)
         *out = *read;
@@ -217,7 +249,7 @@ static InterpretResult readUint(VM *vm, uint32_t *out) {
 }
 
 #define ANY_OP(op)                                                             \
-    if (push(vm, op) != INTERPRET_OK) {                                        \
+    if (push(frame, op) != INTERPRET_OK) {                                     \
         printf("|| Could not push result of unary operation (code %d)!\n",     \
                instruction);                                                   \
         return INTERPRET_ERR;                                                  \
@@ -225,7 +257,7 @@ static InterpretResult readUint(VM *vm, uint32_t *out) {
 
 #define UNARY_OP                                                               \
     Value a;                                                                   \
-    if (pop(vm, &a) != INTERPRET_OK) {                                         \
+    if (pop(frame, &a) != INTERPRET_OK) {                                      \
         printf("|| Expected value for unary operation! (code %d)\n",           \
                instruction);                                                   \
         return INTERPRET_ERR;                                                  \
@@ -244,7 +276,7 @@ static InterpretResult readUint(VM *vm, uint32_t *out) {
 #define BINARY_OP                                                              \
     Value a;                                                                   \
     Value b;                                                                   \
-    if (pop(vm, &b) != INTERPRET_OK || pop(vm, &a) != INTERPRET_OK) {          \
+    if (pop(frame, &b) != INTERPRET_OK || pop(frame, &a) != INTERPRET_OK) {    \
         printf("|| Expected two values for binary operation! (code %d)\n",     \
                instruction);                                                   \
         return INTERPRET_ERR;                                                  \
@@ -260,11 +292,11 @@ static InterpretResult readUint(VM *vm, uint32_t *out) {
         ANY_OP(op)                                                             \
     }
 
-static void printStack(VM *vm) {
+static void printStack(CallFrame *frame) {
 
     printf("          ");
 
-    for (Value *slot = vm->stack; slot < vm->stackTop; slot++) {
+    for (Value *slot = frame->stack; slot < frame->stackTop; slot++) {
 
         printf("[ ");
         printValue(*slot, false);
@@ -274,32 +306,46 @@ static void printStack(VM *vm) {
     printf("\n");
 }
 
-static InterpretResult jump(VM *vm) {
+static InterpretResult loop(VM *vm, CallFrame *frame) {
 
     uint32_t offset;
-    if (readUint(vm, &offset) != INTERPRET_OK) {
+    if (readUint(vm, frame, &offset) != INTERPRET_OK) {
 
-        printf("|| Could not read offset to jump to!\n");
+        printf("|| Could not read offset to loop by!\n");
         return INTERPRET_ERR;
     }
 
-    vm->ip += offset;
+    frame->ip -= offset;
 
     return INTERPRET_OK;
 }
 
-static InterpretResult jumpIfFalse(VM *vm, bool condition) {
+static InterpretResult jump(VM *vm, CallFrame *frame) {
 
     uint32_t offset;
-    if (readUint(vm, &offset) != INTERPRET_OK) {
+    if (readUint(vm, frame, &offset) != INTERPRET_OK) {
 
-        printf("|| Could not read offset to jump to!\n");
+        printf("|| Could not read offset to jump by!\n");
+        return INTERPRET_ERR;
+    }
+
+    frame->ip += offset;
+
+    return INTERPRET_OK;
+}
+
+static InterpretResult jumpIfFalse(VM *vm, CallFrame *frame, bool condition) {
+
+    uint32_t offset;
+    if (readUint(vm, frame, &offset) != INTERPRET_OK) {
+
+        printf("|| Could not read offset to jump by!\n");
         return INTERPRET_ERR;
     }
 
     if (!condition) {
 
-        vm->ip += offset;
+        frame->ip += offset;
     }
 
     return INTERPRET_OK;
@@ -307,22 +353,28 @@ static InterpretResult jumpIfFalse(VM *vm, bool condition) {
 
 InterpretResult run(VM *vm) {
 
-    while (vm->ip - vm->chunk->code < vm->chunk->count) {
+    initFrame(vm, NULL, 0, vm->frames);
+    vm->frameDepth = 0;
+    vm->frames->ip = vm->chunk->code + vm->chunk->start;
+
+    for (CallFrame *frame = &vm->frames[vm->frameDepth];
+         frame->ip - vm->chunk->code < vm->chunk->count;
+         frame = &vm->frames[vm->frameDepth]) {
 
 #ifdef DEBUG_STACK
 
-        printStack(vm);
+        printStack(frame);
 
 #endif
 
 #ifdef DEBUG_TRACE
 
-        disassembleInstruction(vm->chunk, vm->ip - vm->chunk->code);
+        disassembleInstruction(vm->chunk, frame->ip - vm->chunk->code);
 
 #endif
 
         uint8_t instruction;
-        if (readByte(vm, &instruction) != INTERPRET_OK) {
+        if (readByte(vm, frame, &instruction) != INTERPRET_OK) {
 
             printf("|| Ran out of instructions!\n");
             return INTERPRET_ERR;
@@ -330,9 +382,19 @@ InterpretResult run(VM *vm) {
 
         switch (instruction) {
 
+            case OP_LOOP: {
+
+                if (loop(vm, frame) != INTERPRET_OK) {
+
+                    printf("|| Could not loop!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
             case OP_JUMP: {
 
-                if (jump(vm) != INTERPRET_OK) {
+                if (jump(vm, frame) != INTERPRET_OK) {
 
                     printf("|| Could not jump!\n");
                     return INTERPRET_ERR;
@@ -343,7 +405,7 @@ InterpretResult run(VM *vm) {
             case OP_JUMP_IF_NOT: {
 
                 Value condition;
-                if (peek(vm, &condition) != INTERPRET_OK) {
+                if (peek(frame, &condition) != INTERPRET_OK) {
 
                     printf("|| Could not read jump condition!\n");
                     return INTERPRET_ERR;
@@ -355,7 +417,8 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                if (jumpIfFalse(vm, condition.as.boolean) != INTERPRET_OK) {
+                if (jumpIfFalse(vm, frame, condition.as.boolean) !=
+                    INTERPRET_OK) {
 
                     printf("|| Could not jump!\n");
                     return INTERPRET_ERR;
@@ -365,16 +428,22 @@ InterpretResult run(VM *vm) {
 
             case OP_PUSH_SCOPE: {
 
-                pushScope(&vm->localState);
+                pushScope(&frame->localState);
 
             } break;
 
             case OP_POP_SCOPE: {
 
-                size_t popped = popScope(&vm->localState);
+                size_t popped;
+                if (popScope(&frame->localState, &popped) != INTERPRET_OK) {
+
+                    printf("|| Scope popping failed!\n");
+                    return INTERPRET_ERR;
+                }
+
                 for (size_t i = 0; i < popped; i++) {
 
-                    if (pop(vm, NULL) != INTERPRET_OK) {
+                    if (pop(frame, NULL) != INTERPRET_OK) {
 
                         printf("|| Could not fully pop scope!\n");
                         return INTERPRET_ERR;
@@ -383,19 +452,11 @@ InterpretResult run(VM *vm) {
 
             } break;
 
-            case OP_TYPE: {
-
-                UNARY_OP
-
-                ANY_OP(typeString(vm, a))
-
-            } break;
-
             case OP_TRUE: {
 
                 Value val = makeBoolean(true);
 
-                if (push(vm, val) != INTERPRET_OK) {
+                if (push(frame, val) != INTERPRET_OK) {
 
                     printf("|| Could not push boolean literal!\n");
                     return INTERPRET_ERR;
@@ -407,7 +468,7 @@ InterpretResult run(VM *vm) {
 
                 Value val = makeBoolean(false);
 
-                if (push(vm, val) != INTERPRET_OK) {
+                if (push(frame, val) != INTERPRET_OK) {
 
                     printf("|| Could not push boolean literal!\n");
                     return INTERPRET_ERR;
@@ -418,14 +479,14 @@ InterpretResult run(VM *vm) {
             case OP_DEFINE_GLOBAL: {
 
                 uint8_t index;
-                if (readByte(vm, &index) != INTERPRET_OK) {
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
 
                     printf("|| Expected index to define global!\n");
                     return INTERPRET_ERR;
                 }
 
                 Value val;
-                if (pop(vm, &val) != INTERPRET_OK) {
+                if (pop(frame, &val) != INTERPRET_OK) {
 
                     printf("|| Expected value to define global!\n");
                     return INTERPRET_ERR;
@@ -438,7 +499,7 @@ InterpretResult run(VM *vm) {
             case OP_LOAD_GLOBAL: {
 
                 uint8_t index;
-                if (readByte(vm, &index) != INTERPRET_OK) {
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
 
                     printf("|| Expected index to load global!\n");
                     return INTERPRET_ERR;
@@ -452,7 +513,7 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                if (push(vm, value) != INTERPRET_OK) {
+                if (push(frame, value) != INTERPRET_OK) {
 
                     printf("|| Could not push global value!\n");
                     return INTERPRET_ERR;
@@ -463,28 +524,28 @@ InterpretResult run(VM *vm) {
             case OP_DEFINE_LOCAL: {
 
                 uint8_t index;
-                if (readByte(vm, &index) != INTERPRET_OK) {
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
 
                     printf("|| Expected index to define local variable!\n");
                     return INTERPRET_ERR;
                 }
 
                 Value val;
-                if (pop(vm, &val) != INTERPRET_OK) {
+                if (pop(frame, &val) != INTERPRET_OK) {
 
                     printf("|| Expected value to define local variable!\n");
                     return INTERPRET_ERR;
                 }
 
-                addLocal(&vm->localState, index);
+                addLocal(&frame->localState, index);
 
-                if (index == vm->stackTop - vm->stack) {
+                if (index == frame->stackTop - frame->stack) {
 
-                    push(vm, val);
+                    push(frame, val);
 
-                } else if (index < vm->stackTop - vm->stack) {
+                } else if (index < frame->stackTop - frame->stack) {
 
-                    vm->stack[index] = val;
+                    frame->stack[index] = val;
 
                 } else {
 
@@ -497,15 +558,15 @@ InterpretResult run(VM *vm) {
             case OP_LOAD_LOCAL: {
 
                 uint8_t index;
-                if (readByte(vm, &index) != INTERPRET_OK) {
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
 
                     printf("|| Expected index to load local!\n");
                     return INTERPRET_ERR;
                 }
 
-                Value val = vm->stack[index];
+                Value val = frame->stack[index];
 
-                if (push(vm, val) != INTERPRET_OK) {
+                if (push(frame, val) != INTERPRET_OK) {
 
                     printf("|| Could not push local value!\n");
                     return INTERPRET_ERR;
@@ -521,8 +582,35 @@ InterpretResult run(VM *vm) {
 
             case OP_RETURN: {
 
-                // TODO:
-                return INTERPRET_OK;
+                Value result;
+                if (pop(frame, &result) != INTERPRET_OK) {
+
+                    printf("|| Could not pop value to return!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (vm->frameDepth == 0) {
+
+                    printf("|| Stack underflow! Cannot return from global "
+                           "scope\n");
+                    return INTERPRET_ERR;
+                }
+
+                CallFrame *caller = &vm->frames[vm->frameDepth - 1];
+
+                for (size_t index = 0; index <= frame->arity; index++) {
+
+                    if (pop(caller, NULL) != INTERPRET_OK) {
+
+                        printf("|| Could not pop call context!\n");
+                        return INTERPRET_ERR;
+                    }
+                }
+
+                push(caller, result);
+
+                freeFrame(frame);
+                vm->frameDepth--;
 
             } break;
 
@@ -536,7 +624,7 @@ InterpretResult run(VM *vm) {
 
                 Value value;
 
-                if (pop(vm, &value) != INTERPRET_OK) {
+                if (pop(frame, &value) != INTERPRET_OK) {
 
                     printf("|| Expected value to print!\n");
                     return INTERPRET_ERR;
@@ -549,7 +637,7 @@ InterpretResult run(VM *vm) {
             case OP_LOAD_CONST: {
 
                 uint8_t index;
-                if (readByte(vm, &index) != INTERPRET_OK) {
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
 
                     printf("|| Expected index of constant to load!\n");
                     return INTERPRET_ERR;
@@ -563,9 +651,79 @@ InterpretResult run(VM *vm) {
 
                 Value constant = vm->chunk->constants.values[index];
 
-                if (push(vm, constant) != INTERPRET_OK) {
+                if (push(frame, constant) != INTERPRET_OK) {
 
                     printf("|| Could not push constant value!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_LOAD_PARAM: {
+
+                uint8_t index;
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index of constant to load!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (frame->params == NULL) {
+
+                    printf("|| Cannot load parameter in global scope!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value param = frame->params[index];
+                if (push(frame, param) != INTERPRET_OK) {
+
+                    printf("|| Could not push parameter!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_START_FUNCTION: {
+
+                uint32_t size;
+                if (readUint(vm, frame, &size) != INTERPRET_OK) {
+
+                    printf("|| Expected function size!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value function = makeFunction(vm, frame->ip, (size_t)size);
+                frame->ip += size;
+                push(frame, function);
+
+            } break;
+
+            case OP_CALL: {
+
+                uint8_t arity;
+                if (readByte(vm, frame, &arity) != INTERPRET_OK) {
+
+                    printf("|| Expected arity for function call!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value function;
+                if (peekDistance(frame, arity, &function) != INTERPRET_OK) {
+
+                    printf("|| Could not load function to call!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (!isObjType(function, OBJ_FUNCTION)) {
+
+                    printf("|| Cannot call non-function!\n");
+                    return INTERPRET_ERR;
+                }
+
+                ObjFunction *functionObj = (ObjFunction *)function.as.obj;
+                if (call(vm, functionObj, arity) != INTERPRET_OK) {
+
+                    printf("|| Could not call function!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -593,10 +751,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot add values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers, "
-                           "integers or strings)\n");
+                    printf("|| Invalid types passed to binary operator '+'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -616,10 +771,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot subtract values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to binary operator '-'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -639,10 +791,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot multiply values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to binary operator '*'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -657,9 +806,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot divide values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must be both numbers)\n");
+                    printf("|| Invalid types passed to binary operator '/'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -679,10 +826,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot negate a value of type '%s'!\n",
-                           typeStringLiteral(a));
-                    printf(
-                        "|| (Value must be either a number or an integer)\n");
+                    printf("|| Invalid types passed to unary operator '-'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -718,10 +862,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '<'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -741,10 +882,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '>='!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -764,10 +902,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '>'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -787,10 +922,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '<='!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -805,9 +937,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot apply ! to a value of type '%s'!\n",
-                           typeStringLiteral(a));
-                    printf("|| (Value must be a boolean)\n");
+                    printf("|| Invalid types passed to unary operator '!'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -831,11 +961,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot convert a value of type '%s' to an "
-                           "integer!\n",
-                           typeStringLiteral(a));
-                    printf(
-                        "|| (Value must be an integer, number or boolean)\n");
+                    printf("|| Invalid type passed to built-in function 'int'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -864,11 +990,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf(
-                        "|| Cannot convert value of type '%s' to a boolean!\n",
-                        typeStringLiteral(a));
-                    printf("|| (Value must be a number, integer, boolean or "
-                           "string)\n");
+                    printf("|| Invalid type passed to built-in function 'bool'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -892,10 +1014,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf(
-                        "|| Cannot convert value of type '%s' to a number!\n",
-                        typeStringLiteral(a));
-                    printf("|| (Value must be a number, integer or boolean)\n");
+                    printf("|| Invalid type passed to built-in function 'num'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -924,11 +1043,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf(
-                        "|| Cannot convert a value of type '%s' to a string!\n",
-                        typeStringLiteral(a));
-                    printf("|| (Value must be a string, boolean, integer of "
-                           "number)\n");
+                    printf("|| Invalid type passed to built-in function 'str'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -945,6 +1060,14 @@ InterpretResult run(VM *vm) {
             } break;
         }
     }
+
+    if (vm->frameDepth > 0) {
+
+        printf("|| Call stack failed to unwind!\n");
+        return INTERPRET_ERR;
+    }
+
+    freeFrame(vm->frames);
 
     return INTERPRET_OK;
 }

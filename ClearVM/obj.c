@@ -1,6 +1,7 @@
 
 #include "obj.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -135,16 +136,31 @@ Value makeStringFromInteger(VM *vm, int32_t integer) {
     return makeString(vm, digits, buffer);
 }
 
-Value makeStringFromNumber(VM *vm, double number) {
+char *makeRawStringFromNumber(double number, size_t *lengthOut) {
 
     size_t minusSignLength = (number < 0) ? 1 : 0;
-    size_t preDecimalDigits = countDigits((int32_t)number);
+
+    double size = (number < 0) ? -number : number;
+    size_t preDecimalDigits = size < 1.0 ? 1 : 1 + (size_t)log10(size);
     size_t length = minusSignLength + preDecimalDigits + 1 + NUMBER_PLACES;
 
     char *buffer = ALLOCATE(char, length + 1);
     buffer[length] = '\0';
 
     snprintf(buffer, length + 1, "%.*f", NUMBER_PLACES, number);
+
+    if (lengthOut != NULL) {
+
+        *lengthOut = length;
+    }
+
+    return buffer;
+}
+
+Value makeStringFromNumber(VM *vm, double number) {
+
+    size_t length;
+    char *buffer = makeRawStringFromNumber(number, &length);
 
     return makeString(vm, length, buffer);
 }
@@ -189,6 +205,22 @@ Value concatStrings(VM *vm, ObjString *first, ObjString *second) {
     return makeString(vm, newLength, result);
 }
 
+Value makeFunction(VM *vm, uint8_t *code, size_t size) {
+
+    ObjFunction *objFunc = ALLOCATE_OBJ(vm, ObjFunction, OBJ_FUNCTION);
+
+    objFunc->code = code;
+    objFunc->size = size;
+    objFunc->ip = code;
+
+    Value result;
+
+    result.type = VAL_OBJ;
+    result.hash = (size_t)objFunc;
+    result.as.obj = (Obj *)objFunc;
+
+    return result;
+}
 bool isObjType(Value a, ObjType type) {
 
     return a.type == VAL_OBJ && a.as.obj->type == type;

@@ -6,7 +6,6 @@ from enum import Enum
 
 DEBUG = False
 DEBUG_ASSEMBLE = False
-DEBUG_PPRINT = False
 
 
 class OpCode(Enum):
@@ -30,37 +29,41 @@ class OpCode(Enum):
     DEFINE_LOCAL = 9
     LOAD_LOCAL = 10
     # Built-ins
-    TYPE = 11
-    INT = 12
-    BOOL = 13
-    NUM = 14
-    STR = 15
+    INT = 11
+    BOOL = 12
+    NUM = 13
+    STR = 14
     # Statements
-    PRINT = 16
-    PRINT_BLANK = 17
-    RETURN = 18
-    POP = 19
+    PRINT = 15
+    PRINT_BLANK = 16
+    RETURN = 17
+    POP = 18
     # Arithmetic operators
-    NEGATE = 20
-    ADD = 21
-    SUBTRACT = 22
-    MULTIPLY = 23
-    DIVIDE = 24
+    NEGATE = 19
+    ADD = 20
+    SUBTRACT = 21
+    MULTIPLY = 22
+    DIVIDE = 23
     # Comparison operators
-    LESS = 25
-    NLESS = 26
-    GREATER = 27
-    NGREATER = 28
-    EQUAL = 29
-    NEQUAL = 30
+    LESS = 24
+    NLESS = 25
+    GREATER = 26
+    NGREATER = 27
+    EQUAL = 28
+    NEQUAL = 29
     # Boolean operators
-    NOT = 31
+    NOT = 30
     # Scoping
-    PUSH_SCOPE = 32
-    POP_SCOPE = 33
+    PUSH_SCOPE = 31
+    POP_SCOPE = 32
     # Control flow
-    JUMP = 34
-    JUMP_IF_NOT = 35
+    JUMP = 33
+    JUMP_IF_NOT = 34
+    LOOP = 35
+    # Functions
+    LOAD_PARAM = 36
+    START_FUNCTION = 37
+    CALL = 38
 
     def __str__(self):
         return "OP_" + self.name

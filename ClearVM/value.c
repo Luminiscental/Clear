@@ -41,48 +41,6 @@ Value makeNumber(double number) {
     return result;
 }
 
-const char *typeStringLiteral(Value a) {
-
-    switch (a.type) {
-
-        case VAL_INTEGER: {
-
-            return "integer";
-
-        } break;
-
-        case VAL_BOOL: {
-
-            return "bool";
-
-        } break;
-
-        case VAL_NUMBER: {
-
-            return "number";
-
-        } break;
-
-        case VAL_OBJ: {
-
-            switch (a.as.obj->type) {
-
-                case OBJ_STRING: {
-
-                    return "string (obj)";
-
-                } break;
-            }
-
-        } break;
-    }
-}
-
-Value typeString(VM *vm, Value a) {
-
-    return makeStringFromLiteral(vm, typeStringLiteral(a));
-}
-
 bool valuesEqual(Value a, Value b) {
 
     if (a.type != b.type)
@@ -121,6 +79,12 @@ bool valuesEqual(Value a, Value b) {
             switch (a.as.obj->type) {
 
                 case OBJ_STRING: {
+
+                    return a.as.obj == b.as.obj;
+
+                } break;
+
+                case OBJ_FUNCTION: {
 
                     return a.as.obj == b.as.obj;
 
@@ -169,7 +133,10 @@ void printValue(Value value, bool endLine) {
 
         case VAL_NUMBER: {
 
-            printf("%g", value.as.number);
+            size_t length;
+            char *rawString = makeRawStringFromNumber(value.as.number, &length);
+            printf("%s", rawString);
+            FREE_ARRAY(char, rawString, length);
 
         } break;
 
@@ -187,6 +154,13 @@ void printValue(Value value, bool endLine) {
 
                     ObjString *strObj = (ObjString *)value.as.obj;
                     printf("%s", strObj->chars);
+
+                } break;
+
+                case OBJ_FUNCTION: {
+
+                    ObjFunction *funcObj = (ObjFunction *)value.as.obj;
+                    printf("<fn %p>", funcObj);
 
                 } break;
             }

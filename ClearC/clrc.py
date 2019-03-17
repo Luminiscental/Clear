@@ -5,7 +5,7 @@ to bytecode files.
 import sys
 from clr.errors import ClrCompileError
 from clr.values import DEBUG
-from clr.ast import Ast
+from clr.ast.tree import Ast
 from clr.assemble import assemble
 
 
@@ -28,11 +28,11 @@ def main():
     with open(source_file_name, "r") as source_file:
         source = source_file.read()
     try:
-        if DEBUG:
-            print("Compiling:")
         ast = Ast.from_source(source)
         # TODO: Gen debug symbols
         code = ast.compile()
+        if DEBUG:
+            print("Assembling:")
         byte_code = assemble(code)
     except ClrCompileError as compile_error:
         print("Could not compile:")

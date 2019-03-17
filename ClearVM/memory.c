@@ -39,6 +39,13 @@ static void freeObject(Obj *object) {
             FREE(ObjString, objStr);
 
         } break;
+
+        case OBJ_FUNCTION: {
+
+            ObjFunction *objFunc = (ObjFunction *)object;
+            FREE(ObjFunction, objFunc);
+
+        } break;
     }
 }
 

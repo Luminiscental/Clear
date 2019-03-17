@@ -1,172 +1,44 @@
 
-// Simple test program:
+val MAX = 21i;
+var n = 2i;
+var result = 1;
 
-var cond = false or true;
-print "cond = " + str(cond);
+while n <= MAX {
 
-cond = false;
-print "cond = " + str(cond);
+    result = num(n) * result;
+    n = n + 1i;
+}
 
-// val maltyped = 1 + "cake";
-// val weird = 2 or false;
+print str(MAX) + "! = " + str(result);
 
-if true or false {
+print "x^2 of 1 + (x-1)/2";
 
-    print "true or false = true";
+func printValue(num x) int {
 
-    val a = !!false;
-    print "a = " + str(a);
+    func f(num n) num {
 
-    // TODO: disallow repeated unary operators? i.e. force -(-(-3)) instead of ---3
-    val a = -----------7 + ----------------------------13;
-    print "a = " + str(a);
-
-    if true and true {
-
-        print "true and true = true";
-
+        return n * n;
     }
 
-    if true and false {
+    func g(num n) num {
 
-        print "true and false = true";
-
-    } else {
-
-        print "true and false = false";
+        return 1 + (n - 1) / 2;
     }
 
-} else if false {
+    func compose(func(num) num f, func(num) num g, num n) num {
 
-    print "false";
-
-} else {
-
-    print "neither";
-}
-
-{
-    // empty scope
-}
-
-{
-    val i = "happens in a scope";
-    {
-        val i = "gets shadowed ~~ooo~~";
-
-        val i = 1i; // replaced
-        val f = i;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        val i = i + 1i;
-        val f = i * f;
-
-        print str(i) + "! = " + str(f);
-        print;
+        return f(g(n));
     }
-    print i;
+
+    print "x=" + str(x) + " : " + str(compose(f, g, x)) + " : d=" + str(compose(f, g, x) - x);
+
+    return 0i;
 }
 
-{
-    print " ~~ooo~~ empty scope";
+var n = 0;
+while n <= 10 {
+
+    printValue(n);
+    n = n + 1;
 }
 
-if true {
-
-    print "true is true!";
-
-} else {
-
-    print "true isn't true!";
-}
-
-if false {
-
-    print "false is true!";
-
-} else {
-
-    print "false isn't true!";
-}
-
-{
-    val mine = 23.7;
-    val yours = 14;
-
-    if mine > yours {
-
-        print "Mine's bigger than yours ~~~";
-
-    } else {
-
-        print "...we won't talk about this.";
-    }
-}
-
-print;
-
-val x = 3.7;
-print "x = " + str(x);
-
-print;
-
-val j = -293502935i;
-print "j = " + str(j);
-
-print;
-
-val y = 348.524 - 9204924.282326;
-print "y = " + str(y);
-
-print;
-
-val tasty = true;
-val notTasty = false;
-
-print "tasty = " + str(tasty);
-print "notTasty = " + str(notTasty);
-print "tasty == !notTasty = " + str(tasty == !notTasty);
-
-print;
-
-val something = 0;
-print str(something) + " is " + str(bool(something));
-
-print;
-
-val empty = "";
-print """" + empty + """ is " + str(bool(empty));
-
-print;
-
-val notEmpty = "hello";
-print """" + notEmpty + """ is " + str(bool(notEmpty));
-
-print;
-
-print "2.3 < 2.4 = " + str(2.3 < 2.4);
-print "2.3 == 1.2 + 1.1 = " + str(2.3 == 1.2 + 1.1);
-print "-1.7 <= -1.5 - 0.2 = " + str(-1.7 <= -1.5 - 0.2);

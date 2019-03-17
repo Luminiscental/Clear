@@ -58,12 +58,6 @@ class TokenType(Enum):
     VAL = "val"
     VAR = "var"
     WHILE = "while"
-    # built-ins
-    TYPE = "type"
-    INT = "int"
-    BOOL = "bool"
-    NUM = "num"
-    STR = "str"
     # special
     SPACE = "<whitespace>"
     EOF = "<eof>"
@@ -73,7 +67,13 @@ class TokenType(Enum):
         return self.value
 
 
-Token = namedtuple("Token", "token_type lexeme line")
+class Token(namedtuple("Token", "token_type lexeme line")):
+    """
+    This class wraps a namedtuple to store information about a single token.
+    """
+
+    def __str__(self):
+        return self.lexeme
 
 
 KEYWORD_TYPES = {
@@ -93,11 +93,6 @@ KEYWORD_TYPES = {
     "val": TokenType.VAL,
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
-    "type": TokenType.TYPE,
-    "int": TokenType.INT,
-    "bool": TokenType.BOOL,
-    "num": TokenType.NUM,
-    "str": TokenType.STR,
 }
 
 SIMPLE_TOKENS = {
