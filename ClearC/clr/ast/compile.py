@@ -343,13 +343,14 @@ class Compiler(DeclVisitor):
             )()
 
     def visit_call_expr(self, node):
-        super().visit_call_expr(node)
-        if node.target.name.lexeme in BUILTINS:
-            # TODO: Refactor builtins to be handled by the vm
-            # If we are calling a built-in emit the opcode associated with it
-            _, opcode = BUILTINS[node.target.name.lexeme]
+        if node.target.is_ident and node.target.name.lexeme in BUILTINS:
+            # Don't call super if it's a built-in because we don't want to evaluate the name
+            opcode = BUILTINS[node.target.name.lexeme].opcode
+            for arg in node.arguments:
+                arg.accept(self)
             self.program.simple_op(opcode)
         else:
+            super().visit_call_expr(node)
             self.program.simple_op(OpCode.CALL)
             self.program.simple_op(len(node.arguments))
 
@@ -371,10 +372,9 @@ class Compiler(DeclVisitor):
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
-        if node.name.lexeme not in BUILTINS:
-            if DEBUG:
-                print(f"Loading name for {node.get_info()}")
-            self.program.load_name(node.index_annotation)
+        if DEBUG:
+            print(f"Loading name for {node.get_info()}")
+        self.program.load_name(node.index_annotation)
 
     def visit_and_expr(self, node):
         # No super because we need to put the jumps in the right place

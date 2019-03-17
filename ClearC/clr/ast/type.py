@@ -1,8 +1,9 @@
 from enum import Enum
+from collections import namedtuple
 from clr.errors import parse_error
 from clr.tokens import TokenType
-from clr.values import OpCode
 from clr.ast.tree import AstNode
+from clr.values import OpCode
 
 
 class Type(Enum):
@@ -27,29 +28,20 @@ class Return(Enum):
 
 
 class FuncInfo:
-    def __init__(self, return_type, overloads):
+    def __init__(self, return_type, signature):
         self.return_type = return_type
-        self.overloads = overloads
+        self.signature = signature
 
     def __str__(self):
-        return " or ".join(
-            map(
-                lambda overload: "func("
-                + ", ".join(map(str, overload))
-                + ") "
-                + str(self.return_type),
-                self.overloads,
-            )
+        return (
+            "func(" + ", ".join(map(str, self.signature)) + ") " + str(self.return_type)
         )
 
     def __eq__(self, other):
         return (
             isinstance(other, FuncInfo)
             and self.return_type == other.return_type
-            and len(
-                [overload for overload in self.overloads if overload in other.overloads]
-            )
-            > 0
+            and self.signature == other.signature
         )
 
 
@@ -137,7 +129,7 @@ class FunctionType(TypeNode):
     def as_annotation(self):
         func_info = FuncInfo(
             return_type=self.return_type.as_annotation(),
-            overloads=[list(map(lambda param: param.as_annotation(), self.params))],
+            signature=list(map(lambda param: param.as_annotation(), self.params)),
         )
         return TypeAnnotation(kind=Type.FUNCTION, func_info=func_info)
 
@@ -149,52 +141,27 @@ BOOL_TYPE = TypeAnnotation(kind=Type.BOOL)
 
 SIMPLE_TYPES = {"int": INT_TYPE, "num": NUM_TYPE, "str": STR_TYPE, "bool": BOOL_TYPE}
 
+Builtin = namedtuple("Builtin", ("param_types", "opcode", "return_type"))
+
 BUILTINS = {
-    "type": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=STR_TYPE,
-                overloads=[[STR_TYPE], [INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-            ),
-        ),
-        OpCode.TYPE,
+    "int": Builtin(
+        param_types=[INT_TYPE, NUM_TYPE, BOOL_TYPE],
+        opcode=OpCode.INT,
+        return_type=INT_TYPE,
     ),
-    "int": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=INT_TYPE, overloads=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]]
-            ),
-        ),
-        OpCode.INT,
+    "num": Builtin(
+        param_types=[INT_TYPE, NUM_TYPE, BOOL_TYPE],
+        opcode=OpCode.NUM,
+        return_type=NUM_TYPE,
     ),
-    "num": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=NUM_TYPE, overloads=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]]
-            ),
-        ),
-        OpCode.NUM,
+    "str": Builtin(
+        param_types=[INT_TYPE, NUM_TYPE, STR_TYPE, BOOL_TYPE],
+        opcode=OpCode.STR,
+        return_type=STR_TYPE,
     ),
-    "bool": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=BOOL_TYPE, overloads=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]]
-            ),
-        ),
-        OpCode.BOOL,
-    ),
-    "str": (
-        TypeAnnotation(
-            kind=Type.FUNCTION,
-            func_info=FuncInfo(
-                return_type=STR_TYPE,
-                overloads=[[STR_TYPE], [INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-            ),
-        ),
-        OpCode.STR,
+    "bool": Builtin(
+        param_types=[INT_TYPE, NUM_TYPE, BOOL_TYPE],
+        opcode=OpCode.BOOL,
+        return_type=BOOL_TYPE,
     ),
 }

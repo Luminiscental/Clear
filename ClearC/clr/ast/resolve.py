@@ -22,8 +22,6 @@ class TypeResolver(DeclVisitor):
         self.scopes = [defaultdict(TypeAnnotation)]
         self.expected_returns = []
         self.level = 0
-        for builtin, (builtin_type, _) in BUILTINS.items():
-            self._declare_name(builtin, builtin_type)
 
     def _declare_name(self, name, type_annotation):
         self.scopes[self.level][name] = type_annotation
@@ -49,41 +47,36 @@ class TypeResolver(DeclVisitor):
         self.level -= 1
 
     def visit_call_expr(self, node):
-        super().visit_call_expr(node)
-        function_type = node.target.type_annotation
-        if function_type.kind != Type.FUNCTION:
-            emit_error(
-                f"Attempt to call a non-callable object {node.target}! {node.get_info()}"
-            )()
-        passed_signature = list(map(lambda arg: arg.type_annotation, node.arguments))
-        with_len = [
-            overload
-            for overload in function_type.func_info.overloads
-            if len(overload) == len(passed_signature)
-        ]
-        if not with_len:
-            possible_lens = (
-                "["
-                + ", ".join(
-                    map(
-                        lambda overload: str(len(overload)),
-                        function_type.func_info.overloads,
-                    )
-                )
-                + "]"
-            )
-            emit_error(
-                f"No signature with matching number of passed arguments, found {len(passed_signature)} which is not one of the possibilities {possible_lens}! {node.get_info()}"
-            )()
-        args = "(" + ", ".join(map(str, passed_signature)) + ")"
-        for overload in with_len:
-            if overload == passed_signature:
-                break
+        if node.target.is_ident and node.target.name.lexeme in BUILTINS:
+            # If it's a built-in don't call super() as we don't evaluate the target
+            if len(node.arguments) != 1:
+                emit_error(
+                    f"Built-in function {node.target} only takes one argument! {node.get_info()}"
+                )()
+            arg = node.arguments[0]
+            arg.accept(self)
+            builtin = BUILTINS[node.target.name.lexeme]
+            if arg.type_annotation not in builtin.param_types:
+                emit_error(
+                    f"Built-in function {node.target} cannot take an argument of type {arg.type_annotation}! {node.get_info()}"
+                )()
+            node.type_annotation = builtin.return_type
         else:
-            emit_error(
-                f"Could not find signature for function matching provided argument list {args}! {node.get_info()}"
-            )()
-        node.type_annotation = function_type.func_info.return_type
+            super().visit_call_expr(node)
+            function_type = node.target.type_annotation
+            if function_type.kind != Type.FUNCTION:
+                emit_error(
+                    f"Attempt to call a non-callable object {node.target}! {node.get_info()}"
+                )()
+            passed_signature = list(
+                map(lambda arg: arg.type_annotation, node.arguments)
+            )
+            args = "(" + ", ".join(map(str, passed_signature)) + ")"
+            if passed_signature != function_type.func_info.signature:
+                emit_error(
+                    f"Could not find signature for function matching provided argument list {args}! {node.get_info()}"
+                )()
+            node.type_annotation = function_type.func_info.return_type
 
     def visit_unary_expr(self, node):
         super().visit_unary_expr(node)
@@ -159,6 +152,10 @@ class TypeResolver(DeclVisitor):
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
+        if node.name.lexeme in BUILTINS:
+            emit_error(
+                f"Invalid identifier name {node.name.lexeme}! This is reserved for the built-in function {node.name.lexeme}(). {node.get_info()}"
+            )()
         node.type_annotation = self._lookup_name(node.name.lexeme)
         if node.type_annotation.kind == Type.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {node.get_info()}")()
@@ -247,7 +244,7 @@ class TypeResolver(DeclVisitor):
         # Resolve the return type
         return_type = node.return_type.as_annotation()
         # Create an annotation for the function signature
-        func_info = FuncInfo(return_type=return_type, overloads=[arg_types])
+        func_info = FuncInfo(return_type=return_type, signature=arg_types)
         type_annotation = TypeAnnotation(
             kind=Type.FUNCTION, assignable=False, func_info=func_info
         )

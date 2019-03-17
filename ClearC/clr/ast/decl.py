@@ -9,13 +9,13 @@ Classes:
     - FuncDecl
     - ValDecl
 """
-from clr.tokens import TokenType
-from clr.errors import parse_error
+from clr.tokens import TokenType, token_info
+from clr.errors import parse_error, emit_error
 from clr.ast.stmt import BlockStmt, parse_stmt
 from clr.ast.tree import AstNode
 from clr.ast.expr import parse_expr
 from clr.ast.index import IndexAnnotation
-from clr.ast.type import parse_type
+from clr.ast.type import parse_type, BUILTINS
 
 
 def parse_decl(parser):
@@ -54,7 +54,6 @@ class DeclNode(AstNode):
     def __init__(self, parser):
         super().__init__(parser)
         self.index_annotation = IndexAnnotation()
-        self.is_stmt = False
 
 
 class FuncDecl(DeclNode):
@@ -87,6 +86,10 @@ class FuncDecl(DeclNode):
             TokenType.IDENTIFIER, parse_error("Expected function name!", parser)
         )
         self.name = parser.get_prev()
+        if self.name.lexeme in BUILTINS:
+            emit_error(
+                f"Invalid identifier name {self.name.lexeme}! This is reserved for the built-in function {self.name.lexeme}(). {token_info(self.name)}"
+            )()
         parser.consume(
             TokenType.LEFT_PAREN,
             parse_error("Expected '(' to start function parameters!", parser),
@@ -156,6 +159,10 @@ class ValDecl(DeclNode):
             TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
         )
         self.name = parser.get_prev()
+        if self.name.lexeme in BUILTINS:
+            emit_error(
+                f"Invalid identifier name {self.name.lexeme}! This is reserved for the built-in function {self.name.lexeme}(). {token_info(self.name)}"
+            )()
         parser.consume(
             TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
         )

@@ -266,12 +266,6 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         } break;
 
-        case OP_TYPE: {
-
-            return simpleInstruction("OP_TYPE", offset);
-
-        } break;
-
         case OP_PRINT: {
 
             return simpleInstruction("OP_PRINT", offset);

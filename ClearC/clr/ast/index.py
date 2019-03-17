@@ -133,14 +133,21 @@ class Indexer(DeclVisitor):
         del self.scopes[self.level]
         self.level -= 1
 
+    def visit_call_expr(self, node):
+        if node.target.is_ident and node.target.name.lexeme in BUILTINS:
+            # If it's a built-in don't call super as we don't want to lookup the name
+            for arg in node.arguments:
+                arg.accept(self)
+        else:
+            super().visit_call_expr(node)
+
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
-        if node.name.lexeme not in BUILTINS:
-            node.index_annotation = self._lookup_name(node.name.lexeme)
-            if node.index_annotation.kind == Index.UNRESOLVED:
-                emit_error(f"Reference to undefined identifier! {node.get_info()}")()
-            elif DEBUG:
-                print(f"Set index for {node.get_info()} as {node.index_annotation}")
+        node.index_annotation = self._lookup_name(node.name.lexeme)
+        if node.index_annotation.kind == Index.UNRESOLVED:
+            emit_error(f"Reference to undefined identifier! {node.get_info()}")()
+        elif DEBUG:
+            print(f"Set index for {node.get_info()} as {node.index_annotation}")
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)

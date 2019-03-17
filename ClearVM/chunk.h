@@ -26,49 +26,48 @@ typedef enum {
     OP_LOAD_LOCAL = 10,
 
     // Built-ins
-    OP_TYPE = 11,
-    OP_INT = 12,
-    OP_BOOL = 13,
-    OP_NUM = 14,
-    OP_STR = 15,
+    OP_INT = 11,
+    OP_BOOL = 12,
+    OP_NUM = 13,
+    OP_STR = 14,
 
     // Statements
-    OP_PRINT = 16,
-    OP_PRINT_BLANK = 17,
-    OP_RETURN = 18,
-    OP_POP = 19,
+    OP_PRINT = 15,
+    OP_PRINT_BLANK = 16,
+    OP_RETURN = 17,
+    OP_POP = 18,
 
     // Arithmetic operators
-    OP_NEGATE = 20,
-    OP_ADD = 21,
-    OP_SUBTRACT = 22,
-    OP_MULTIPLY = 23,
-    OP_DIVIDE = 24,
+    OP_NEGATE = 19,
+    OP_ADD = 20,
+    OP_SUBTRACT = 21,
+    OP_MULTIPLY = 22,
+    OP_DIVIDE = 23,
 
     // Comparison operators
-    OP_LESS = 25,
-    OP_NLESS = 26,
-    OP_GREATER = 27,
-    OP_NGREATER = 28,
-    OP_EQUAL = 29,
-    OP_NEQUAL = 30,
+    OP_LESS = 24,
+    OP_NLESS = 25,
+    OP_GREATER = 26,
+    OP_NGREATER = 27,
+    OP_EQUAL = 28,
+    OP_NEQUAL = 29,
 
     // Boolean operators
-    OP_NOT = 31,
+    OP_NOT = 30,
 
     // Scoping
-    OP_PUSH_SCOPE = 32,
-    OP_POP_SCOPE = 33,
+    OP_PUSH_SCOPE = 31,
+    OP_POP_SCOPE = 32,
 
     // Control flow
-    OP_JUMP = 34,
-    OP_JUMP_IF_NOT = 35,
-    OP_LOOP = 36,
+    OP_JUMP = 33,
+    OP_JUMP_IF_NOT = 34,
+    OP_LOOP = 35,
 
     // Functions
-    OP_LOAD_PARAM = 37,
-    OP_START_FUNCTION = 38,
-    OP_CALL = 39
+    OP_LOAD_PARAM = 36,
+    OP_START_FUNCTION = 37,
+    OP_CALL = 38
 
 } OpCode;
 

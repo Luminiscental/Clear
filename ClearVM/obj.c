@@ -221,7 +221,6 @@ Value makeFunction(VM *vm, uint8_t *code, size_t size) {
 
     return result;
 }
-
 bool isObjType(Value a, ObjType type) {
 
     return a.type == VAL_OBJ && a.as.obj->type == type;

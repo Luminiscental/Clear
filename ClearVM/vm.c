@@ -452,14 +452,6 @@ InterpretResult run(VM *vm) {
 
             } break;
 
-            case OP_TYPE: {
-
-                UNARY_OP
-
-                ANY_OP(typeString(vm, a))
-
-            } break;
-
             case OP_TRUE: {
 
                 Value val = makeBoolean(true);
@@ -759,10 +751,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot add values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers, "
-                           "integers or strings)\n");
+                    printf("|| Invalid types passed to binary operator '+'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -782,10 +771,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot subtract values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to binary operator '-'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -805,10 +791,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot multiply values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to binary operator '*'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -823,9 +806,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot divide values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Values must be both numbers)\n");
+                    printf("|| Invalid types passed to binary operator '/'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -845,10 +826,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot negate a value of type '%s'!\n",
-                           typeStringLiteral(a));
-                    printf(
-                        "|| (Value must be either a number or an integer)\n");
+                    printf("|| Invalid types passed to unary operator '-'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -884,10 +862,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '<'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -907,10 +882,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '>='!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -930,10 +902,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '>'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -953,10 +922,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot compare values of type '%s' and '%s'!\n",
-                           typeStringLiteral(a), typeStringLiteral(b));
-                    printf("|| (Types must be the same, and either numbers or "
-                           "integers)\n");
+                    printf("|| Invalid types passed to comparison operator '<='!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -971,9 +937,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot apply ! to a value of type '%s'!\n",
-                           typeStringLiteral(a));
-                    printf("|| (Value must be a boolean)\n");
+                    printf("|| Invalid types passed to unary operator '!'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -997,11 +961,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf("|| Cannot convert a value of type '%s' to an "
-                           "integer!\n",
-                           typeStringLiteral(a));
-                    printf(
-                        "|| (Value must be an integer, number or boolean)\n");
+                    printf("|| Invalid type passed to built-in function 'int'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -1030,11 +990,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf(
-                        "|| Cannot convert value of type '%s' to a boolean!\n",
-                        typeStringLiteral(a));
-                    printf("|| (Value must be a number, integer, boolean or "
-                           "string)\n");
+                    printf("|| Invalid type passed to built-in function 'bool'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -1058,10 +1014,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf(
-                        "|| Cannot convert value of type '%s' to a number!\n",
-                        typeStringLiteral(a));
-                    printf("|| (Value must be a number, integer or boolean)\n");
+                    printf("|| Invalid type passed to built-in function 'num'!\n");
                     return INTERPRET_ERR;
                 }
 
@@ -1090,11 +1043,7 @@ InterpretResult run(VM *vm) {
 
                 else {
 
-                    printf(
-                        "|| Cannot convert a value of type '%s' to a string!\n",
-                        typeStringLiteral(a));
-                    printf("|| (Value must be a string, boolean, integer of "
-                           "number)\n");
+                    printf("|| Invalid type passed to built-in function 'str'!\n");
                     return INTERPRET_ERR;
                 }
 

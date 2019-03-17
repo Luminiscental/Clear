@@ -378,6 +378,7 @@ class IdentExpr(ExprNode):
         self.name = parser.get_prev()
         # Identifiers have indices, by default it is unresolved
         self.index_annotation = IndexAnnotation()
+        self.is_ident = True
 
     def accept(self, expr_visitor):
         """

@@ -10,6 +10,8 @@ class AstNode:
 
     Fields:
         - token : the representative token; by default the first token parsed in the node.
+        - is_ident : boolean for whether this is an identifier node.
+        - is_stmt : boolean for whether this is a statement node.
 
     Methods:
         get_info
@@ -17,10 +19,15 @@ class AstNode:
 
     def __init__(self, parser):
         self.token = parser.get_current()
+        self.is_ident = False
+        self.is_stmt = False
 
     def get_info(self):
         """
-        Returns information describing the representative token for this node.
+        This method returns information describing the representative token for this node.
+
+        Returns:
+            a string with information about the representative token.
         """
         return token_info(self.token)
 

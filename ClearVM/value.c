@@ -41,48 +41,6 @@ Value makeNumber(double number) {
     return result;
 }
 
-const char *typeStringLiteral(Value a) {
-
-    switch (a.type) {
-
-        case VAL_INTEGER: {
-
-            return "integer";
-
-        } break;
-
-        case VAL_BOOL: {
-
-            return "bool";
-
-        } break;
-
-        case VAL_NUMBER: {
-
-            return "number";
-
-        } break;
-
-        case VAL_OBJ: {
-
-            switch (a.as.obj->type) {
-
-                case OBJ_STRING: {
-
-                    return "string (obj)";
-
-                } break;
-            }
-
-        } break;
-    }
-}
-
-Value typeString(VM *vm, Value a) {
-
-    return makeStringFromLiteral(vm, typeStringLiteral(a));
-}
-
 bool valuesEqual(Value a, Value b) {
 
     if (a.type != b.type)
@@ -202,7 +160,7 @@ void printValue(Value value, bool endLine) {
                 case OBJ_FUNCTION: {
 
                     ObjFunction *funcObj = (ObjFunction *)value.as.obj;
-                    printf("%p", funcObj);
+                    printf("<fn %p>", funcObj);
 
                 } break;
             }
