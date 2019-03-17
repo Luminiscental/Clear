@@ -1,6 +1,6 @@
 
-func printFac(int n) {
-    func fac(int n) {
+func printFac(int n) str {
+    func fac(int n)  num {
         var counter = n;
         var result = 1;
         while counter > 1i {
@@ -21,7 +21,7 @@ while i < MAX {
     i = i + 1i;
 }
 
-func kindaLoop() {
+func kindaLoop() int {
     val BIG_MAX = 1000000i;
     var counter = 0i;
     while {

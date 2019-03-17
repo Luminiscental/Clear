@@ -4,7 +4,7 @@ from collections import defaultdict
 from clr.tokens import TokenType
 from clr.errors import emit_error
 from clr.ast.visitor import DeclVisitor
-from clr.values import OpCode
+from clr.values import OpCode, DEBUG
 
 
 class Type(Enum):
@@ -44,10 +44,19 @@ class FuncInfo:
 class TypeAnnotation:
     def __init__(self, kind=Type.UNRESOLVED, assignable=False, func_info=None):
         self.kind = kind
-        if type(self.kind) == type(self):
-            print(f"Created a weird kind!!!!!!!!!!!!!!!!!!")
         self.func_info = func_info
         self.assignable = assignable
+
+    @staticmethod
+    def from_ident(name):
+        if name is None:
+            return None
+        return {
+            "int": INT_TYPE,
+            "num": NUM_TYPE,
+            "str": STR_TYPE,
+            "bool": BOOL_TYPE,
+        }.get(name.lexeme, TypeAnnotation())
 
     def __repr__(self):
         return str(self.kind)
@@ -303,13 +312,13 @@ class TypeResolver(DeclVisitor):
                 f"Return statement found outside of function! {node.get_info()}"
             )()
         expected = self.expected_returns[-1]
-        if expected.kind != Type.UNRESOLVED and expected != node.value.type_annotation:
+        if expected is None:
+            emit_error(f"Return statement found in void function! {node.get_info()}")()
+        if expected != node.value.type_annotation:
             emit_error(
-                f"Incompatible return type! Already expected {expected} but was given {node.value.type_annotation}! {node.get_info()}"
+                f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation}! {node.get_info()}"
             )()
-        expected = node.value.type_annotation
         node.return_annotation = ReturnAnnotation(Return.ALWAYS, expected)
-        self.expected_returns[-1] = expected
 
     def visit_while_stmt(self, node):
         super().visit_while_stmt(node)
@@ -343,35 +352,42 @@ class TypeResolver(DeclVisitor):
 
     def visit_func_decl(self, node):
         # No super because we handle the params
-        self.start_scope()
-        self.expected_returns.append(TypeAnnotation())
+        # Iterate over the parameters and resolve to types
         arg_types = []
         for param_type, param_name in node.params:
-            resolved_type = {
-                "int": TypeAnnotation(kind=Type.INT),
-                "num": TypeAnnotation(kind=Type.NUM),
-                "str": TypeAnnotation(kind=Type.STR),
-                "bool": TypeAnnotation(kind=Type.BOOL),
-            }.get(param_type.lexeme, TypeAnnotation())
+            resolved_type = TypeAnnotation.from_ident(param_type)
             if resolved_type.kind == Type.UNRESOLVED:
                 emit_error(
                     f"Invalid parameter type {param_type} for function! {node.get_info()}"
                 )()
             arg_types.append(resolved_type)
-            self._declare_name(param_name.lexeme, resolved_type)
-        node.block.accept(self)
-        self.end_scope()
-        del self.expected_returns[-1]
-        if node.block.return_annotation.kind == Return.SOMETIMES:
-            emit_error(f"Non-void function does not always return! {node.get_info()}")()
-        # TODO: Lookup and add as an overload if already present
-        func_info = FuncInfo(
-            return_type=node.block.return_annotation.return_type, overloads=[arg_types]
-        )
+        # Resolve the return type
+        return_type = TypeAnnotation.from_ident(node.return_type)
+        # Create an annotation for the function signature
+        func_info = FuncInfo(return_type=return_type, overloads=[arg_types])
         type_annotation = TypeAnnotation(
             kind=Type.FUNCTION, assignable=False, func_info=func_info
         )
+        # Declare the function
         self._declare_name(node.name.lexeme, type_annotation)
+        # Start the function scope
+        self.start_scope()
+        # Iterate over the parameters and declare them
+        for param_type, param_name in node.params:
+            self._declare_name(param_name.lexeme, resolved_type)
+        # Expect return statements for the return type
+        self.expected_returns.append(return_type)
+        # Define the function by its block
+        node.block.accept(self)
+        # End the function scope
+        self.end_scope()
+        # Stop expecting return statements
+        del self.expected_returns[-1]
+        if (
+            return_type is not None
+            and node.block.return_annotation.kind != Return.ALWAYS
+        ):
+            emit_error(f"Non-void function does not always return! {node.get_info()}")()
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)

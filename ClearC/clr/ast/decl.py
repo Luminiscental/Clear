@@ -59,7 +59,7 @@ class FuncDecl(DeclNode):
     This class represents an AST node for a function declaration, initialized from a parser.
 
     It follows the grammar rule
-    FuncDecl : 'func' identifier '(' ( identifier identifier ( ',' identifier identifier )* )? ')' BlockStmt
+    FuncDecl : 'func' identifier '(' ( identifier identifier ( ',' identifier identifier )* )? ')' identifier? BlockStmt
 
     Superclasses:
         - DeclNode
@@ -67,6 +67,7 @@ class FuncDecl(DeclNode):
     Fields:
         - name : the identifier token naming the declared function.
         - params : a list of (identifier, identifier) tuples for the parameters of the declared function.
+        - return_type : the identifier token naming the return type, or None if omitted.
         - block : the BlockStmt of code defining the function.
 
     Methods:
@@ -103,6 +104,10 @@ class FuncDecl(DeclNode):
                     TokenType.COMMA,
                     parse_error("Expected comma to delimit arguments!", parser),
                 )
+        if parser.match(TokenType.IDENTIFIER):
+            self.return_type = parser.get_prev()
+        else:
+            self.return_type = None
         self.block = BlockStmt(parser)
         self.token = self.name
 
