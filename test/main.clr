@@ -12,6 +12,8 @@ func printFac(int n) {
     return str(n) + "! = " + str(fac(n));
 }
 
+print printFac(100i);
+
 val MAX = 10i;
 var i = 0i;
 while i < MAX {

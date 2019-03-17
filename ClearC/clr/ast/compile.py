@@ -28,7 +28,6 @@ class Program:
         - load_constant
         - simple_op
         - define_name
-        - set_name
         - load_name
         - begin_function
         - end_function
@@ -68,23 +67,13 @@ class Program:
         Parameters:
             - index : the index annotation to define for.
         """
-        if index.kind == Index.GLOBAL:
-            self.code_list.append(OpCode.DEFINE_GLOBAL)
-        else:
-            self.code_list.append(OpCode.DEFINE_LOCAL)
-        self.code_list.append(index.value)
-
-    def set_name(self, index):
-        """
-        This method emits bytecode to set a name with the value on top of the stack.
-
-        Parameters:
-            - index : the index annotation to set for.
-        """
-        if index.kind == Index.GLOBAL:
-            self.code_list.append(OpCode.DEFINE_GLOBAL)
-        else:
-            self.code_list.append(OpCode.DEFINE_LOCAL)
+        opcode = {
+            Index.GLOBAL: lambda: OpCode.DEFINE_GLOBAL,
+            Index.LOCAL: lambda: OpCode.DEFINE_LOCAL,
+        }.get(
+            index.kind, emit_error(f"Cannot define name with index kind {index.kind}!")
+        )()
+        self.code_list.append(opcode)
         self.code_list.append(index.value)
 
     def load_name(self, index):
@@ -94,15 +83,11 @@ class Program:
         Parameters:
             - index : the index annotation to load from.
         """
-        opcode = None
-        if index.kind == Index.GLOBAL:
-            opcode = OpCode.LOAD_GLOBAL
-        elif index.kind == Index.PARAM:
-            opcode = OpCode.LOAD_PARAM
-        elif index.kind == Index.LOCAL:
-            opcode = OpCode.LOAD_LOCAL
-        else:
-            emit_error(f"Could not load unresolved name {index}!")()
+        opcode = {
+            Index.GLOBAL: lambda: OpCode.LOAD_GLOBAL,
+            Index.LOCAL: lambda: OpCode.LOAD_LOCAL,
+            Index.PARAM: lambda: OpCode.LOAD_PARAM,
+        }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
         self.code_list.append(opcode)
         self.code_list.append(index.value)
 
@@ -116,6 +101,7 @@ class Program:
         """
         self.code_list.append(OpCode.START_FUNCTION)
         index = len(self.code_list)
+        # Insert temporary offset to later be patched
         self.code_list.append(ClrUint(0))
         return index
 
@@ -128,6 +114,7 @@ class Program:
         """
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
+        # Patch the previously inserted offset
         self.code_list[index] = ClrUint(offset)
 
     def begin_jump(self, conditional=False, leave_value=False):
@@ -142,15 +129,17 @@ class Program:
                 otherwise it is popped.
 
         Returns:
-            Tuple of the index to later patch the jump offset, and whether the jump is conditional
+            The index to later patch the jump offset, and whether the jump is conditional
                 as a boolean.
         """
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
         index = len(self.code_list)
         if DEBUG:
             print(f"Defining a jump from {index}")
+        # Insert temporary offset to later be patched
         temp_offset = ClrUint(0)
         self.code_list.append(temp_offset)
+        # If there was a condition and we aren't told to leave it pop it from the stack
         if conditional and not leave_value:
             self.code_list.append(OpCode.POP)
         return index, conditional
@@ -161,7 +150,8 @@ class Program:
         over has been emitted.
 
         Parameters:
-            jump_ref : the index of the offset to patch for the jump, e.g. returned from begin_jump.
+            jump_ref : the index of the offset to patch for the jump and a boolean for whether it
+                was conditional as a tuple, e.g. returned from begin_jump.
             leave_value=False : if true the value on top of the stack is left after the jump,
                 otherwise it is popped.
         """
@@ -170,6 +160,7 @@ class Program:
         offset = assembled_size(contained)
         if DEBUG:
             print(f"Jump from {index} set with offset {offset}")
+        # Patch the previously inserted offset
         self.code_list[index] = ClrUint(offset)
         if conditional and not leave_value:
             self.code_list.append(OpCode.POP)
@@ -196,6 +187,7 @@ class Program:
         """
         self.code_list.append(OpCode.LOOP)
         offset_index = len(self.code_list)
+        # Insert an offset temporarily to include it when calculating the actual offset.
         self.code_list.append(ClrUint(0))
         contained = self.code_list[index:]
         offset = ClrUint(assembled_size(contained))
@@ -228,24 +220,6 @@ class Compiler(DeclVisitor):
 
     Methods:
         - flush_code
-        - visit_val_decl (extended)
-        - visit_func_decl (overriden)
-        - visit_print_stmt (extended)
-        - visit_if_stmt (overriden)
-        - visit_while_stmt (overriden)
-        - visit_ret_stmt (extended)
-        - visit_expr_stmt (extended)
-        - start_scope (extended)
-        - end_scope (extended)
-        - visit_unary_expr (extended)
-        - visit_binary_expr (overriden)
-        - visit_call_expr (extended)
-        - visit_number_expr (extended)
-        - visit_string_expr (extended)
-        - visit_boolean_expr (extended)
-        - visit_ident_expr (extended)
-        - visit_and_expr (overriden)
-        - visit_or_expr (overriden)
     """
 
     def __init__(self):
@@ -271,6 +245,7 @@ class Compiler(DeclVisitor):
         for decl in node.block.declarations:
             decl.accept(self)
         self.program.end_function(function)
+        # Define the function as a name after its definition
         self.program.define_name(node.index_annotation)
 
     def visit_print_stmt(self, node):
@@ -282,16 +257,23 @@ class Compiler(DeclVisitor):
 
     def visit_if_stmt(self, node):
         # No super because we need the jumps in the right place
+        # Create a list of jumps that skip to the end once a block completes
         final_jumps = []
         for cond, block in node.checks:
             cond.accept(self)
+            # If the condition is false jump to the next block
             jump = self.program.begin_jump(conditional=True)
             block.accept(self)
+            # Otherwise jump to the end after the block completes
             final_jumps.append(self.program.begin_jump())
+            # The jump to the next block goes after the jump to the end to avoid it
             self.program.end_jump(jump)
         if node.otherwise is not None:
+            # If we haven't jumped to the end then all the previous blocks didn't execute so run the
+            # else block
             node.otherwise.accept(self)
         for final_jump in final_jumps:
+            # All the final jumps end here after everything
             self.program.end_jump(final_jump)
 
     def visit_while_stmt(self, node):
@@ -299,8 +281,10 @@ class Compiler(DeclVisitor):
         loop = self.program.begin_loop()
         if node.condition is not None:
             node.condition.accept(self)
+            # If there is a condition jump to the end if it's false
             skip_jump = self.program.begin_jump(conditional=True)
         node.block.accept(self)
+        # Go back to before the condition to check it again
         self.program.loop_back(loop)
         if node.condition is not None:
             self.program.end_jump(skip_jump)
@@ -335,9 +319,10 @@ class Compiler(DeclVisitor):
         if node.operator.token_type == TokenType.EQUAL:
             # If it's an assignment don't call super as we don't want to evaluate the left hand side
             node.right.accept(self)
-            self.program.set_name(node.left.index_annotation)
+            self.program.define_name(node.left.index_annotation)
             if DEBUG:
                 print(f"Loading name for {node.left.get_info()}")
+            # Assignment is an expression so we load the assigned value as well
             self.program.load_name(node.left.index_annotation)
         else:
             super().visit_binary_expr(node)
@@ -360,6 +345,8 @@ class Compiler(DeclVisitor):
     def visit_call_expr(self, node):
         super().visit_call_expr(node)
         if node.target.name.lexeme in BUILTINS:
+            # TODO: Refactor builtins to be handled by the vm
+            # If we are calling a built-in emit the opcode associated with it
             _, opcode = BUILTINS[node.target.name.lexeme]
             self.program.simple_op(opcode)
         else:
@@ -393,14 +380,21 @@ class Compiler(DeclVisitor):
         # No super because we need to put the jumps in the right place
         node.left.accept(self)
         short_circuit = self.program.begin_jump(conditional=True)
+        # If the first is false jump past the second, if we don't jump pop the value to replace
+        # with the second one
         node.right.accept(self)
+        # If we jumped here because the first was false leave that false value on the stack
         self.program.end_jump(short_circuit, leave_value=True)
 
     def visit_or_expr(self, node):
         # No super because we need to put the jumps in the right place
         node.left.accept(self)
+        # If the first value is false jump past the shortcircuit
         long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
+        # If we haven't skipped the shortcircuit jump to the end
         short_circuit = self.program.begin_jump()
+        # If we skipped the shortcircuit pop the first value to replace with the second one
         self.program.end_jump(long_circuit)
         node.right.accept(self)
+        # If we short circuited leave the true value on the stack
         self.program.end_jump(short_circuit, leave_value=True)
