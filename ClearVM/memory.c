@@ -51,6 +51,8 @@ static void freeObject(Obj *object) {
 
 void freeObjects(VM *vm) {
 
+    // TODO: There is a leak somewhere
+
     Obj *object = vm->objects;
 
     while (object != NULL) {

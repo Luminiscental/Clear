@@ -74,7 +74,7 @@ class Indexer(DeclVisitor):
         self.global_index = 0
         self.is_function = False
 
-    def _lookup_name(self, name):
+    def lookup_name(self, name):
         lookback = 0
         # Keep looking back up to the global scope
         while lookback <= self.level:
@@ -89,7 +89,7 @@ class Indexer(DeclVisitor):
         return result
 
     def _declare_name(self, name):
-        prev = self._lookup_name(name)
+        prev = self.lookup_name(name)
         # If the name already was not found as already declared make it a new index
         if prev.kind == Index.UNRESOLVED:
             if self.level > 0:
@@ -144,7 +144,7 @@ class Indexer(DeclVisitor):
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
-        node.index_annotation = self._lookup_name(node.name.lexeme)
+        node.index_annotation = self.lookup_name(node.name.lexeme)
         if node.index_annotation.kind == Index.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {node.get_info()}")()
         elif DEBUG:
@@ -156,7 +156,7 @@ class Indexer(DeclVisitor):
 
     def visit_func_decl(self, node):
         # No super as we handle the params / scoping
-        function = FunctionIndexer()
+        function = FunctionIndexer(self)
         for _, name in node.params:
             function.add_param(name.lexeme)
         for decl in node.block.declarations:
@@ -179,9 +179,11 @@ class FunctionIndexer(Indexer):
         - add_param
     """
 
-    def __init__(self):
+    def __init__(self, parent):
         super().__init__()
+        self.parent = parent
         self.scopes.append(defaultdict(IndexAnnotation))
+        # Default scope is not the global scope in a function
         self.level += 1
         self.params = []
         self.is_function = True
@@ -195,20 +197,19 @@ class FunctionIndexer(Indexer):
         pair = (name, IndexAnnotation(kind=Index.PARAM, value=index))
         self.params.append(pair)
 
-    def visit_ident_expr(self, node):
-        try:
-            # Try to index the name normally by delegating to super()
-            super().visit_ident_expr(node)
-        except ClrCompileError as undef_err:
+    def lookup_name(self, name):
+        result = super().lookup_name(name)
+        if result.kind == Index.UNRESOLVED:
             # If it wasn't found look for it as a param
             for param_name, param_index in self.params:
-                if param_name == node.name.lexeme:
-                    node.index_annotation = param_index
-                    if DEBUG:
-                        print(
-                            f"Set index for {node.get_info()} as {node.index_annotation}"
-                        )
-                    break
-            else:
-                # If it still wasn't found raise the error again
-                raise undef_err
+                if param_name == name:
+                    result = param_index
+        if result.kind == Index.UNRESOLVED:
+            # If it still isn't found look for it as an upvalue
+            lookup = self.parent.lookup_name(name)
+            if DEBUG:
+                print(f"upvalue candidate: {lookup}")
+            if lookup.kind == Index.GLOBAL:
+                # globals can be referenced normally
+                result = lookup
+        return result
