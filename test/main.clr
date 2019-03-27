@@ -1,22 +1,8 @@
 
-func oldFunc() int {
-    return 0i;
+func _0(int n) int {
+    return n + 1i;
 }
 
-var three = oldFunc;
-var four = oldFunc;
+val not_lambda = _0;
 
-{
-    func makeFunc(int n) func() int {
-        func result() int {
-            return n;
-        }
-        return result;
-    }
-
-    three = makeFunc(3i);
-    four = makeFunc(4i);
-}
-
-print "three() = " + str(three());
-print "four() = " + str(four());
+print "not_lambda(3) = " + str(not_lambda(3i));

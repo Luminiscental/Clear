@@ -46,12 +46,24 @@ static void freeObject(Obj *object) {
             FREE(ObjFunction, objFunc);
 
         } break;
+
+        case OBJ_CLOSURE: {
+
+            ObjClosure *objClosure = (ObjClosure *)object;
+            FREE(ObjClosure, objClosure);
+
+        } break;
+
+        case OBJ_UPVALUE: {
+
+            ObjUpvalue *objUpvalue = (ObjUpvalue *)object;
+            FREE(ObjUpvalue, objUpvalue);
+
+        } break;
     }
 }
 
 void freeObjects(VM *vm) {
-
-    // TODO: There is a leak somewhere
 
     Obj *object = vm->objects;
 

@@ -76,20 +76,8 @@ bool valuesEqual(Value a, Value b) {
             if (a.as.obj->type != b.as.obj->type)
                 return false;
 
-            switch (a.as.obj->type) {
-
-                case OBJ_STRING: {
-
-                    return a.as.obj == b.as.obj;
-
-                } break;
-
-                case OBJ_FUNCTION: {
-
-                    return a.as.obj == b.as.obj;
-
-                } break;
-            }
+            // Objects are compared by identity.
+            return a.as.obj == b.as.obj;
 
         } break;
     }
@@ -159,8 +147,20 @@ void printValue(Value value, bool endLine) {
 
                 case OBJ_FUNCTION: {
 
-                    ObjFunction *funcObj = (ObjFunction *)value.as.obj;
-                    printf("<fn %p>", funcObj);
+                    printf("<fn %p>", value.as.obj);
+
+                } break;
+
+                case OBJ_CLOSURE: {
+
+                    printf("<fn %p>", value.as.obj);
+
+                } break;
+
+                case OBJ_UPVALUE: {
+
+                    ObjUpvalue *upvalue = (ObjUpvalue *)value.as.obj;
+                    printValue(*upvalue->value, false);
 
                 } break;
             }
