@@ -465,6 +465,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         } break;
 
+        case OP_CLOCK: {
+
+            return simpleInstruction("OP_CLOCK", offset);
+
+        } break;
+
         default: {
 
             printf("\n");

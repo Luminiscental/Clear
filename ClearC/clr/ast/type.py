@@ -140,26 +140,27 @@ BOOL_TYPE = TypeAnnotation(kind=Type.BOOL)
 
 SIMPLE_TYPES = {"int": INT_TYPE, "num": NUM_TYPE, "str": STR_TYPE, "bool": BOOL_TYPE}
 
-Builtin = namedtuple("Builtin", ("param_types", "opcode", "return_type"))
+Builtin = namedtuple("Builtin", ("signatures", "opcode", "return_type"))
 
 BUILTINS = {
+    "clock": Builtin(signatures=[[]], opcode=OpCode.CLOCK, return_type=NUM_TYPE),
     "int": Builtin(
-        param_types=[INT_TYPE, NUM_TYPE, BOOL_TYPE],
+        signatures=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
         opcode=OpCode.INT,
         return_type=INT_TYPE,
     ),
     "num": Builtin(
-        param_types=[INT_TYPE, NUM_TYPE, BOOL_TYPE],
+        signatures=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
         opcode=OpCode.NUM,
         return_type=NUM_TYPE,
     ),
     "str": Builtin(
-        param_types=[INT_TYPE, NUM_TYPE, STR_TYPE, BOOL_TYPE],
+        signatures=[[INT_TYPE], [NUM_TYPE], [STR_TYPE], [BOOL_TYPE]],
         opcode=OpCode.STR,
         return_type=STR_TYPE,
     ),
     "bool": Builtin(
-        param_types=[INT_TYPE, NUM_TYPE, BOOL_TYPE],
+        signatures=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
         opcode=OpCode.BOOL,
         return_type=BOOL_TYPE,
     ),

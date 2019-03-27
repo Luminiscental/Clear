@@ -66,7 +66,8 @@ class StmtVisitor(ExprVisitor):
             node.otherwise.accept(self)
 
     def visit_print_stmt(self, node):
-        node.value.accept(self)
+        if node.value:
+            node.value.accept(self)
 
 
 class DeclVisitor(StmtVisitor):

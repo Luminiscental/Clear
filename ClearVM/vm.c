@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "common.h"
 #include "memory.h"
@@ -447,6 +448,13 @@ InterpretResult run(VM *vm) {
         }
 
         switch (instruction) {
+
+            case OP_CLOCK: {
+
+                double result = (double)clock() / CLOCKS_PER_SEC;
+                push(frame, makeNumber(result));
+
+            } break;
 
             case OP_LOOP: {
 

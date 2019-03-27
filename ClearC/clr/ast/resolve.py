@@ -53,16 +53,13 @@ class TypeResolver(DeclVisitor):
     def visit_call_expr(self, node):
         if node.target.is_ident and node.target.name.lexeme in BUILTINS:
             # If it's a built-in don't call super() as we don't evaluate the target
-            if len(node.arguments) != 1:
-                emit_error(
-                    f"Built-in function {node.target} only takes one argument! {node.get_info()}"
-                )()
-            arg = node.arguments[0]
-            arg.accept(self)
+            for arg in node.arguments:
+                arg.accept(self)
             builtin = BUILTINS[node.target.name.lexeme]
-            if arg.type_annotation not in builtin.param_types:
+            type_list = list(map(lambda pair: pair.type_annotation, node.arguments))
+            if type_list not in builtin.signatures:
                 emit_error(
-                    f"Built-in function {node.target} cannot take an argument of type {arg.type_annotation}! {node.get_info()}"
+                    f"Built-in function {node.target} cannot take arguments of type {str(type_list)}! {node.get_info()}"
                 )()
             node.type_annotation = builtin.return_type
         else:
