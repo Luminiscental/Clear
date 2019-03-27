@@ -157,12 +157,12 @@ class Indexer(DeclVisitor):
 
     def visit_func_decl(self, node):
         # No super as we handle the params / scoping
+        node.index_annotation = self._declare_name(node.name.lexeme)
         function = FunctionIndexer(self)
         for _, name in node.params:
             function.add_param(name.lexeme)
         for decl in node.block.declarations:
             decl.accept(function)
-        node.index_annotation = self._declare_name(node.name.lexeme)
         node.upvalues.extend(function.upvalues)
 
 

@@ -1,8 +1,29 @@
 
-func _0(int n) int {
-    return n + 1i;
+func factorial(int n) num {
+    if n == 0i {
+        return 1;
+    }
+    return num(n) * factorial(n - 1i);
 }
 
-val not_lambda = _0;
+func intDiv(int a, int b) int {
+    val aNum = num(a);
+    val bNum = num(b);
+    val floatDiv = aNum / bNum;
+    return int(floatDiv);
+}
 
-print "not_lambda(3) = " + str(not_lambda(3i));
+func digitSum(int n) int {
+    if n == 0i {
+        return 0i;
+    } else if n < 0i {
+        print "oh dear";
+        return 0i;
+    }
+    val rest = intDiv(n, 10i);
+    val digit = n - rest * 10i;
+    return digit + digitSum(rest);
+}
+
+print "5! = " + str(factorial(5i));
+print "sum of 12345 = " + str(digitSum(12345i));

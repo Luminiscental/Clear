@@ -264,7 +264,7 @@ class Compiler(DeclVisitor):
             decl.accept(self)
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)
-        # Define the function as a name after its definition
+        # Define the function as the closure value
         self.program.define_name(node.index_annotation)
 
     def visit_print_stmt(self, node):

@@ -417,6 +417,8 @@ static InterpretResult jumpIfFalse(VM *vm, CallFrame *frame, bool condition) {
 
 InterpretResult run(VM *vm) {
 
+    // TODO: Reduce redundant stack manipulation
+
     initFrame(vm, NULL, NULL, 0, vm->frames);
     vm->frameDepth = 0;
     vm->frames->ip = vm->chunk->code + vm->chunk->start;
