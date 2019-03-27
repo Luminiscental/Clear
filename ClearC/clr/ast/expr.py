@@ -168,6 +168,7 @@ class ExprNode(AstNode):
         from clr.ast.type import TypeAnnotation
 
         self.type_annotation = TypeAnnotation()
+        self.assignable = False
 
 
 class CallExpr(ExprNode):

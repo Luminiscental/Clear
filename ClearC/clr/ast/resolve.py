@@ -1,5 +1,5 @@
 import itertools
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from clr.tokens import TokenType
 from clr.errors import emit_error
 from clr.ast.visitor import DeclVisitor
@@ -16,29 +16,33 @@ from clr.ast.type import (
     BOOL_TYPE,
 )
 
+TypePair = namedtuple(
+    "TypedPair", ("annotation", "assignable"), defaults=(TypeAnnotation(), False)
+)
+
 
 class TypeResolver(DeclVisitor):
     def __init__(self):
-        self.scopes = [defaultdict(TypeAnnotation)]
+        self.scopes = [defaultdict(TypePair)]
         self.expected_returns = []
         self.level = 0
 
-    def _declare_name(self, name, type_annotation):
-        self.scopes[self.level][name] = type_annotation
+    def _declare_name(self, name, type_annotation, assignable=False):
+        self.scopes[self.level][name] = TypePair(type_annotation, assignable)
 
     def _lookup_name(self, name):
-        result = TypeAnnotation()
+        result = TypePair()
         lookback = 0
         while lookback <= self.level:
             result = self.scopes[self.level - lookback][name]
             lookback += 1
-            if result.kind != Type.UNRESOLVED:
+            if result.annotation.kind != Type.UNRESOLVED:
                 break
         return result
 
     def start_scope(self):
         super().start_scope()
-        self.scopes.append(defaultdict(TypeAnnotation))
+        self.scopes.append(defaultdict(TypePair))
         self.level += 1
 
     def end_scope(self):
@@ -120,7 +124,7 @@ class TypeResolver(DeclVisitor):
             emit_error(
                 f"Incompatible operand type {arg_kind} for binary operator! {node.get_info()}"
             )()
-        if node.operator.token_type == TokenType.EQUAL and not left_type.assignable:
+        if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
             emit_error(f"Unassignable expression {node.left}! {node.get_info()}")()
         node.type_annotation = left_type
 
@@ -156,7 +160,7 @@ class TypeResolver(DeclVisitor):
             emit_error(
                 f"Invalid identifier name {node.name.lexeme}! This is reserved for the built-in function {node.name.lexeme}(). {node.get_info()}"
             )()
-        node.type_annotation = self._lookup_name(node.name.lexeme)
+        (node.type_annotation, node.assignable) = self._lookup_name(node.name.lexeme)
         if node.type_annotation.kind == Type.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {node.get_info()}")()
 
@@ -245,9 +249,7 @@ class TypeResolver(DeclVisitor):
         return_type = node.return_type.as_annotation()
         # Create an annotation for the function signature
         func_info = FuncInfo(return_type=return_type, signature=arg_types)
-        type_annotation = TypeAnnotation(
-            kind=Type.FUNCTION, assignable=False, func_info=func_info
-        )
+        type_annotation = TypeAnnotation(kind=Type.FUNCTION, func_info=func_info)
         # Declare the function
         self._declare_name(node.name.lexeme, type_annotation)
         # Start the function scope
@@ -269,5 +271,4 @@ class TypeResolver(DeclVisitor):
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
         type_annotation = node.value.type_annotation
-        type_annotation.assignable = node.mutable
-        self._declare_name(node.name.lexeme, type_annotation)
+        self._declare_name(node.name.lexeme, type_annotation, assignable=node.mutable)

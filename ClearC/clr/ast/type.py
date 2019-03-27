@@ -46,10 +46,9 @@ class FuncInfo:
 
 
 class TypeAnnotation:
-    def __init__(self, kind=Type.UNRESOLVED, assignable=False, func_info=None):
+    def __init__(self, kind=Type.UNRESOLVED, func_info=None):
         self.kind = kind
         self.func_info = func_info
-        self.assignable = assignable
 
     def __repr__(self):
         if self.kind == Type.FUNCTION:

@@ -67,7 +67,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
 #ifdef DEBUG_DIS
 
-            printf("OP_INTEGER '%d'\n", *value);
+            printf("%-12s '%d'\n", "OP_INTEGER", *value);
 
 #endif
 
@@ -88,7 +88,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
 #ifdef DEBUG_DIS
 
-            printf("OP_NUMBER '%g'\n", *value);
+            printf("%-12s '%g'\n", "OP_NUMBER", *value);
 
 #endif
 
@@ -119,7 +119,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
 #ifdef DEBUG_DIS
 
-            printf("OP_STRING '%s'\n", string);
+            printf("%-12s '%s'\n", "OP_STRING", string);
 
 #endif
 

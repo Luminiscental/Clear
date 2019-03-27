@@ -1,16 +1,18 @@
 
-val outside = 3;
+var global = 0i;
 
-{
-    val inside = 4;
+func incrementGlobal() int {
+    global = global + 1i;
+    return global;
+}
 
-    func noop() int {
+var i = 0i;
+val count = 10i;
 
-        print outside;
-        print inside;
+while i < count {
 
-        return 0i;
-    }
+    incrementGlobal();
+    i = i + 1i;
 
-    noop();
+    print "global = " + str(global);
 }
