@@ -67,7 +67,11 @@ typedef enum {
     // Functions
     OP_LOAD_PARAM = 36,
     OP_START_FUNCTION = 37,
-    OP_CALL = 38
+    OP_CALL = 38,
+
+    // Closures
+    OP_CLOSURE = 39,
+    OP_LOAD_UPVALUE = 40
 
 } OpCode;
 

@@ -64,6 +64,9 @@ class OpCode(Enum):
     LOAD_PARAM = 36
     START_FUNCTION = 37
     CALL = 38
+    # Closures
+    CLOSURE = 39
+    LOAD_UPVALUE = 40
 
     def __str__(self):
         return "OP_" + self.name

@@ -1,9 +1,16 @@
 
 val outside = 3;
+
 {
+    val inside = 4;
+
     func noop() int {
+
         print outside;
+        print inside;
+
         return 0i;
     }
+
     noop();
 }

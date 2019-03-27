@@ -39,7 +39,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
 #ifdef DEBUG_DIS
 
-    printf("%04d %-16s ", offset, "OP_STORE_CONST");
+    printf("%04d %-18s ", offset, "OP_STORE_CONST");
 
 #endif
 
@@ -187,7 +187,7 @@ static uint32_t constantInstruction(const char *name, Chunk *chunk,
 
     uint8_t constant = chunk->code[offset + 1];
 
-    printf("%-16s %4d '", name, constant);
+    printf("%-18s %4d '", name, constant);
     printValue(chunk->constants.values[constant], false);
     printf("'\n");
     return offset + 2;
@@ -203,7 +203,7 @@ static uint32_t uintInstruction(const char *name, Chunk *chunk,
     }
 
     uint32_t *read = (uint32_t *)(chunk->code + offset + 1);
-    printf("%-16s %4d\n", name, *read);
+    printf("%-18s %4d\n", name, *read);
     return offset + 1 + sizeof(uint32_t);
 }
 
@@ -218,7 +218,7 @@ static uint32_t indexInstruction(const char *name, Chunk *chunk,
 
     uint8_t index = chunk->code[offset + 1];
 
-    printf("%-16s %4d\n", name, index);
+    printf("%-18s %4d\n", name, index);
     return offset + 2;
 }
 
@@ -443,6 +443,18 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         case OP_CALL: {
 
             return indexInstruction("OP_CALL", chunk, offset);
+
+        } break;
+
+        case OP_CLOSURE: {
+
+            return indexInstruction("OP_CLOSURE", chunk, offset);
+
+        } break;
+
+        case OP_LOAD_UPVALUE: {
+
+            return indexInstruction("OP_LOAD_UPVALUE", chunk, offset);
 
         } break;
 

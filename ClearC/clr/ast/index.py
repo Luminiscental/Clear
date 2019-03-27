@@ -11,7 +11,7 @@ Classes:
 from enum import Enum
 from collections import defaultdict
 from clr.ast.visitor import DeclVisitor
-from clr.errors import ClrCompileError, emit_error
+from clr.errors import emit_error
 from clr.values import DEBUG
 from clr.ast.resolve import BUILTINS
 
@@ -28,6 +28,7 @@ class Index(Enum):
     PARAM = "<param>"
     LOCAL = "<local>"
     GLOBAL = "<global>"
+    UPVALUE = "<upvalue>"
 
     def __str__(self):
         return self.value
@@ -162,6 +163,7 @@ class Indexer(DeclVisitor):
         for decl in node.block.declarations:
             decl.accept(function)
         node.index_annotation = self._declare_name(node.name.lexeme)
+        node.upvalues.extend(function.upvalues)
 
 
 class FunctionIndexer(Indexer):
@@ -186,6 +188,7 @@ class FunctionIndexer(Indexer):
         # Default scope is not the global scope in a function
         self.level += 1
         self.params = []
+        self.upvalues = []
         self.is_function = True
 
     def add_param(self, name):
@@ -210,6 +213,10 @@ class FunctionIndexer(Indexer):
             if DEBUG:
                 print(f"upvalue candidate: {lookup}")
             if lookup.kind == Index.GLOBAL:
-                # globals can be referenced normally
+                # Globals can be referenced normally
                 result = lookup
+            else:
+                upvalue_index = len(self.upvalues)
+                self.upvalues.append(lookup)
+                result = IndexAnnotation(Index.UPVALUE, upvalue_index)
         return result

@@ -31,6 +31,7 @@ class Program:
         - load_name
         - begin_function
         - end_function
+        - make_closure
         - begin_jump
         - end_jump
         - begin_loop
@@ -87,6 +88,7 @@ class Program:
             Index.GLOBAL: lambda: OpCode.LOAD_GLOBAL,
             Index.LOCAL: lambda: OpCode.LOAD_LOCAL,
             Index.PARAM: lambda: OpCode.LOAD_PARAM,
+            Index.UPVALUE: lambda: OpCode.LOAD_UPVALUE,
         }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
         self.code_list.append(opcode)
         self.code_list.append(index.value)
@@ -116,6 +118,19 @@ class Program:
         offset = assembled_size(contained)
         # Patch the previously inserted offset
         self.code_list[index] = ClrUint(offset)
+
+    def make_closure(self, upvalues):
+        """
+        This method emits bytecode to convert a function on top of the stack to a closure with
+        the given upvalues.
+
+        Parameters:
+            - upvalues : a list of index annotations referencing each value to make an upvalue to.
+        """
+        self.code_list.append(OpCode.CLOSURE)
+        self.code_list.append(len(upvalues))
+        for upvalue in upvalues:
+            self.load_name(upvalue)
 
     def begin_jump(self, conditional=False, leave_value=False):
         """
@@ -245,6 +260,8 @@ class Compiler(DeclVisitor):
         for decl in node.block.declarations:
             decl.accept(self)
         self.program.end_function(function)
+        if node.upvalues:
+            self.program.make_closure(node.upvalues)
         # Define the function as a name after its definition
         self.program.define_name(node.index_annotation)
 

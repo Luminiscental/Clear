@@ -118,6 +118,7 @@ class FuncDecl(DeclNode):
         # Consume the definition block
         self.block = BlockStmt(parser)
         self.token = self.name
+        self.upvalues = []
 
     def accept(self, decl_visitor):
         """
