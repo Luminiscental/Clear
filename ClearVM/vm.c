@@ -103,12 +103,16 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out) {
     return INTERPRET_ERR;
 }
 
-void initFrame(VM *vm, CallFrame *caller, size_t arity, CallFrame *frame) {
+void initFrame(VM *vm, CallFrame *caller, ObjClosure *closure, size_t arity,
+               CallFrame *frame) {
 
     initLocalState(&frame->localState);
     resetStack(frame);
     frame->vm = vm;
     frame->arity = arity;
+    frame->closure = closure;
+    if (closure != NULL)
+        frame->ip = closure->function->code;
 
     if (caller != NULL) {
 
@@ -120,7 +124,7 @@ void initFrame(VM *vm, CallFrame *caller, size_t arity, CallFrame *frame) {
     }
 }
 
-static InterpretResult call(VM *vm, ObjFunction *function, uint8_t arity) {
+static InterpretResult call(VM *vm, ObjClosure *closure, uint8_t arity) {
 
     if (vm->frameDepth >= FRAMES_MAX - 1) {
 
@@ -131,18 +135,76 @@ static InterpretResult call(VM *vm, ObjFunction *function, uint8_t arity) {
     CallFrame *caller = &vm->frames[vm->frameDepth];
     CallFrame *callee = &vm->frames[vm->frameDepth + 1];
 
-    initFrame(vm, caller, arity, callee);
-    callee->ip = function->code;
+    initFrame(vm, caller, closure, arity, callee);
 
     vm->frameDepth++;
 
     return INTERPRET_OK;
 }
 
-void initVM(VM *vm) {
-    vm->objects = NULL;
-    initTable(&vm->strings);
+static Value captureUpvalue(VM *vm, Value *local) {
 
+    if (vm->openUpvalues == NULL) {
+
+        Value result = makeUpvalue(vm, local);
+        vm->openUpvalues = (ObjUpvalue *)result.as.obj;
+
+        return result;
+    }
+
+    ObjUpvalue *prevUpvalue = NULL;
+    ObjUpvalue *upvalue = vm->openUpvalues;
+
+    while (upvalue != NULL && upvalue->value > local) {
+
+        prevUpvalue = upvalue;
+        upvalue = upvalue->next;
+    }
+
+    if (upvalue != NULL && upvalue->value == local) {
+
+        Value result;
+
+        result.type = VAL_OBJ;
+        result.as.obj = (Obj *)upvalue;
+
+        return result;
+    }
+
+    Value result = makeUpvalue(vm, local);
+    ObjUpvalue *created = (ObjUpvalue *)result.as.obj;
+
+    if (prevUpvalue == NULL) {
+
+        vm->openUpvalues = created;
+
+    } else {
+
+        prevUpvalue->next = created;
+    }
+
+    return result;
+}
+
+static void closeUpvalues(VM *vm, Value *last) {
+
+    while (vm->openUpvalues != NULL && vm->openUpvalues->value >= last) {
+
+        ObjUpvalue *upvalue = vm->openUpvalues;
+
+        upvalue->closedValue = *upvalue->value;
+        upvalue->value = &upvalue->closedValue;
+
+        vm->openUpvalues = upvalue->next;
+    }
+}
+
+void initVM(VM *vm) {
+
+    vm->objects = NULL;
+    vm->openUpvalues = NULL;
+
+    initTable(&vm->strings);
     initGlobalState(&vm->globalState);
 }
 
@@ -174,8 +236,10 @@ InterpretResult pop(CallFrame *frame, Value *out) {
 
         frame->stackTop--;
 
+        Value *popped = frame->stackTop;
+
         if (out != NULL)
-            *out = *frame->stackTop;
+            *out = *popped;
 
         return INTERPRET_OK;
     }
@@ -353,7 +417,7 @@ static InterpretResult jumpIfFalse(VM *vm, CallFrame *frame, bool condition) {
 
 InterpretResult run(VM *vm) {
 
-    initFrame(vm, NULL, 0, vm->frames);
+    initFrame(vm, NULL, NULL, 0, vm->frames);
     vm->frameDepth = 0;
     vm->frames->ip = vm->chunk->code + vm->chunk->start;
 
@@ -440,6 +504,8 @@ InterpretResult run(VM *vm) {
                     printf("|| Scope popping failed!\n");
                     return INTERPRET_ERR;
                 }
+
+                closeUpvalues(vm, frame->stackTop - popped);
 
                 for (size_t i = 0; i < popped; i++) {
 
@@ -541,7 +607,11 @@ InterpretResult run(VM *vm) {
 
                 if (index == frame->stackTop - frame->stack) {
 
-                    push(frame, val);
+                    if (push(frame, val) != INTERPRET_OK) {
+
+                        printf("|| Could not push new local!\n");
+                        return INTERPRET_ERR;
+                    }
 
                 } else if (index < frame->stackTop - frame->stack) {
 
@@ -574,6 +644,62 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+            case OP_SET_UPVALUE: {
+
+                uint8_t index;
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index to set upvalue!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value val;
+                if (pop(frame, &val) != INTERPRET_OK) {
+
+                    printf("|| Expected value to set upvalue to!\n");
+                    return INTERPRET_ERR;
+                }
+
+                *frame->closure->upvalues[index]->value = val;
+
+                if (push(frame, val) != INTERPRET_OK) {
+
+                    printf("|| Could not push assignment result!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_LOAD_UPVALUE: {
+
+                uint8_t index;
+                if (readByte(vm, frame, &index) != INTERPRET_OK) {
+
+                    printf("|| Expected index to load upvalue!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (frame->closure == NULL) {
+
+                    printf("|| Cannot get upvalue in global scope!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (index >= frame->closure->upvalueCount) {
+
+                    printf("|| Upvalue index out of range!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (push(frame, *frame->closure->upvalues[index]->value) !=
+                    INTERPRET_OK) {
+
+                    printf("|| Could not push upvalue!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
             case OP_POP: {
 
                 UNARY_OP
@@ -596,6 +722,8 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
+                closeUpvalues(vm, frame->stack);
+
                 CallFrame *caller = &vm->frames[vm->frameDepth - 1];
 
                 for (size_t index = 0; index <= frame->arity; index++) {
@@ -607,7 +735,11 @@ InterpretResult run(VM *vm) {
                     }
                 }
 
-                push(caller, result);
+                if (push(caller, result) != INTERPRET_OK) {
+
+                    printf("|| Could not push function return value!\n");
+                    return INTERPRET_ERR;
+                }
 
                 freeFrame(frame);
                 vm->frameDepth--;
@@ -694,7 +826,82 @@ InterpretResult run(VM *vm) {
 
                 Value function = makeFunction(vm, frame->ip, (size_t)size);
                 frame->ip += size;
-                push(frame, function);
+
+                if (push(frame, function) != INTERPRET_OK) {
+
+                    printf("|| Could not push function!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_CLOSURE: {
+
+                Value val;
+
+                if (pop(frame, &val) != INTERPRET_OK) {
+
+                    printf("|| Could not pop value to close!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (!isObjType(val, OBJ_FUNCTION)) {
+
+                    printf("|| Value to close is not an unclosed function!\n");
+                    return INTERPRET_ERR;
+                }
+
+                uint8_t upvalueCount;
+                if (readByte(vm, frame, &upvalueCount) != INTERPRET_OK) {
+
+                    printf("|| Could not read upvalue count!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value closureValue =
+                    makeClosure(vm, (ObjFunction *)val.as.obj, upvalueCount);
+                ObjClosure *closure = (ObjClosure *)closureValue.as.obj;
+
+                for (size_t i = 0; i < upvalueCount; i++) {
+
+                    uint8_t upvalueKind;
+                    if (readByte(vm, frame, &upvalueKind) != INTERPRET_OK) {
+
+                        printf("|| Could not read upvalue type!\n");
+                        return INTERPRET_ERR;
+                    }
+
+                    uint8_t index;
+                    if (readByte(vm, frame, &index) != INTERPRET_OK) {
+
+                        printf("|| Could not read upvalue index!\n");
+                        return INTERPRET_ERR;
+                    }
+
+                    if (upvalueKind == OP_LOAD_LOCAL) {
+
+                        closure->upvalues[i] = (ObjUpvalue *)captureUpvalue(
+                                                   vm, frame->stack + index)
+                                                   .as.obj;
+
+                        // TODO: Parameter upvalues
+                    } else if (upvalueKind == OP_LOAD_UPVALUE) {
+
+                        closure->upvalues[i] = frame->closure->upvalues[index];
+
+                    } else {
+
+                        printf("|| Unrecognized upvalue type %d!\n",
+                               upvalueKind);
+                        return INTERPRET_ERR;
+                    }
+                }
+
+                if (push(frame, closureValue) != INTERPRET_OK) {
+
+                    printf("|| Could not push closure!\n");
+                    return INTERPRET_ERR;
+                }
 
             } break;
 
@@ -714,14 +921,14 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                if (!isObjType(function, OBJ_FUNCTION)) {
+                if (!isObjType(function, OBJ_CLOSURE)) {
 
                     printf("|| Cannot call non-function!\n");
                     return INTERPRET_ERR;
                 }
 
-                ObjFunction *functionObj = (ObjFunction *)function.as.obj;
-                if (call(vm, functionObj, arity) != INTERPRET_OK) {
+                ObjClosure *closure = (ObjClosure *)function.as.obj;
+                if (call(vm, closure, arity) != INTERPRET_OK) {
 
                     printf("|| Could not call function!\n");
                     return INTERPRET_ERR;

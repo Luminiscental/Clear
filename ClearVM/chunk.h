@@ -71,7 +71,8 @@ typedef enum {
 
     // Closures
     OP_CLOSURE = 39,
-    OP_LOAD_UPVALUE = 40
+    OP_LOAD_UPVALUE = 40,
+    OP_SET_UPVALUE = 41
 
 } OpCode;
 

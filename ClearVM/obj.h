@@ -9,7 +9,9 @@ typedef struct sVM VM;
 typedef enum eObjType {
 
     OBJ_STRING,
-    OBJ_FUNCTION
+    OBJ_FUNCTION,
+    OBJ_CLOSURE,
+    OBJ_UPVALUE
 
 } ObjType;
 
@@ -48,5 +50,27 @@ typedef struct sObjFunction {
 } ObjFunction;
 
 Value makeFunction(VM *vm, uint8_t *code, size_t size);
+
+typedef struct sObjUpvalue {
+
+    Obj obj;
+    Value *value;
+    Value closedValue;
+    struct sObjUpvalue *next;
+
+} ObjUpvalue;
+
+Value makeUpvalue(VM *vm, Value *slot);
+
+typedef struct sObjClosure {
+
+    Obj obj;
+    ObjFunction *function;
+    ObjUpvalue **upvalues;
+    size_t upvalueCount;
+
+} ObjClosure;
+
+Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount);
 
 #endif

@@ -221,6 +221,45 @@ Value makeFunction(VM *vm, uint8_t *code, size_t size) {
 
     return result;
 }
+
+Value makeUpvalue(VM *vm, Value *slot) {
+
+    ObjUpvalue *upvalue = ALLOCATE_OBJ(vm, ObjUpvalue, OBJ_UPVALUE);
+
+    upvalue->value = slot;
+    upvalue->next = NULL;
+
+    Value result;
+
+    result.type = VAL_OBJ;
+    result.hash = (size_t)upvalue;
+    result.as.obj = (Obj *)upvalue;
+
+    return result;
+}
+
+Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount) {
+
+    ObjClosure *closure = ALLOCATE_OBJ(vm, ObjClosure, OBJ_CLOSURE);
+
+    closure->function = function;
+    closure->upvalueCount = upvalueCount;
+    closure->upvalues = ALLOCATE(ObjUpvalue *, upvalueCount);
+
+    for (size_t i = 0; i < upvalueCount; i++) {
+
+        closure->upvalues[i] = NULL;
+    }
+
+    Value result;
+
+    result.type = VAL_OBJ;
+    result.hash = (size_t)closure;
+    result.as.obj = (Obj *)closure;
+
+    return result;
+}
+
 bool isObjType(Value a, ObjType type) {
 
     return a.type == VAL_OBJ && a.as.obj->type == type;

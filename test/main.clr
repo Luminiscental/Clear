@@ -1,18 +1,50 @@
 
-var global = 0i;
+var globalCounter = 0i;
 
-func incrementGlobal() int {
-    global = global + 1i;
-    return global;
+func globalFunc() int {
+
+    val before = globalCounter;
+    globalCounter = globalCounter + 1i;
+    return before;
 }
 
-var i = 0i;
-val count = 10i;
+var aFunc = globalFunc;
 
-while i < count {
-
-    incrementGlobal();
-    i = i + 1i;
-
-    print "global = " + str(global);
+func printInfo() int {
+    print "aFunc() = " + str(aFunc());
+    return 0i;
 }
+
+print "== initial global ==";
+printInfo();
+printInfo();
+printInfo();
+
+{
+    var localCounter = 0i;
+
+    func localFunc() int {
+
+        val before = localCounter;
+        localCounter = localCounter + 1i;
+        return before;
+    }
+
+    aFunc = localFunc;
+
+    print "== while still local ==";
+    printInfo();
+    printInfo();
+    printInfo();
+    printInfo();
+}
+
+print "== final global ==";
+printInfo();
+printInfo();
+printInfo();
+
+
+
+
+

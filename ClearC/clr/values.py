@@ -67,6 +67,7 @@ class OpCode(Enum):
     # Closures
     CLOSURE = 39
     LOAD_UPVALUE = 40
+    SET_UPVALUE = 41
 
     def __str__(self):
         return "OP_" + self.name

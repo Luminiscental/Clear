@@ -210,13 +210,14 @@ class FunctionIndexer(Indexer):
         if result.kind == Index.UNRESOLVED:
             # If it still isn't found look for it as an upvalue
             lookup = self.parent.lookup_name(name)
-            if DEBUG:
-                print(f"upvalue candidate: {lookup}")
-            if lookup.kind == Index.GLOBAL:
-                # Globals can be referenced normally
-                result = lookup
-            else:
-                upvalue_index = len(self.upvalues)
-                self.upvalues.append(lookup)
-                result = IndexAnnotation(Index.UPVALUE, upvalue_index)
+            if lookup.kind != Index.UNRESOLVED:
+                if DEBUG:
+                    print(f"upvalue candidate: {lookup}")
+                if lookup.kind == Index.GLOBAL:
+                    # Globals can be referenced normally
+                    result = lookup
+                else:
+                    upvalue_index = len(self.upvalues)
+                    self.upvalues.append(lookup)
+                    result = IndexAnnotation(Index.UPVALUE, upvalue_index)
         return result

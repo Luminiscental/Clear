@@ -71,6 +71,7 @@ class Program:
         opcode = {
             Index.GLOBAL: lambda: OpCode.DEFINE_GLOBAL,
             Index.LOCAL: lambda: OpCode.DEFINE_LOCAL,
+            Index.UPVALUE: lambda: OpCode.SET_UPVALUE,
         }.get(
             index.kind, emit_error(f"Cannot define name with index kind {index.kind}!")
         )()
@@ -130,6 +131,8 @@ class Program:
         self.code_list.append(OpCode.CLOSURE)
         self.code_list.append(len(upvalues))
         for upvalue in upvalues:
+            if DEBUG:
+                print(f"Loading upvalue {upvalue}")
             self.load_name(upvalue)
 
     def begin_jump(self, conditional=False, leave_value=False):
@@ -260,8 +263,7 @@ class Compiler(DeclVisitor):
         for decl in node.block.declarations:
             decl.accept(self)
         self.program.end_function(function)
-        if node.upvalues:
-            self.program.make_closure(node.upvalues)
+        self.program.make_closure(node.upvalues)
         # Define the function as a name after its definition
         self.program.define_name(node.index_annotation)
 

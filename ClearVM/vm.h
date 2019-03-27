@@ -53,7 +53,7 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out);
 
 typedef struct sCallFrame {
 
-    // TODO: Upvalues
+    ObjClosure *closure;
 
     Value *params;
     size_t arity;
@@ -67,7 +67,8 @@ typedef struct sCallFrame {
 
 } CallFrame;
 
-void initFrame(VM *vm, CallFrame *caller, size_t arity, CallFrame *frame);
+void initFrame(VM *vm, CallFrame *caller, ObjClosure *closure, size_t arity,
+               CallFrame *frame);
 
 typedef struct sVM {
 
@@ -76,6 +77,8 @@ typedef struct sVM {
     // TODO: GC
     Obj *objects;
     GlobalState globalState;
+
+    ObjUpvalue *openUpvalues;
 
     CallFrame frames[FRAMES_MAX];
     size_t frameDepth;

@@ -143,6 +143,8 @@ void loadConstants(VM *vm, Chunk *chunk) {
 
         uint8_t instruction = chunk->code[offset];
 
+        // TODO: Interleaving these is now a waste; have one instruction up
+        // front saying how many there are instead.
         if (instruction != OP_STORE_CONST) {
 
             chunk->start = offset;
@@ -455,6 +457,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         case OP_LOAD_UPVALUE: {
 
             return indexInstruction("OP_LOAD_UPVALUE", chunk, offset);
+
+        } break;
+
+        case OP_SET_UPVALUE: {
+
+            return indexInstruction("OP_SET_UPVALUE", chunk, offset);
 
         } break;
 
