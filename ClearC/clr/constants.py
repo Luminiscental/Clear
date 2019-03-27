@@ -134,7 +134,6 @@ class Constants:
         return index
 
     def _store(self, value):
-        self.code_list.append(OpCode.STORE_CONST)
         try:
             op_type = {
                 ClrNum: OpCode.NUMBER,
@@ -150,6 +149,7 @@ class Constants:
         """
         This function returns a list of bytecode to store all the constant values.
         """
+        self.code_list.append(ClrUint(len(self.values)))
         for value in self.values:
             self._store(value)
         return self.code_list

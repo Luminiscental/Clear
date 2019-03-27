@@ -39,11 +39,11 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
 #ifdef DEBUG_DIS
 
-    printf("%04d %-18s ", offset, "OP_STORE_CONST");
+    printf("%04d %-18s ", offset, "constant --->");
 
 #endif
 
-    uint32_t result = offset + 2;
+    uint32_t result = offset + 1;
 
     if (result > chunk->count) {
 
@@ -51,7 +51,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
         return chunk->count;
     }
 
-    uint8_t type = chunk->code[offset + 1];
+    uint8_t type = chunk->code[offset];
 
     switch (type) {
 
@@ -139,20 +139,19 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
 
 void loadConstants(VM *vm, Chunk *chunk) {
 
-    for (uint32_t offset = 0; offset < chunk->count;) {
+    uint32_t offset = 0;
 
-        uint8_t instruction = chunk->code[offset];
+    uint32_t constantCount = *(uint32_t *)chunk->code;
+    uint32_t index = 0;
 
-        // TODO: Interleaving these is now a waste; have one instruction up
-        // front saying how many there are instead.
-        if (instruction != OP_STORE_CONST) {
+    offset += sizeof(uint32_t);
 
-            chunk->start = offset;
-            return;
-        }
+    for (; offset < chunk->count && index < constantCount; index++) {
 
         offset = storeConstant(vm, chunk, offset);
     }
+
+    chunk->start = offset;
 }
 
 void freeChunk(Chunk *chunk) {
