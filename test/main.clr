@@ -1,50 +1,22 @@
 
-var globalCounter = 0i;
-
-func globalFunc() int {
-
-    val before = globalCounter;
-    globalCounter = globalCounter + 1i;
-    return before;
-}
-
-var aFunc = globalFunc;
-
-func printInfo() int {
-    print "aFunc() = " + str(aFunc());
+func oldFunc() int {
     return 0i;
 }
 
-print "== initial global ==";
-printInfo();
-printInfo();
-printInfo();
+var three = oldFunc;
+var four = oldFunc;
 
 {
-    var localCounter = 0i;
-
-    func localFunc() int {
-
-        val before = localCounter;
-        localCounter = localCounter + 1i;
-        return before;
+    func makeFunc(int n) func() int {
+        func result() int {
+            return n;
+        }
+        return result;
     }
 
-    aFunc = localFunc;
-
-    print "== while still local ==";
-    printInfo();
-    printInfo();
-    printInfo();
-    printInfo();
+    three = makeFunc(3i);
+    four = makeFunc(4i);
 }
 
-print "== final global ==";
-printInfo();
-printInfo();
-printInfo();
-
-
-
-
-
+print "three() = " + str(three());
+print "four() = " + str(four());

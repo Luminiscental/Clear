@@ -722,9 +722,12 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                closeUpvalues(vm, frame->stack);
-
                 CallFrame *caller = &vm->frames[vm->frameDepth - 1];
+
+                // Close any upvalues left in the function frame
+                closeUpvalues(vm, frame->stack);
+                // Close any upvalues of the parameters
+                closeUpvalues(vm, caller->stackTop - frame->arity);
 
                 for (size_t index = 0; index <= frame->arity; index++) {
 
@@ -884,10 +887,15 @@ InterpretResult run(VM *vm) {
                                                    vm, frame->stack + index)
                                                    .as.obj;
 
-                        // TODO: Parameter upvalues
                     } else if (upvalueKind == OP_LOAD_UPVALUE) {
 
                         closure->upvalues[i] = frame->closure->upvalues[index];
+
+                    } else if (upvalueKind == OP_LOAD_PARAM) {
+
+                        closure->upvalues[i] = (ObjUpvalue *)captureUpvalue(
+                                                   vm, frame->params + index)
+                                                   .as.obj;
 
                     } else {
 
