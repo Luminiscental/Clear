@@ -76,7 +76,7 @@ class RetStmt(StmtNode):
 class WhileStmt(StmtNode):
     def __init__(self, parser):
         # TODO: Break statements
-        super().__init__()
+        super().__init__(parser)
         parser.consume(
             TokenType.WHILE, parse_error("Expected while statement!", parser)
         )
@@ -192,7 +192,7 @@ class FuncDecl(DeclNode):
 
 class ValDecl(DeclNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         parser.consume_one(
             VAL_TOKENS, parse_error("Expected value declaration!", parser)
         )
