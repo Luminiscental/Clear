@@ -21,7 +21,7 @@ def parse_stmt(parser):
     return ExprStmt(parser)
 
 
-class StmtNode:
+class StmtNode:  # pylint: disable=too-few-public-methods
     def __init__(self, parser):
         self.return_annotation = ReturnAnnotation()
         self.first_token = parser.get_current()
@@ -136,7 +136,7 @@ def parse_decl(parser):
     return parse_stmt(parser)
 
 
-class DeclNode(StmtNode):
+class DeclNode(StmtNode):  # pylint: disable=too-few-public-methods
     def __init__(self, parser):
         super().__init__(parser)
         self.index_annotation = IndexAnnotation()

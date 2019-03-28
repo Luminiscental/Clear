@@ -1,4 +1,5 @@
 from enum import Enum
+from collections import namedtuple
 
 
 class ReturnAnnotationType(Enum):
@@ -10,7 +11,8 @@ class ReturnAnnotationType(Enum):
         return self.value
 
 
-class ReturnAnnotation:
-    def __init__(self, kind=ReturnAnnotationType.NEVER, return_type=None):
-        self.kind = kind
-        self.return_type = return_type
+ReturnAnnotation = namedtuple(
+    "ReturnAnnotation",
+    ("kind", "return_type"),
+    defaults=(ReturnAnnotationType.NEVER, None),
+)

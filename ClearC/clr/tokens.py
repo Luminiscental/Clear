@@ -224,6 +224,29 @@ class Scanner:
         self.state = ScanState.ANY
         return False
 
+    def _start_string(self, char):
+        self.acc += char
+        self.state = ScanState.STRING
+
+    def _start_identifier(self, char):
+        continuing = False
+        if self.tokens:
+            last_token = self.tokens[-1]
+            last_lexeme = last_token.lexeme
+            last_type = last_token.token_type
+
+            if last_type in KEYWORD_TYPES.values():
+                self.acc += last_lexeme
+                del self.tokens[-1]
+                continuing = True
+
+        if not continuing:
+            self.keyword_trie.reset()
+
+        self.keyword_trie.step(char)
+        self.acc += char
+        self.state = ScanState.IDENTIFIER
+
     def _scan_any(self, char):
         if self.tokens:
             last_token = self.tokens[-1]
@@ -248,21 +271,13 @@ class Scanner:
             self.acc += char
             self.state = ScanState.NUMBER
         elif char == '"':
-            self.acc += char
-            self.state = ScanState.STRING
+            self._start_string(char)
         elif char.isspace():
             if char == "\n":
                 self.line += 1
             self.tokens.append(Token(TokenType.SPACE, char, self.line))
         elif char.isalpha() or char == "_":
-            if self.tokens and last_type in KEYWORD_TYPES.values():
-                self.acc += last_lexeme
-                del self.tokens[-1]
-            else:
-                self.keyword_trie.reset()
-            self.keyword_trie.step(char)
-            self.acc += char
-            self.state = ScanState.IDENTIFIER
+            self._start_identifier(char)
         else:
             self.tokens.append(Token(TokenType.ERR, char, self.line))
             if DEBUG:
