@@ -19,6 +19,7 @@ from clr.ast.type_annotations import (
     SIMPLE_TYPES,
 )
 from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType
+from clr.ast.index_annotations import IndexAnnotationType, IndexAnnotation
 
 
 Builtin = namedtuple("Builtin", ("signatures", "opcode", "return_type"))
@@ -665,26 +666,6 @@ class ValDecl(DeclNode):
 VAL_TOKENS = {TokenType.VAL, TokenType.VAR}
 
 
-class Index(Enum):
-    UNRESOLVED = "<unresolved>"
-    PARAM = "<param>"
-    LOCAL = "<local>"
-    GLOBAL = "<global>"
-    UPVALUE = "<upvalue>"
-
-    def __str__(self):
-        return self.value
-
-
-class IndexAnnotation:
-    def __init__(self, kind=Index.UNRESOLVED, value=-1):
-        self.kind = kind
-        self.value = value
-
-    def __repr__(self):
-        return f"IndexAnnotation(kind={self.kind}, value={self.value})"
-
-
 class Indexer(DeclVisitor):
     def __init__(self):
         self.scopes = [defaultdict(IndexAnnotation)]
@@ -700,7 +681,7 @@ class Indexer(DeclVisitor):
             result = self.scopes[self.level - lookback][name]
             lookback += 1
             # If the scope containes a resolved index for thei name we're done
-            if result.kind != Index.UNRESOLVED:
+            if result.kind != IndexAnnotationType.UNRESOLVED:
                 if DEBUG:
                     print(f"Found {name} with index {result}")
                 break
@@ -710,15 +691,15 @@ class Indexer(DeclVisitor):
     def _declare_name(self, name):
         prev = self.lookup_name(name)
         # If the name already was not found as already declared make it a new index
-        if prev.kind == Index.UNRESOLVED:
+        if prev.kind == IndexAnnotationType.UNRESOLVED:
             if self.level > 0:
                 idx = self.local_index
                 self.local_index += 1
-                kind = Index.LOCAL
+                kind = IndexAnnotationType.LOCAL
             else:
                 idx = self.global_index
                 self.global_index += 1
-                kind = Index.GLOBAL
+                kind = IndexAnnotationType.GLOBAL
         else:
             # If it was already declared use the old value directly
             idx = prev.value
@@ -741,7 +722,9 @@ class Indexer(DeclVisitor):
         else:
             popped = self.scopes[self.level]
             popped_indices = [
-                index for index in popped.values() if index.kind != Index.UNRESOLVED
+                index
+                for index in popped.values()
+                if index.kind != IndexAnnotationType.UNRESOLVED
             ]
             # If there are resolved indices that went out of scope, reset back so that they can be
             # re-used
@@ -764,7 +747,7 @@ class Indexer(DeclVisitor):
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
         node.index_annotation = self.lookup_name(node.name.lexeme)
-        if node.index_annotation.kind == Index.UNRESOLVED:
+        if node.index_annotation.kind == IndexAnnotationType.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
         elif DEBUG:
             print(f"Set index for {token_info(node.name)} as {node.index_annotation}")
@@ -797,29 +780,29 @@ class FunctionIndexer(Indexer):
 
     def add_param(self, name):
         index = len(self.params)
-        pair = (name, IndexAnnotation(kind=Index.PARAM, value=index))
+        pair = (name, IndexAnnotation(kind=IndexAnnotationType.PARAM, value=index))
         self.params.append(pair)
 
     def lookup_name(self, name):
         result = super().lookup_name(name)
-        if result.kind == Index.UNRESOLVED:
+        if result.kind == IndexAnnotationType.UNRESOLVED:
             # If it wasn't found look for it as a param
             for param_name, param_index in self.params:
                 if param_name == name:
                     result = param_index
-        if result.kind == Index.UNRESOLVED:
+        if result.kind == IndexAnnotationType.UNRESOLVED:
             # If it still isn't found look for it as an upvalue
             lookup = self.parent.lookup_name(name)
-            if lookup.kind != Index.UNRESOLVED:
+            if lookup.kind != IndexAnnotationType.UNRESOLVED:
                 if DEBUG:
                     print(f"upvalue candidate: {lookup}")
-                if lookup.kind == Index.GLOBAL:
+                if lookup.kind == IndexAnnotationType.GLOBAL:
                     # Globals can be referenced normally
                     result = lookup
                 else:
                     upvalue_index = len(self.upvalues)
                     self.upvalues.append(lookup)
-                    result = IndexAnnotation(Index.UPVALUE, upvalue_index)
+                    result = IndexAnnotation(IndexAnnotationType.UPVALUE, upvalue_index)
         return result
 
 
@@ -1104,9 +1087,9 @@ class Program:
 
     def define_name(self, index):
         opcode = {
-            Index.GLOBAL: lambda: OpCode.DEFINE_GLOBAL,
-            Index.LOCAL: lambda: OpCode.DEFINE_LOCAL,
-            Index.UPVALUE: lambda: OpCode.SET_UPVALUE,
+            IndexAnnotationType.GLOBAL: lambda: OpCode.DEFINE_GLOBAL,
+            IndexAnnotationType.LOCAL: lambda: OpCode.DEFINE_LOCAL,
+            IndexAnnotationType.UPVALUE: lambda: OpCode.SET_UPVALUE,
         }.get(
             index.kind, emit_error(f"Cannot define name with index kind {index.kind}!")
         )()
@@ -1115,10 +1098,10 @@ class Program:
 
     def load_name(self, index):
         opcode = {
-            Index.GLOBAL: lambda: OpCode.LOAD_GLOBAL,
-            Index.LOCAL: lambda: OpCode.LOAD_LOCAL,
-            Index.PARAM: lambda: OpCode.LOAD_PARAM,
-            Index.UPVALUE: lambda: OpCode.LOAD_UPVALUE,
+            IndexAnnotationType.GLOBAL: lambda: OpCode.LOAD_GLOBAL,
+            IndexAnnotationType.LOCAL: lambda: OpCode.LOAD_LOCAL,
+            IndexAnnotationType.PARAM: lambda: OpCode.LOAD_PARAM,
+            IndexAnnotationType.UPVALUE: lambda: OpCode.LOAD_UPVALUE,
         }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
         self.code_list.append(opcode)
         self.code_list.append(index.value)
