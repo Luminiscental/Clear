@@ -25,6 +25,7 @@ TypeInfo = namedtuple(
 
 class TypeResolver(DeclVisitor):
     def __init__(self):
+        super().__init__()
         self.scopes = [defaultdict(TypeInfo)]
         self.expected_returns = []
         self.level = 0

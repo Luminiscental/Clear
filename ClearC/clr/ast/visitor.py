@@ -1,3 +1,6 @@
+from clr.errors import ClrCompileError
+
+
 class ExprVisitor:
     def visit_call_expr(self, node):
         node.target.accept(self)
@@ -33,6 +36,9 @@ class ExprVisitor:
 
 
 class StmtVisitor(ExprVisitor):
+    def __init__(self):
+        self.errors = []
+
     def start_scope(self):
         pass
 
@@ -83,3 +89,13 @@ class DeclVisitor(StmtVisitor):
 
     def visit_val_decl(self, node):
         node.initializer.accept(self)
+
+
+def sync_errors(accept_func):
+    def synced(self, visitor):
+        try:
+            accept_func(self, visitor)
+        except ClrCompileError as error:
+            visitor.errors.append(str(error))
+
+    return synced

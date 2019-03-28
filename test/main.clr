@@ -2,5 +2,6 @@
 var y = 3;
 val x = y = 4;
 
-print "x = " + str(x);
+print "x = " + str(z);
+print "y = " + str(asd);
 print "y = " + str(y);

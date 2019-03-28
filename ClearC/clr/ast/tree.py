@@ -15,19 +15,29 @@ class Ast:
             decl = parse_decl(parser)
             self.children.append(decl)
         if parser.errors:
-            emit_error("\n".join(parser.errors))()
+            emit_error("Parse errors:\n" + "\n".join(parser.errors))()
+        if DEBUG:
+            print("-- Finished parsing")
 
-        self.accept(TypeResolver())
+        resolver = TypeResolver()
+        self.accept(resolver)
+        if resolver.errors:
+            emit_error("Resolve errors:\n" + "\n".join(resolver.errors))()
         if DEBUG:
             print("-- Finished resolving")
 
-        self.accept(NameIndexer())
+        indexer = NameIndexer()
+        self.accept(indexer)
+        if indexer.errors:
+            emit_error("Index errors:\n" + "\n".join(indexer.errors))()
         if DEBUG:
             print("-- Finished indexing")
 
     def compile(self):
         compiler = Compiler()
         self.accept(compiler)
+        if compiler.errors:
+            emit_error("Compile errors:\n" + "\n".join(compiler.errors))()
         if DEBUG:
             print("-- Finished compiling")
         return compiler.flush_code()

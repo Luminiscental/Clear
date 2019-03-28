@@ -5,6 +5,7 @@ from clr.ast.index_annotations import IndexAnnotation
 from clr.ast.expression_nodes import parse_expr
 from clr.ast.type_annotations import BUILTINS
 from clr.ast.type_nodes import parse_type
+from clr.ast.visitor import sync_errors
 
 
 def parse_stmt(parser):
@@ -39,6 +40,7 @@ class BlockStmt(StmtNode):
             decl = parse_decl(parser)
             self.declarations.append(decl)
 
+    @sync_errors
     def accept(self, stmt_visitor):
         stmt_visitor.visit_block_stmt(self)
 
@@ -52,6 +54,7 @@ class ExprStmt(StmtNode):
             parse_error("Expected semicolon to end expression statement!", parser),
         )
 
+    @sync_errors
     def accept(self, stmt_visitor):
         stmt_visitor.visit_expr_stmt(self)
 
@@ -69,6 +72,7 @@ class RetStmt(StmtNode):
             parse_error("Expected semicolon after return statement!", parser),
         )
 
+    @sync_errors
     def accept(self, stmt_visitor):
         stmt_visitor.visit_ret_stmt(self)
 
@@ -86,6 +90,7 @@ class WhileStmt(StmtNode):
             self.condition = None
         self.block = BlockStmt(parser)
 
+    @sync_errors
     def accept(self, stmt_visitor):
         stmt_visitor.visit_while_stmt(self)
 
@@ -105,6 +110,7 @@ class IfStmt(StmtNode):
                 self.otherwise = BlockStmt(parser)
                 break
 
+    @sync_errors
     def accept(self, stmt_visitor):
         stmt_visitor.visit_if_stmt(self)
 
@@ -124,6 +130,7 @@ class PrintStmt(StmtNode):
         else:
             self.value = None
 
+    @sync_errors
     def accept(self, stmt_visitor):
         stmt_visitor.visit_print_stmt(self)
 
@@ -191,6 +198,7 @@ class FuncDecl(DeclNode):
         self.block = BlockStmt(parser)
         self.upvalues = []
 
+    @sync_errors
     def accept(self, decl_visitor):
         decl_visitor.visit_func_decl(self)
 
@@ -221,6 +229,7 @@ class ValDecl(DeclNode):
             parse_error("Expected semicolon after value declaration!", parser),
         )
 
+    @sync_errors
     def accept(self, decl_visitor):
         decl_visitor.visit_val_decl(self)
 

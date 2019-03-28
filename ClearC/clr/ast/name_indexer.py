@@ -10,6 +10,7 @@ from clr.ast.type_annotations import BUILTINS
 
 class NameIndexer(DeclVisitor):
     def __init__(self):
+        super().__init__()
         self.scopes = [defaultdict(IndexAnnotation)]
         self.level = 0
         self.local_index = 0
