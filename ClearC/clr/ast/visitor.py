@@ -82,4 +82,4 @@ class DeclVisitor(StmtVisitor):
         node.block.accept(self)
 
     def visit_val_decl(self, node):
-        node.value.accept(self)
+        node.initializer.accept(self)

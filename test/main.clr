@@ -1,89 +1,10 @@
 
-// ----------------------------------
-
-func repeat(int count, func() int f) int {
-    var i = 0i;
-    while i < count {
-        f();
-        i = i + 1i;
-    }
-    return 0i;
-}
-
-func timeFunction(func() int f) num {
-    val start = clock();
-    val count = 10000i;
-    repeat(count, f);
-    val end = clock();
-    val ms = 1000 * (end - start) / num(count);
-    print "-> time taken: " + str(ms) + "ms";
-    return ms;
-}
-
-// ----------------------------------
-
-func tailFactorial(num acc, int n) num {
-    if n == 0i {
-        return acc;
-    } else {
-        return tailFactorial(num(n) * acc, n - 1i);
-    }
-}
-
 func factorial(int n) num {
-    return tailFactorial(1, n);
-}
-
-func naiveFactorial(int n) num {
     if n == 0i {
         return 1;
     } else {
-        return num(n) * naiveFactorial(n - 1i);
+        return num(n) * factorial(n - 1i);
     }
 }
 
-func timeFactorials() int {
-    func makeTailTest(int n) func() int {
-        func test() int {
-            factorial(n);
-            return 0i;
-        }
-        return test;
-    }
-
-    func makeNaiveTest(int n) func() int {
-        func test() int {
-            naiveFactorial(n);
-            return 0i;
-        }
-        return test;
-    }
-
-    var ratioCount = 0i;
-    var ratioSum = 0;
-
-    var i = 10i;
-    while i < 60i {
-        val tailTest = makeTailTest(i);
-        val naiveTest = makeNaiveTest(i);
-        print str(i) + "!";
-        print "    tail:";
-        val tailTime = timeFunction(tailTest);
-        print "    naive:";
-        val naiveTime = timeFunction(naiveTest);
-        ratioSum = ratioSum + tailTime / naiveTime;
-        ratioCount = ratioCount + 1i;
-        i = i + 5i;
-    }
-
-    print;
-    print;
-
-    val ratioAvg = ratioSum / num(ratioCount);
-    print "tail / naive : " + str(ratioAvg);
-
-    return 0i;
-}
-
-timeFactorials();
-
+print "10! = " + str(factorial(10i));

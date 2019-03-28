@@ -7,84 +7,19 @@ from clr.errors import parse_error, emit_error
 from clr.constants import ClrStr, ClrNum, ClrInt, ClrUint, Constants
 from clr.assemble import assembled_size
 from clr.ast.visitor import DeclVisitor
-
-
-class Type(Enum):
-    INT = "int"
-    NUM = "num"
-    STR = "str"
-    BOOL = "bool"
-    FUNCTION = "<function>"
-    UNRESOLVED = "<unresolved>"
-
-    def __str__(self):
-        return self.value
-
-
-class Return(Enum):
-    NEVER = "<never>"
-    SOMETIMES = "<sometimes>"
-    ALWAYS = "<always>"
-
-    def __str__(self):
-        return self.value
-
-
-class FuncInfo:
-    def __init__(self, return_type, signature):
-        self.return_type = return_type
-        self.signature = signature
-
-    def __str__(self):
-        return (
-            "func(" + ", ".join(map(str, self.signature)) + ") " + str(self.return_type)
-        )
-
-    def __eq__(self, other):
-        return (
-            isinstance(other, FuncInfo)
-            and self.return_type == other.return_type
-            and self.signature == other.signature
-        )
-
-
-class TypeAnnotation:
-    def __init__(self, kind=Type.UNRESOLVED, func_info=None):
-        self.kind = kind
-        self.func_info = func_info
-
-    def __repr__(self):
-        if self.kind == Type.FUNCTION:
-            return str(self.func_info)
-        return str(self.kind)
-
-    def __eq__(self, other):
-        if not isinstance(other, TypeAnnotation):
-            return False
-        if self.kind != other.kind:
-            return False
-        if self.kind == Type.FUNCTION:
-            return self.func_info == other.func_info
-        return True
-
-
-class ReturnAnnotation:
-    def __init__(self, kind=Return.NEVER, return_type=None):
-        self.kind = kind
-        self.return_type = return_type
-
-
-TypePair = namedtuple(
-    "TypedPair", ("annotation", "assignable"), defaults=(TypeAnnotation(), False)
+from clr.ast.type_annotations import (
+    TypeAnnotation,
+    TypeAnnotationType,
+    FunctionTypeAnnotation,
+    INT_TYPE,
+    NUM_TYPE,
+    STR_TYPE,
+    BOOL_TYPE,
+    ANY_TYPE,
+    SIMPLE_TYPES,
 )
+from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType
 
-
-INT_TYPE = TypeAnnotation(kind=Type.INT)
-NUM_TYPE = TypeAnnotation(kind=Type.NUM)
-STR_TYPE = TypeAnnotation(kind=Type.STR)
-BOOL_TYPE = TypeAnnotation(kind=Type.BOOL)
-
-SIMPLE_TYPES = {"int": INT_TYPE, "num": NUM_TYPE, "str": STR_TYPE, "bool": BOOL_TYPE}
 
 Builtin = namedtuple("Builtin", ("signatures", "opcode", "return_type"))
 
@@ -161,57 +96,36 @@ class Parser:
         err()
 
 
-class AstNode:
+class SimpleType:
     def __init__(self, parser):
-        self.token = parser.get_current()
-        self.is_ident = False
-        self.is_stmt = False
-
-    def get_info(self):
-        return token_info(self.token)
-
-
-class TypeNode(AstNode):
-    def as_annotation(self):
-        return TypeAnnotation()
-
-
-class SimpleType(TypeNode):
-    def __init__(self, parser):
-        super().__init__(parser)
         err = parse_error("Expected simple type!", parser)
         parser.consume(TokenType.IDENTIFIER, err)
         if parser.get_prev().lexeme not in SIMPLE_TYPES:
             err()
-        self.value = parser.get_prev()
-
-    def as_annotation(self):
-        return SIMPLE_TYPES[self.value.lexeme]
+        self.token = parser.get_prev()
+        self.as_annotation = SIMPLE_TYPES[self.token.lexeme]
 
 
-class FunctionType(TypeNode):
+class FunctionType:
     def __init__(self, parser):
-        super().__init__(parser)
         parser.consume(TokenType.FUNC, parse_error("Expected function type!", parser))
         parser.consume(
             TokenType.LEFT_PAREN, parse_error("Expected parameter types!", parser)
         )
         self.params = []
         while not parser.match(TokenType.RIGHT_PAREN):
-            self.params.append(parse_type(parser))
+            param_type = parse_type(parser)
+            self.params.append(param_type)
             if not parser.check(TokenType.RIGHT_PAREN):
                 parser.consume(
                     TokenType.COMMA,
                     parse_error("Expected comma to delimit parameters!", parser),
                 )
         self.return_type = parse_type(parser)
-
-    def as_annotation(self):
-        func_info = FuncInfo(
-            return_type=self.return_type.as_annotation(),
-            signature=list(map(lambda param: param.as_annotation(), self.params)),
+        self.as_annotation = FunctionTypeAnnotation(
+            return_type=self.return_type.as_annotation,
+            signature=list(map(lambda param: param.as_annotation, self.params)),
         )
-        return TypeAnnotation(kind=Type.FUNCTION, func_info=func_info)
 
 
 def parse_type(parser):
@@ -220,13 +134,12 @@ def parse_type(parser):
     return FunctionType(parser)
 
 
-class Ast(AstNode):
+class Ast:
     def __init__(self, parser):
-        super().__init__(parser)
-
         self.children = []
         while not parser.match(TokenType.EOF):
-            self.children.append(parse_decl(parser))
+            decl = parse_decl(parser)
+            self.children.append(decl)
 
         self.accept(TypeResolver())
         if DEBUG:
@@ -329,16 +242,15 @@ def parse_grouping(parser):
     return value
 
 
-class ExprNode(AstNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+class ExprNode:
+    def __init__(self):
         self.type_annotation = TypeAnnotation()
         self.assignable = False
 
 
 class CallExpr(ExprNode):
     def __init__(self, left, parser):
-        super().__init__(parser)
+        super().__init__()
         self.target = left
         parser.consume(
             TokenType.LEFT_PAREN, parse_error("Expected '(' to call!", parser)
@@ -361,7 +273,7 @@ class CallExpr(ExprNode):
 
 class UnaryExpr(ExprNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume_one(UNARY_OPS, parse_error("Expected unary operator!", parser))
         self.operator = parser.get_prev()
         self.target = parse_expr(parser, precedence=Precedence.UNARY)
@@ -372,17 +284,16 @@ class UnaryExpr(ExprNode):
 
 class BinaryExpr(ExprNode):
     def __init__(self, left, parser):
-        super().__init__(parser)
+        super().__init__()
         self.left = left
         parser.consume_one(BINARY_OPS, parse_error("Expected binary operator!", parser))
         self.operator = parser.get_prev()
-        prec = get_rule(self.operator).precedence
+        precedence = get_rule(self.operator).precedence
         # Right-associative operations bind to the right including repeated operations,
         # left-associative operations don't
         if self.operator.token_type not in LEFT_ASSOC_OPS:
-            prec = prec.next()
-        self.right = parse_expr(parser, precedence=prec)
-        self.token = self.operator
+            precedence = precedence.next()
+        self.right = parse_expr(parser, precedence)
 
     def accept(self, expr_visitor):
         expr_visitor.visit_binary_expr(self)
@@ -390,13 +301,12 @@ class BinaryExpr(ExprNode):
 
 class AndExpr(ExprNode):
     def __init__(self, left, parser):
-        super().__init__(parser)
+        super().__init__()
         self.left = left
         parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
         self.operator = parser.get_prev()
         # and acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.AND)
-        self.token = self.operator
 
     def accept(self, expr_visitor):
         expr_visitor.visit_and_expr(self)
@@ -404,13 +314,12 @@ class AndExpr(ExprNode):
 
 class OrExpr(ExprNode):
     def __init__(self, left, parser):
-        super().__init__(parser)
+        super().__init__()
         self.left = left
         parser.consume(TokenType.OR, parse_error("Expected or operator!", parser))
         self.operator = parser.get_prev()
         # or acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.OR)
-        self.token = self.operator
 
     def accept(self, expr_visitor):
         expr_visitor.visit_or_expr(self)
@@ -418,12 +327,11 @@ class OrExpr(ExprNode):
 
 class IdentExpr(ExprNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
         self.name = parser.get_prev()
         # Identifiers have indices, by default it is unresolved
         self.index_annotation = IndexAnnotation()
-        self.is_ident = True
 
     def accept(self, expr_visitor):
         expr_visitor.visit_ident_expr(self)
@@ -431,9 +339,9 @@ class IdentExpr(ExprNode):
 
 class StringExpr(ExprNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
-        total = [self.token]
+        total = [parser.get_prev()]
         # Adjacent string literals are combined and joined with " to allow effective escaping,
         # don't judge me
         while parser.match(TokenType.STRING):
@@ -447,17 +355,18 @@ class StringExpr(ExprNode):
 
 class NumberExpr(ExprNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
+        lexeme = parser.get_prev().lexeme
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
-                self.value = ClrInt(self.token.lexeme)
+                self.value = ClrInt(lexeme)
                 self.integral = True
             except ValueError:
                 parse_error("Integer literal must be an integer!", parser)()
         else:
             try:
-                self.value = ClrNum(self.token.lexeme)
+                self.value = ClrNum(lexeme)
                 self.integral = False
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
@@ -468,7 +377,7 @@ class NumberExpr(ExprNode):
 
 class BooleanExpr(ExprNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
         self.value = parser.get_prev().token_type == TokenType.TRUE
 
@@ -552,16 +461,14 @@ def parse_stmt(parser):
     return ExprStmt(parser)
 
 
-class StmtNode(AstNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+class StmtNode:
+    def __init__(self):
         self.return_annotation = ReturnAnnotation()
-        self.is_stmt = True
 
 
 class BlockStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
         opener = parser.get_prev()
         self.declarations = []
@@ -577,13 +484,12 @@ class BlockStmt(StmtNode):
 
 class ExprStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         self.value = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
             parse_error("Expected semicolon to end expression statement!", parser),
         )
-        self.token = self.value.token
 
     def accept(self, stmt_visitor):
         stmt_visitor.visit_expr_stmt(self)
@@ -591,7 +497,7 @@ class ExprStmt(StmtNode):
 
 class RetStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(
             TokenType.RETURN, parse_error("Expected return statement!", parser)
         )
@@ -608,7 +514,7 @@ class RetStmt(StmtNode):
 class WhileStmt(StmtNode):
     def __init__(self, parser):
         # TODO: Break statements
-        super().__init__(parser)
+        super().__init__()
         parser.consume(
             TokenType.WHILE, parse_error("Expected while statement!", parser)
         )
@@ -624,7 +530,7 @@ class WhileStmt(StmtNode):
 
 class IfStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
         self.checks = [(parse_expr(parser), BlockStmt(parser))]
         self.otherwise = None
@@ -643,7 +549,7 @@ class IfStmt(StmtNode):
 
 class PrintStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(
             TokenType.PRINT, parse_error("Expected print statement!", parser)
         )
@@ -668,15 +574,14 @@ def parse_decl(parser):
     return parse_stmt(parser)
 
 
-class DeclNode(AstNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+class DeclNode:
+    def __init__(self):
         self.index_annotation = IndexAnnotation()
 
 
 class FuncDecl(DeclNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume(
             TokenType.FUNC, parse_error("Expected function declaration!", parser)
         )
@@ -716,7 +621,6 @@ class FuncDecl(DeclNode):
         self.return_type = parse_type(parser)
         # Consume the definition block
         self.block = BlockStmt(parser)
-        self.token = self.name
         self.upvalues = []
 
     def accept(self, decl_visitor):
@@ -725,7 +629,7 @@ class FuncDecl(DeclNode):
 
 class ValDecl(DeclNode):
     def __init__(self, parser):
-        super().__init__(parser)
+        super().__init__()
         parser.consume_one(
             VAL_TOKENS, parse_error("Expected value declaration!", parser)
         )
@@ -743,12 +647,11 @@ class ValDecl(DeclNode):
             TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
         )
         # Consume the expression to initialize with
-        self.value = parse_expr(parser)
+        self.initializer = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
             parse_error("Expected semicolon after value declaration!", parser),
         )
-        self.token = self.name
 
     def accept(self, decl_visitor):
         decl_visitor.visit_val_decl(self)
@@ -846,7 +749,7 @@ class Indexer(DeclVisitor):
         self.level -= 1
 
     def visit_call_expr(self, node):
-        if node.target.is_ident and node.target.name.lexeme in BUILTINS:
+        if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # If it's a built-in don't call super as we don't want to lookup the name
             for arg in node.arguments:
                 arg.accept(self)
@@ -915,28 +818,33 @@ class FunctionIndexer(Indexer):
         return result
 
 
+TypeInfo = namedtuple(
+    "TypeInfo", ("annotation", "assignable"), defaults=(TypeAnnotation(), False)
+)
+
+
 class TypeResolver(DeclVisitor):
     def __init__(self):
-        self.scopes = [defaultdict(TypePair)]
+        self.scopes = [defaultdict(TypeInfo)]
         self.expected_returns = []
         self.level = 0
 
     def _declare_name(self, name, type_annotation, assignable=False):
-        self.scopes[self.level][name] = TypePair(type_annotation, assignable)
+        self.scopes[self.level][name] = TypeInfo(type_annotation, assignable)
 
     def _lookup_name(self, name):
-        result = TypePair()
+        result = TypeInfo()
         lookback = 0
         while lookback <= self.level:
             result = self.scopes[self.level - lookback][name]
             lookback += 1
-            if result.annotation.kind != Type.UNRESOLVED:
+            if result.annotation.kind != TypeAnnotationType.UNRESOLVED:
                 break
         return result
 
     def start_scope(self):
         super().start_scope()
-        self.scopes.append(defaultdict(TypePair))
+        self.scopes.append(defaultdict(TypeInfo))
         self.level += 1
 
     def end_scope(self):
@@ -945,7 +853,7 @@ class TypeResolver(DeclVisitor):
         self.level -= 1
 
     def visit_call_expr(self, node):
-        if node.target.is_ident and node.target.name.lexeme in BUILTINS:
+        if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # If it's a built-in don't call super() as we don't evaluate the target
             for arg in node.arguments:
                 arg.accept(self)
@@ -959,7 +867,7 @@ class TypeResolver(DeclVisitor):
         else:
             super().visit_call_expr(node)
             function_type = node.target.type_annotation
-            if function_type.kind != Type.FUNCTION:
+            if function_type.kind != TypeAnnotationType.FUNCTION:
                 emit_error(
                     f"Attempt to call a non-callable object {node.target}! {node.get_info()}"
                 )()
@@ -967,18 +875,18 @@ class TypeResolver(DeclVisitor):
                 map(lambda arg: arg.type_annotation, node.arguments)
             )
             args = "(" + ", ".join(map(str, passed_signature)) + ")"
-            if passed_signature != function_type.func_info.signature:
+            if passed_signature != function_type.signature:
                 emit_error(
                     f"Could not find signature for function matching provided argument list {args}! {node.get_info()}"
                 )()
-            node.type_annotation = function_type.func_info.return_type
+            node.type_annotation = function_type.return_type
 
     def visit_unary_expr(self, node):
         super().visit_unary_expr(node)
         target_type = node.target.type_annotation
         if (
-            target_type.kind
-            not in {TokenType.MINUS: [Type.NUM, Type.INT], TokenType.BANG: [Type.BOOL]}[
+            target_type
+            not in {TokenType.MINUS: [NUM_TYPE, INT_TYPE], TokenType.BANG: [BOOL_TYPE]}[
                 node.operator.token_type
             ]
         ):
@@ -995,25 +903,24 @@ class TypeResolver(DeclVisitor):
             emit_error(
                 f"Incompatible operand types {left_type} and {right_type} for binary operator! {node.get_info()}"
             )()
-        arg_kind = left_type.kind
         if (
-            arg_kind
+            left_type
             not in {
-                TokenType.PLUS: [Type.NUM, Type.INT, Type.STR],
-                TokenType.MINUS: [Type.NUM, Type.INT],
-                TokenType.STAR: [Type.NUM, Type.INT],
-                TokenType.SLASH: [Type.NUM],
-                TokenType.EQUAL_EQUAL: Type,
-                TokenType.BANG_EQUAL: Type,
-                TokenType.LESS: [Type.NUM, Type.INT],
-                TokenType.GREATER_EQUAL: [Type.NUM, Type.INT],
-                TokenType.GREATER: [Type.NUM, Type.INT],
-                TokenType.LESS_EQUAL: [Type.NUM, Type.INT],
-                TokenType.EQUAL: Type,
+                TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
+                TokenType.MINUS: [NUM_TYPE, INT_TYPE],
+                TokenType.STAR: [NUM_TYPE, INT_TYPE],
+                TokenType.SLASH: [NUM_TYPE],
+                TokenType.EQUAL_EQUAL: ANY_TYPE,
+                TokenType.BANG_EQUAL: ANY_TYPE,
+                TokenType.LESS: [NUM_TYPE, INT_TYPE],
+                TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
+                TokenType.GREATER: [NUM_TYPE, INT_TYPE],
+                TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
+                TokenType.EQUAL: ANY_TYPE,
             }[node.operator.token_type]
         ):
             emit_error(
-                f"Incompatible operand type {arg_kind} for binary operator! {node.get_info()}"
+                f"Incompatible operand type {left_type} for binary operator! {node.get_info()}"
             )()
         if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
             emit_error(f"Unassignable expression {node.left}! {node.get_info()}")()
@@ -1023,11 +930,11 @@ class TypeResolver(DeclVisitor):
         super().visit_and_expr(node)
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type.kind != Type.BOOL:
+        if left_type != BOOL_TYPE:
             emit_error(
                 f"Incompatible type {left_type} for left operand to logic operator! {node.get_info()}"
             )()
-        if right_type.kind != Type.BOOL:
+        if right_type != BOOL_TYPE:
             emit_error(
                 f"Incompatible type {right_type} for right operand to logic operator! {node.get_info()}"
             )()
@@ -1036,11 +943,11 @@ class TypeResolver(DeclVisitor):
         super().visit_or_expr(node)
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type.kind != Type.BOOL:
+        if left_type != BOOL_TYPE:
             emit_error(
                 f"Incompatible type {left_type} for left operand to logic operator! {node.get_info()}"
             )()
-        if right_type.kind != Type.BOOL:
+        if right_type != BOOL_TYPE:
             emit_error(
                 f"Incompatible type {right_type} for right operand to logic operator! {node.get_info()}"
             )()
@@ -1052,7 +959,7 @@ class TypeResolver(DeclVisitor):
                 f"Invalid identifier name {node.name.lexeme}! This is reserved for the built-in function {node.name.lexeme}(). {node.get_info()}"
             )()
         (node.type_annotation, node.assignable) = self._lookup_name(node.name.lexeme)
-        if node.type_annotation.kind == Type.UNRESOLVED:
+        if node.type_annotation.kind == TypeAnnotationType.UNRESOLVED:
             emit_error(f"Reference to undefined identifier! {node.get_info()}")()
 
     def visit_string_expr(self, node):
@@ -1069,15 +976,18 @@ class TypeResolver(DeclVisitor):
 
     def visit_block_stmt(self, node):
         super().visit_block_stmt(node)
-        kind = Return.NEVER
+        kind = ReturnAnnotationType.NEVER
         return_type = None
         for decl in node.declarations:
-            if kind == Return.ALWAYS:
+            if kind == ReturnAnnotationType.ALWAYS:
                 emit_error(f"Unreachable code! {decl.get_info()}")()
-            if not decl.is_stmt:
+            if not isinstance(decl, StmtNode):
                 continue
             annotation = decl.return_annotation
-            if annotation.kind in [Return.SOMETIMES, Return.ALWAYS]:
+            if annotation.kind in [
+                ReturnAnnotationType.SOMETIMES,
+                ReturnAnnotationType.ALWAYS,
+            ]:
                 kind = annotation.kind
                 return_type = annotation.return_type
         node.return_annotation = ReturnAnnotation(kind, return_type)
@@ -1093,13 +1003,13 @@ class TypeResolver(DeclVisitor):
             emit_error(
                 f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation}! {node.get_info()}"
             )()
-        node.return_annotation = ReturnAnnotation(Return.ALWAYS, expected)
+        node.return_annotation = ReturnAnnotation(ReturnAnnotationType.ALWAYS, expected)
 
     def visit_while_stmt(self, node):
         super().visit_while_stmt(node)
         node.return_annotation = node.block.return_annotation
-        if node.return_annotation.kind == Return.ALWAYS:
-            node.return_annotation.kind = Return.SOMETIMES
+        if node.return_annotation.kind == ReturnAnnotationType.ALWAYS:
+            node.return_annotation.kind = ReturnAnnotationType.SOMETIMES
 
     def visit_if_stmt(self, node):
         super().visit_if_stmt(node)
@@ -1112,15 +1022,25 @@ class TypeResolver(DeclVisitor):
                 else ReturnAnnotation()
             ],
         )
-        kind = Return.NEVER
-        if all(map(lambda annotation: annotation.kind == Return.ALWAYS, annotations)):
-            kind = Return.ALWAYS
-        elif any(map(lambda annotation: annotation.kind != Return.NEVER, annotations)):
-            kind = Return.SOMETIMES
+        kind = ReturnAnnotationType.NEVER
+        if all(
+            map(
+                lambda annotation: annotation.kind == ReturnAnnotationType.ALWAYS,
+                annotations,
+            )
+        ):
+            kind = ReturnAnnotationType.ALWAYS
+        elif any(
+            map(
+                lambda annotation: annotation.kind != ReturnAnnotationType.NEVER,
+                annotations,
+            )
+        ):
+            kind = ReturnAnnotationType.SOMETIMES
         returns = [
             annotation.return_type
             for annotation in annotations
-            if annotation.kind != Return.NEVER
+            if annotation.kind != ReturnAnnotationType.NEVER
         ]
         return_type = returns[0] if returns else None
         node.return_annotation = ReturnAnnotation(kind, return_type)
@@ -1130,24 +1050,25 @@ class TypeResolver(DeclVisitor):
         # Iterate over the parameters and resolve to types
         arg_types = []
         for param_type, param_name in node.params:
-            resolved_type = param_type.as_annotation()
-            if resolved_type.kind == Type.UNRESOLVED:
+            resolved_type = param_type.as_annotation
+            if resolved_type.kind == TypeAnnotationType.UNRESOLVED:
                 emit_error(
                     f"Invalid parameter type {param_type} for function! {node.get_info()}"
                 )()
             arg_types.append(resolved_type)
         # Resolve the return type
-        return_type = node.return_type.as_annotation()
+        return_type = node.return_type.as_annotation
         # Create an annotation for the function signature
-        func_info = FuncInfo(return_type=return_type, signature=arg_types)
-        type_annotation = TypeAnnotation(kind=Type.FUNCTION, func_info=func_info)
+        type_annotation = FunctionTypeAnnotation(
+            return_type=return_type, signature=arg_types
+        )
         # Declare the function
         self._declare_name(node.name.lexeme, type_annotation)
         # Start the function scope
         self.start_scope()
         # Iterate over the parameters and declare them
         for param_type, param_name in node.params:
-            self._declare_name(param_name.lexeme, param_type.as_annotation())
+            self._declare_name(param_name.lexeme, param_type.as_annotation)
         # Expect return statements for the return type
         self.expected_returns.append(return_type)
         # Define the function by its block
@@ -1156,12 +1077,12 @@ class TypeResolver(DeclVisitor):
         self.end_scope()
         # Stop expecting return statements
         del self.expected_returns[-1]
-        if node.block.return_annotation.kind != Return.ALWAYS:
+        if node.block.return_annotation.kind != ReturnAnnotationType.ALWAYS:
             emit_error(f"Function does not always return! {node.get_info()}")()
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
-        type_annotation = node.value.type_annotation
+        type_annotation = node.initializer.type_annotation
         self._declare_name(node.name.lexeme, type_annotation, assignable=node.mutable)
 
 
@@ -1380,7 +1301,7 @@ class Compiler(DeclVisitor):
             )()
 
     def visit_call_expr(self, node):
-        if node.target.is_ident and node.target.name.lexeme in BUILTINS:
+        if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # Don't call super if it's a built-in because we don't want to evaluate the name
             opcode = BUILTINS[node.target.name.lexeme].opcode
             for arg in node.arguments:
