@@ -131,7 +131,9 @@ class FunctionType:
 def parse_type(parser):
     if parser.get_current().lexeme in SIMPLE_TYPES:
         return SimpleType(parser)
-    return FunctionType(parser)
+    if parser.get_current().token_type == TokenType.FUNC:
+        return FunctionType(parser)
+    parse_error("Expected type!", parser)()
 
 
 class Ast:
@@ -462,13 +464,14 @@ def parse_stmt(parser):
 
 
 class StmtNode:
-    def __init__(self):
+    def __init__(self, parser):
         self.return_annotation = ReturnAnnotation()
+        self.first_token = parser.get_current()
 
 
 class BlockStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
         opener = parser.get_prev()
         self.declarations = []
@@ -484,7 +487,7 @@ class BlockStmt(StmtNode):
 
 class ExprStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         self.value = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
@@ -497,10 +500,11 @@ class ExprStmt(StmtNode):
 
 class RetStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         parser.consume(
             TokenType.RETURN, parse_error("Expected return statement!", parser)
         )
+        self.return_token = parser.get_prev()
         self.value = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
@@ -530,7 +534,7 @@ class WhileStmt(StmtNode):
 
 class IfStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
         self.checks = [(parse_expr(parser), BlockStmt(parser))]
         self.otherwise = None
@@ -549,7 +553,7 @@ class IfStmt(StmtNode):
 
 class PrintStmt(StmtNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         parser.consume(
             TokenType.PRINT, parse_error("Expected print statement!", parser)
         )
@@ -574,14 +578,15 @@ def parse_decl(parser):
     return parse_stmt(parser)
 
 
-class DeclNode:
-    def __init__(self):
+class DeclNode(StmtNode):
+    def __init__(self, parser):
+        super().__init__(parser)
         self.index_annotation = IndexAnnotation()
 
 
 class FuncDecl(DeclNode):
     def __init__(self, parser):
-        super().__init__()
+        super().__init__(parser)
         parser.consume(
             TokenType.FUNC, parse_error("Expected function declaration!", parser)
         )
@@ -760,9 +765,9 @@ class Indexer(DeclVisitor):
         super().visit_ident_expr(node)
         node.index_annotation = self.lookup_name(node.name.lexeme)
         if node.index_annotation.kind == Index.UNRESOLVED:
-            emit_error(f"Reference to undefined identifier! {node.get_info()}")()
+            emit_error(f"Reference to undefined identifier! {token_info(node.name)}")()
         elif DEBUG:
-            print(f"Set index for {node.get_info()} as {node.index_annotation}")
+            print(f"Set index for {token_info(node.name)} as {node.index_annotation}")
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
@@ -861,7 +866,7 @@ class TypeResolver(DeclVisitor):
             type_list = list(map(lambda pair: pair.type_annotation, node.arguments))
             if type_list not in builtin.signatures:
                 emit_error(
-                    f"Built-in function {node.target} cannot take arguments of type {str(type_list)}! {node.get_info()}"
+                    f"Built-in function {token_info(node.target.name)} cannot take arguments of type {str(type_list)}!"
                 )()
             node.type_annotation = builtin.return_type
         else:
@@ -869,7 +874,7 @@ class TypeResolver(DeclVisitor):
             function_type = node.target.type_annotation
             if function_type.kind != TypeAnnotationType.FUNCTION:
                 emit_error(
-                    f"Attempt to call a non-callable object {node.target}! {node.get_info()}"
+                    f"Attempt to call a non-callable object {token_info(node.target.name)}!"
                 )()
             passed_signature = list(
                 map(lambda arg: arg.type_annotation, node.arguments)
@@ -877,7 +882,7 @@ class TypeResolver(DeclVisitor):
             args = "(" + ", ".join(map(str, passed_signature)) + ")"
             if passed_signature != function_type.signature:
                 emit_error(
-                    f"Could not find signature for function matching provided argument list {args}! {node.get_info()}"
+                    f"Could not find signature for function {token_info(node.target.name)} matching provided argument list {args}!"
                 )()
             node.type_annotation = function_type.return_type
 
@@ -891,7 +896,7 @@ class TypeResolver(DeclVisitor):
             ]
         ):
             emit_error(
-                f"Incompatible operand type {target_type} for unary operator! {node.get_info()}"
+                f"Incompatible operand type {target_type} for unary operator {token_info(node.operator)}!"
             )()
         node.type_annotation = target_type
 
@@ -901,7 +906,7 @@ class TypeResolver(DeclVisitor):
         right_type = node.right.type_annotation
         if left_type.kind != right_type.kind:
             emit_error(
-                f"Incompatible operand types {left_type} and {right_type} for binary operator! {node.get_info()}"
+                f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}!"
             )()
         if (
             left_type
@@ -920,10 +925,10 @@ class TypeResolver(DeclVisitor):
             }[node.operator.token_type]
         ):
             emit_error(
-                f"Incompatible operand type {left_type} for binary operator! {node.get_info()}"
+                f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}!"
             )()
         if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
-            emit_error(f"Unassignable expression {node.left}! {node.get_info()}")()
+            emit_error(f"Unassignable expression {node.left}!")()
         node.type_annotation = left_type
 
     def visit_and_expr(self, node):
@@ -932,11 +937,11 @@ class TypeResolver(DeclVisitor):
         right_type = node.right.type_annotation
         if left_type != BOOL_TYPE:
             emit_error(
-                f"Incompatible type {left_type} for left operand to logic operator! {node.get_info()}"
+                f"Incompatible type {left_type} for left operand to logic operator {token_info(node.operator)}!"
             )()
         if right_type != BOOL_TYPE:
             emit_error(
-                f"Incompatible type {right_type} for right operand to logic operator! {node.get_info()}"
+                f"Incompatible type {right_type} for right operand to logic operator {token_info(node.operator)}!"
             )()
 
     def visit_or_expr(self, node):
@@ -945,22 +950,22 @@ class TypeResolver(DeclVisitor):
         right_type = node.right.type_annotation
         if left_type != BOOL_TYPE:
             emit_error(
-                f"Incompatible type {left_type} for left operand to logic operator! {node.get_info()}"
+                f"Incompatible type {left_type} for left operand to logic operator {token_info(node.operator)}!"
             )()
         if right_type != BOOL_TYPE:
             emit_error(
-                f"Incompatible type {right_type} for right operand to logic operator! {node.get_info()}"
+                f"Incompatible type {right_type} for right operand to logic operator {token_info(node.operator)}!"
             )()
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
         if node.name.lexeme in BUILTINS:
             emit_error(
-                f"Invalid identifier name {node.name.lexeme}! This is reserved for the built-in function {node.name.lexeme}(). {node.get_info()}"
+                f"Invalid identifier name {token_info(node.name)}! This is reserved for the built-in function {node.name.lexeme}."
             )()
         (node.type_annotation, node.assignable) = self._lookup_name(node.name.lexeme)
         if node.type_annotation.kind == TypeAnnotationType.UNRESOLVED:
-            emit_error(f"Reference to undefined identifier! {node.get_info()}")()
+            emit_error(f"Reference to undefined identifier {token_info(node.name)}!")()
 
     def visit_string_expr(self, node):
         super().visit_string_expr(node)
@@ -980,7 +985,7 @@ class TypeResolver(DeclVisitor):
         return_type = None
         for decl in node.declarations:
             if kind == ReturnAnnotationType.ALWAYS:
-                emit_error(f"Unreachable code! {decl.get_info()}")()
+                emit_error(f"Unreachable code {token_info(decl.first_token)}!")()
             if not isinstance(decl, StmtNode):
                 continue
             annotation = decl.return_annotation
@@ -996,12 +1001,12 @@ class TypeResolver(DeclVisitor):
         super().visit_ret_stmt(node)
         if not self.expected_returns:
             emit_error(
-                f"Return statement found outside of function! {node.get_info()}"
+                f"Return statement found outside of function {token_info(node.return_token)}!"
             )()
         expected = self.expected_returns[-1]
         if expected != node.value.type_annotation:
             emit_error(
-                f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation}! {node.get_info()}"
+                f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation} at {token_info(node.return_token)}!"
             )()
         node.return_annotation = ReturnAnnotation(ReturnAnnotationType.ALWAYS, expected)
 
@@ -1053,7 +1058,7 @@ class TypeResolver(DeclVisitor):
             resolved_type = param_type.as_annotation
             if resolved_type.kind == TypeAnnotationType.UNRESOLVED:
                 emit_error(
-                    f"Invalid parameter type {param_type} for function! {node.get_info()}"
+                    f"Invalid parameter type {param_type} for function {token_info(node.name)}!"
                 )()
             arg_types.append(resolved_type)
         # Resolve the return type
@@ -1078,7 +1083,7 @@ class TypeResolver(DeclVisitor):
         # Stop expecting return statements
         del self.expected_returns[-1]
         if node.block.return_annotation.kind != ReturnAnnotationType.ALWAYS:
-            emit_error(f"Function does not always return! {node.get_info()}")()
+            emit_error(f"Function does not always return {token_info(node.name)}!")()
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
@@ -1279,7 +1284,7 @@ class Compiler(DeclVisitor):
             node.right.accept(self)
             self.program.define_name(node.left.index_annotation)
             if DEBUG:
-                print(f"Loading name for {node.left.get_info()}")
+                print(f"Loading name for {node.left}")
             # Assignment is an expression so we load the assigned value as well
             self.program.load_name(node.left.index_annotation)
         else:
@@ -1331,7 +1336,7 @@ class Compiler(DeclVisitor):
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
         if DEBUG:
-            print(f"Loading name for {node.get_info()}")
+            print(f"Loading name for {node}")
         self.program.load_name(node.index_annotation)
 
     def visit_and_expr(self, node):
