@@ -1,10 +1,2 @@
 
-func factorial(int n) num {
-    if n == 0i {
-        return 1;
-    } else {
-        return num(n) * factorial(n - 1i);
-    }
-}
-
-print "10! = " + str(factorial(10i));
+return "str"();

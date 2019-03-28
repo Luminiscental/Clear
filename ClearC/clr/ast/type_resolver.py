@@ -69,7 +69,7 @@ class TypeResolver(DeclVisitor):
             function_type = node.target.type_annotation
             if function_type.kind != TypeAnnotationType.FUNCTION:
                 emit_error(
-                    f"Attempt to call a non-callable object {token_info(node.target.name)}!"
+                    f"Attempt to call a non-callable object {node.target}! (type is {function_type})"
                 )()
             passed_signature = list(
                 map(lambda arg: arg.type_annotation, node.arguments)

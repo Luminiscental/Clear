@@ -106,6 +106,9 @@ class CallExpr(ExprNode):
                     parse_error("Expected comma to delimit arguments!", parser),
                 )
 
+    def __str__(self):
+        return str(self.target) + "(" + ", ".join(map(str, self.arguments)) + ")"
+
     def accept(self, expr_visitor):
         expr_visitor.visit_call_expr(self)
 
@@ -116,6 +119,9 @@ class UnaryExpr(ExprNode):
         parser.consume_one(UNARY_OPS, parse_error("Expected unary operator!", parser))
         self.operator = parser.get_prev()
         self.target = parse_expr(parser, precedence=Precedence.UNARY)
+
+    def __str__(self):
+        return str(self.operator) + str(self.target)
 
     def accept(self, expr_visitor):
         expr_visitor.visit_unary_expr(self)
@@ -134,6 +140,9 @@ class BinaryExpr(ExprNode):
             precedence = precedence.next()
         self.right = parse_expr(parser, precedence)
 
+    def __str__(self):
+        return str(self.left) + " " + str(self.operator) + " " + str(self.right)
+
     def accept(self, expr_visitor):
         expr_visitor.visit_binary_expr(self)
 
@@ -146,6 +155,9 @@ class AndExpr(ExprNode):
         self.operator = parser.get_prev()
         # and acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.AND)
+
+    def __str__(self):
+        return str(self.left) + " and " + str(self.right)
 
     def accept(self, expr_visitor):
         expr_visitor.visit_and_expr(self)
@@ -160,6 +172,9 @@ class OrExpr(ExprNode):
         # or acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.OR)
 
+    def __str__(self):
+        return str(self.left) + " or " + str(self.right)
+
     def accept(self, expr_visitor):
         expr_visitor.visit_or_expr(self)
 
@@ -171,6 +186,9 @@ class IdentExpr(ExprNode):
         self.name = parser.get_prev()
         # Identifiers have indices, by default it is unresolved
         self.index_annotation = IndexAnnotation()
+
+    def __str__(self):
+        return self.name.lexeme
 
     def accept(self, expr_visitor):
         expr_visitor.visit_ident_expr(self)
@@ -187,6 +205,9 @@ class StringExpr(ExprNode):
             total.append(parser.get_prev())
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
         self.value = ClrStr(joined)
+
+    def __str__(self):
+        return '"' + self.value.value.replace('"', '""') + '"'
 
     def accept(self, expr_visitor):
         expr_visitor.visit_string_expr(self)
@@ -210,6 +231,9 @@ class NumberExpr(ExprNode):
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
 
+    def __str__(self):
+        return str(self.value.value)
+
     def accept(self, expr_visitor):
         expr_visitor.visit_number_expr(self)
 
@@ -219,6 +243,9 @@ class BooleanExpr(ExprNode):
         super().__init__()
         parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
         self.value = parser.get_prev().token_type == TokenType.TRUE
+
+    def __str__(self):
+        return str(self.value)
 
     def accept(self, expr_visitor):
         expr_visitor.visit_boolean_expr(self)

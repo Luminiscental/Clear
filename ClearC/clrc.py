@@ -25,6 +25,7 @@ def main():
             print("Assembling:")
         byte_code = assemble(code)
     except ClrCompileError as compile_error:
+        # TODO: Synchronize errors on declarations/statements
         print("Could not compile:")
         print(compile_error)
     else:
