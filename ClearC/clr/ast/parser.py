@@ -5,6 +5,7 @@ class Parser:
     def __init__(self, tokens):
         self.index = 0
         self.tokens = tokens
+        self.errors = []
 
     def get_current(self):
         return self.tokens[self.index]

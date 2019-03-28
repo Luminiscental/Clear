@@ -1,5 +1,5 @@
 from clr.tokens import TokenType, token_info
-from clr.errors import parse_error, emit_error
+from clr.errors import ClrCompileError, parse_error, emit_error
 from clr.ast.return_annotations import ReturnAnnotation
 from clr.ast.index_annotations import IndexAnnotation
 from clr.ast.expression_nodes import parse_expr
@@ -129,11 +129,16 @@ class PrintStmt(StmtNode):
 
 
 def parse_decl(parser):
-    if parser.check_one(VAL_TOKENS):
-        return ValDecl(parser)
-    if parser.check(TokenType.FUNC):
-        return FuncDecl(parser)
-    return parse_stmt(parser)
+    try:
+        if parser.check_one(VAL_TOKENS):
+            return ValDecl(parser)
+        if parser.check(TokenType.FUNC):
+            return FuncDecl(parser)
+        return parse_stmt(parser)
+    except ClrCompileError as error:
+        if not parser.match(TokenType.EOF):
+            parser.errors.append(str(error))
+            parser.advance()
 
 
 class DeclNode(StmtNode):  # pylint: disable=too-few-public-methods

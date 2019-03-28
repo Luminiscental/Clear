@@ -217,22 +217,22 @@ class NumberExpr(ExprNode):
     def __init__(self, parser):
         super().__init__()
         parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
-        lexeme = parser.get_prev().lexeme
+        self.lexeme = parser.get_prev().lexeme
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
-                self.value = ClrInt(lexeme)
+                self.value = ClrInt(self.lexeme)
                 self.integral = True
             except ValueError:
                 parse_error("Integer literal must be an integer!", parser)()
         else:
             try:
-                self.value = ClrNum(lexeme)
+                self.value = ClrNum(self.lexeme)
                 self.integral = False
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
 
     def __str__(self):
-        return str(self.value.value)
+        return self.lexeme
 
     def accept(self, expr_visitor):
         expr_visitor.visit_number_expr(self)

@@ -1,5 +1,6 @@
 from clr.values import DEBUG
 from clr.tokens import TokenType, tokenize
+from clr.errors import emit_error
 from clr.ast.parser import Parser
 from clr.ast.name_indexer import NameIndexer
 from clr.ast.type_resolver import TypeResolver
@@ -13,6 +14,8 @@ class Ast:
         while not parser.match(TokenType.EOF):
             decl = parse_decl(parser)
             self.children.append(decl)
+        if parser.errors:
+            emit_error("\n".join(parser.errors))()
 
         self.accept(TypeResolver())
         if DEBUG:
