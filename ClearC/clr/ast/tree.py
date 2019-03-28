@@ -16,38 +16,12 @@ from clr.ast.type_annotations import (
     STR_TYPE,
     BOOL_TYPE,
     ANY_TYPE,
+    BUILTINS,
 )
 from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType
 from clr.ast.index_annotations import IndexAnnotationType, IndexAnnotation
 from clr.ast.parser import Parser
 from clr.ast.type_nodes import parse_type
-
-
-Builtin = namedtuple("Builtin", ("signatures", "opcode", "return_type"))
-
-BUILTINS = {
-    "clock": Builtin(signatures=[[]], opcode=OpCode.CLOCK, return_type=NUM_TYPE),
-    "int": Builtin(
-        signatures=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-        opcode=OpCode.INT,
-        return_type=INT_TYPE,
-    ),
-    "num": Builtin(
-        signatures=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-        opcode=OpCode.NUM,
-        return_type=NUM_TYPE,
-    ),
-    "str": Builtin(
-        signatures=[[INT_TYPE], [NUM_TYPE], [STR_TYPE], [BOOL_TYPE]],
-        opcode=OpCode.STR,
-        return_type=STR_TYPE,
-    ),
-    "bool": Builtin(
-        signatures=[[INT_TYPE], [NUM_TYPE], [BOOL_TYPE]],
-        opcode=OpCode.BOOL,
-        return_type=BOOL_TYPE,
-    ),
-}
 
 
 class Ast:
