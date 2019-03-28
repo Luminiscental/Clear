@@ -1,8 +1,3 @@
-"""
-This module provides classes for storing information about tokens within
-Clear source, as well as a tokenize function for converting a string of source
-to a list of tokens.
-"""
 import re
 from enum import Enum
 from collections import namedtuple
@@ -12,9 +7,6 @@ from clr.values import DEBUG
 
 
 class TokenType(Enum):
-    """
-    This class enumerates the possible token types.
-    """
 
     # symbols
     LEFT_PAREN = "("
@@ -68,10 +60,6 @@ class TokenType(Enum):
 
 
 class Token(namedtuple("Token", "token_type lexeme line")):
-    """
-    This class wraps a namedtuple to store information about a single token.
-    """
-
     def __str__(self):
         return self.lexeme
 
@@ -121,10 +109,6 @@ EQUAL_SUFFIX_TOKENS = {
 
 class ScanState(Enum):
 
-    """
-    This class enumerates the possible states while scanning tokens.
-    """
-
     NUMBER = 0
     DECIMAL = 1
     STRING = 2
@@ -134,26 +118,10 @@ class ScanState(Enum):
 
 def token_info(token):
 
-    """
-    This function returns information about the given token as a string.
-    """
-
     return f'<line {token.line}> "{token.lexeme}"'
 
 
 class Scanner:
-    """
-    This class encapsulates state while scanning individual characters to form a list of tokens.
-
-    Fields:
-        - line : the current line number
-        - acc : a string storing accumulated characters that haven't formed a token yet
-        - tokens : the list of emitted tokens
-        - state : the current scanning state
-        - keyword_trie : a trie with state regarding whether the accumulated characters could be
-            forming a keyword or not
-    """
-
     def __init__(self):
         self.line = 1
         self.acc = ""
@@ -162,12 +130,6 @@ class Scanner:
         self.keyword_trie = Trie(KEYWORD_TYPES)
 
     def store_acc(self, token_type):
-        """
-        This method emits the accumulated characters as a token of the given token type
-
-        Parameters:
-            - token_type : the type of token to emit
-        """
         token = Token(token_type, self.acc, self.line)
         self.tokens.append(token)
         self.acc = ""
@@ -285,9 +247,6 @@ class Scanner:
         return True
 
     def scan(self, char):
-        """
-        This method scans a character taking into account and updating the current scanning state
-        """
         if not {
             ScanState.ANY: self._scan_any,
             ScanState.DECIMAL: self._scan_decimal,
@@ -298,18 +257,10 @@ class Scanner:
             self._scan_any(char)
 
     def get_tokens(self):
-        """
-        This method returns the list of emitted tokens omitting delimiting placeholder tokens
-        """
         return [token for token in self.tokens if token.token_type != TokenType.SPACE]
 
 
 def tokenize(source):
-
-    """
-    This function takes a string of Clear source code and returns a list
-    of tokens from it, removing whitespace and comments.
-    """
 
     # Replace // followed by a string of non-newline characters with nothing
     source = re.sub(r"//.*", "", source)

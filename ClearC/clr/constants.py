@@ -1,16 +1,8 @@
-"""
-This module provides classes for creating and indexing constant values for Clear programs.
-"""
 from clr.values import OpCode, DEBUG
 from clr.errors import emit_error
 
 
 class ClrInt:
-    """
-    This class wraps an integer value in Clear,
-    implementing type-checking comparisons for use in dictionaries.
-    """
-
     def __init__(self, value):
         self.value = int(value)
 
@@ -28,11 +20,6 @@ class ClrInt:
 
 
 class ClrUint:
-    """
-    This class wraps an unsigned integer value in Clear,
-    implementing type-checking comparisons for use in dictionaries.
-    """
-
     def __init__(self, value):
         if value < 0:
             emit_error(f"Uint created with negative value {value}!")()
@@ -52,11 +39,6 @@ class ClrUint:
 
 
 class ClrNum:
-    """
-    This class wraps a number value in Clear,
-    implementing type-checking comparisons for use in dictionaries.
-    """
-
     def __init__(self, value):
         self.value = float(value)
 
@@ -74,11 +56,6 @@ class ClrNum:
 
 
 class ClrStr:
-    """
-    This class wraps an string value in Clear,
-    implementing type-checking comparisons for use in dictionaries.
-    """
-
     def __init__(self, value):
         self.value = str(value)
 
@@ -96,11 +73,6 @@ class ClrStr:
 
 
 class Constants:
-    """
-    This class stores a list of constants to be used in a Clear program
-    indexed to emit bytecode storing them for later use.
-    """
-
     def __init__(self):
         self.values = []
         self.count = 0
@@ -113,17 +85,10 @@ class Constants:
         return next(self.values)
 
     def add_all(self, other):
-        """
-        This function takes an iterator and adds all of the values within it.
-        """
         for item in other:
             self.add(item)
 
     def add(self, value):
-        """
-        This function takes a constant value and returns an index to it within the list;
-        adding it if it isn't already present.
-        """
         if value in self.values:
             return self.values.index(value)
         index = self.count
@@ -146,9 +111,6 @@ class Constants:
         self.code_list.append(value)
 
     def flush(self):
-        """
-        This function returns a list of bytecode to store all the constant values.
-        """
         self.code_list.append(ClrUint(len(self.values)))
         for value in self.values:
             self._store(value)
