@@ -1,4 +1,5 @@
 from clr.errors import ClrCompileError
+from clr.ast.statement_nodes import StmtNode
 
 
 class ExprVisitor:
@@ -48,9 +49,8 @@ class StmtVisitor(ExprVisitor):
     def visit_block_stmt(self, node):
         self.start_scope()
         for decl in node.declarations:
-            if not decl.is_stmt:
-                continue
-            decl.accept(self)
+            if isinstance(decl, StmtNode):
+                decl.accept(self)
         self.end_scope()
 
     def visit_expr_stmt(self, node):
