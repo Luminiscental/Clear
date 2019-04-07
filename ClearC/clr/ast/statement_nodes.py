@@ -1,11 +1,10 @@
 from clr.tokens import TokenType, token_info
-from clr.errors import ClrCompileError, parse_error, emit_error
+from clr.errors import ClrCompileError, parse_error, emit_error, sync_errors
 from clr.ast.return_annotations import ReturnAnnotation
 from clr.ast.index_annotations import IndexAnnotation
 from clr.ast.expression_nodes import parse_expr
 from clr.ast.type_annotations import BUILTINS
 from clr.ast.type_nodes import parse_type
-from clr.ast.visitor import sync_errors
 
 
 def parse_stmt(parser):
@@ -141,6 +140,8 @@ def parse_decl(parser):
             return ValDecl(parser)
         if parser.check(TokenType.FUNC):
             return FuncDecl(parser)
+        if parser.check(TokenType.STRUCT):
+            return StructDecl(parser)
         return parse_stmt(parser)
     except ClrCompileError as error:
         if not parser.match(TokenType.EOF):

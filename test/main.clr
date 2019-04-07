@@ -7,6 +7,5 @@ struct Point {
 var y = 3;
 val x = y = 4;
 
-print "x = " + str(z);
-print "y = " + str(asd);
+print "x = " + str(x);
 print "y = " + str(y);

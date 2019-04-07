@@ -92,13 +92,3 @@ class DeclVisitor(StmtVisitor):
 
     def visit_struct_decl(self, node):
         pass
-
-
-def sync_errors(accept_func):
-    def synced(self, visitor):
-        try:
-            accept_func(self, visitor)
-        except ClrCompileError as error:
-            visitor.errors.append(str(error))
-
-    return synced
