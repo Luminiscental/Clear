@@ -1,4 +1,9 @@
 
+struct Point {
+    int x;
+    int y;
+}
+
 var y = 3;
 val x = y = 4;
 

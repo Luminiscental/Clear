@@ -154,6 +154,37 @@ class DeclNode(StmtNode):  # pylint: disable=too-few-public-methods
         self.index_annotation = IndexAnnotation()
 
 
+class ValDecl(DeclNode):
+    def __init__(self, parser):
+        super().__init__(parser)
+        parser.consume_one(
+            VAL_TOKENS, parse_error("Expected value declaration!", parser)
+        )
+        self.mutable = parser.get_prev().token_type == TokenType.VAR
+        # Consume the variable name
+        parser.consume(
+            TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
+        )
+        self.name = parser.get_prev()
+        if self.name.lexeme in BUILTINS:
+            emit_error(
+                f"Invalid identifier name {self.name.lexeme}! This is reserved for the built-in function {self.name.lexeme}(). {token_info(self.name)}"
+            )()
+        parser.consume(
+            TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
+        )
+        # Consume the expression to initialize with
+        self.initializer = parse_expr(parser)
+        parser.consume(
+            TokenType.SEMICOLON,
+            parse_error("Expected semicolon after value declaration!", parser),
+        )
+
+    @sync_errors
+    def accept(self, decl_visitor):
+        decl_visitor.visit_val_decl(self)
+
+
 class FuncDecl(DeclNode):
     def __init__(self, parser):
         super().__init__(parser)
@@ -203,35 +234,41 @@ class FuncDecl(DeclNode):
         decl_visitor.visit_func_decl(self)
 
 
-class ValDecl(DeclNode):
+class StructDecl(DeclNode):
     def __init__(self, parser):
         super().__init__(parser)
-        parser.consume_one(
-            VAL_TOKENS, parse_error("Expected value declaration!", parser)
-        )
-        self.mutable = parser.get_prev().token_type == TokenType.VAR
-        # Consume the variable name
         parser.consume(
-            TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
+            TokenType.STRUCT, parse_error("Expected struct declaration!", parser)
+        )
+        # Consume the name token
+        parser.consume(
+            TokenType.IDENTIFIER, parse_error("Expected struct name!", parser)
         )
         self.name = parser.get_prev()
-        if self.name.lexeme in BUILTINS:
-            emit_error(
-                f"Invalid identifier name {self.name.lexeme}! This is reserved for the built-in function {self.name.lexeme}(). {token_info(self.name)}"
-            )()
+        self.fields = []
         parser.consume(
-            TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
+            TokenType.LEFT_BRACE, parse_error("Expected struct body!", parser)
         )
-        # Consume the expression to initialize with
-        self.initializer = parse_expr(parser)
-        parser.consume(
-            TokenType.SEMICOLON,
-            parse_error("Expected semicolon after value declaration!", parser),
-        )
+        # Consume the fields until we hit the closing brace
+        while not parser.match(TokenType.RIGHT_BRACE):
+            # Consume a type for the field
+            field_type = parse_type(parser)
+            # And then a name for the field
+            parser.consume(
+                TokenType.IDENTIFIER, parse_error("Expected field name!", parser)
+            )
+            field_name = parser.get_prev()
+            # Field declarations end with a semicolon
+            parser.consume(
+                TokenType.SEMICOLON, parse_error("Expected semi-colon!", parser)
+            )
+            # Append the fields as (type, name) tuples
+            pair = (field_type, field_name)
+            self.fields.append(pair)
 
     @sync_errors
     def accept(self, decl_visitor):
-        decl_visitor.visit_val_decl(self)
+        decl_visitor.visit_struct_decl(self)
 
 
 VAL_TOKENS = {TokenType.VAL, TokenType.VAR}

@@ -84,11 +84,14 @@ class DeclVisitor(StmtVisitor):
             decl.accept(self)
         self.end_scope()
 
+    def visit_val_decl(self, node):
+        node.initializer.accept(self)
+
     def visit_func_decl(self, node):
         node.block.accept(self)
 
-    def visit_val_decl(self, node):
-        node.initializer.accept(self)
+    def visit_struct_decl(self, node):
+        pass
 
 
 def sync_errors(accept_func):

@@ -35,7 +35,7 @@ class TokenType(Enum):
     INTEGER_SUFFIX = "i"
     # keywords
     AND = "and"
-    CLASS = "class"
+    STRUCT = "struct"
     ELSE = "else"
     FALSE = "false"
     FOR = "for"
@@ -66,7 +66,7 @@ class Token(namedtuple("Token", "token_type lexeme line")):
 
 KEYWORD_TYPES = {
     "and": TokenType.AND,
-    "class": TokenType.CLASS,
+    "struct": TokenType.STRUCT,
     "else": TokenType.ELSE,
     "false": TokenType.FALSE,
     "for": TokenType.FOR,
