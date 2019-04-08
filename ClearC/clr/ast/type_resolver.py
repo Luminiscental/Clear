@@ -70,9 +70,10 @@ class TypeResolver(StructTrackingDeclVisitor):
                 arg.accept(self)
             builtin = BUILTINS[node.target.name.lexeme]
             type_list = list(map(lambda pair: pair.type_annotation, node.arguments))
+            arg_string = "(" + ", ".join(map(str, type_list)) + ")"
             if type_list not in builtin.signatures:
                 emit_error(
-                    f"Built-in function {token_info(node.target.name)} cannot take arguments of type {str(type_list)}: `{node}`!"
+                    f"Built-in function {token_info(node.target.name)} cannot take arguments of type {arg_string}: `{node}`!"
                 )()
             node.type_annotation = builtin.return_type
         else:
