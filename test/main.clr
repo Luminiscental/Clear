@@ -18,8 +18,10 @@ func test(Point a, Rectangle b) int {
         + b.b.y;
 }
 
-val a = Point(1i, 2i);
+var a = Point(1i, 2i);
 val b = Point(2i, 3i);
 val rect = Rectangle(a, b);
+
+a = Point(-2i, a.y);
 
 print test(a, rect);

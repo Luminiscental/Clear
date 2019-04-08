@@ -141,7 +141,16 @@ class BinaryExpr(ExprNode):
         self.right = parse_expr(parser, precedence)
 
     def __str__(self):
-        return str(self.left) + " " + str(self.operator) + " " + str(self.right)
+        separator = " "
+        if self.operator.token_type == TokenType.DOT:
+            separator = ""
+        return (
+            str(self.left)
+            + separator
+            + str(self.operator)
+            + separator
+            + str(self.right)
+        )
 
     def accept(self, expr_visitor):
         expr_visitor.visit_binary_expr(self)
