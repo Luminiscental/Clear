@@ -267,6 +267,7 @@ BINARY_OPS = {
     TokenType.GREATER,
     TokenType.LESS_EQUAL,
     TokenType.EQUAL,
+    TokenType.DOT,
 }
 
 LEFT_ASSOC_OPS = {TokenType.EQUAL}
@@ -289,6 +290,7 @@ PRATT_TABLE = defaultdict(
         TokenType.TRUE: ParseRule(prefix=BooleanExpr),
         TokenType.FALSE: ParseRule(prefix=BooleanExpr),
         TokenType.BANG: ParseRule(prefix=UnaryExpr),
+        TokenType.DOT: ParseRule(infix=BinaryExpr, precedence=Precedence.CALL),
         TokenType.EQUAL_EQUAL: ParseRule(
             infix=BinaryExpr, precedence=Precedence.EQUALITY
         ),
