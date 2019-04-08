@@ -4,7 +4,7 @@ or file format specification values.
 """
 from enum import Enum
 
-DEBUG = True
+DEBUG = False
 DEBUG_ASSEMBLE = False
 
 
@@ -69,6 +69,10 @@ class OpCode(Enum):
     CLOSURE = 40
     LOAD_UPVALUE = 41
     SET_UPVALUE = 42
+    # Structs
+    STRUCT = 43
+    GET_FIELD = 44
+    SET_FIELD = 45
 
     def __str__(self):
         return "OP_" + self.name

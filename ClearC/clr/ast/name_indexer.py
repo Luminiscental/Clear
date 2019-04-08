@@ -109,6 +109,10 @@ class NameIndexer(DeclVisitor):
             decl.accept(function)
         node.upvalues.extend(function.upvalues)
 
+    def visit_struct_decl(self, node):
+        # Declare the constructor
+        node.index_annotation = self._declare_name(node.name.lexeme)
+
 
 class FunctionNameIndexer(NameIndexer):
     def __init__(self, parent):

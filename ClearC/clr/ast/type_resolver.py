@@ -268,6 +268,10 @@ class TypeResolver(DeclVisitor):
             return_type=return_type, signature=arg_types
         )
         # Declare the function
+        if node.name.lexeme in self.structs:
+            emit_error(
+                f"Cannot create function {token_info(node.name)} with same name as struct constructor!"
+            )()
         self._declare_name(node.name.lexeme, type_annotation)
         # Start the function scope
         self.start_scope()
@@ -304,4 +308,8 @@ class TypeResolver(DeclVisitor):
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
         type_annotation = node.initializer.type_annotation
+        if node.name.lexeme in self.structs:
+            emit_error(
+                f"Cannot create variable {token_info(node.name)} with same name as struct constructor!"
+            )()
         self._declare_name(node.name.lexeme, type_annotation, assignable=node.mutable)

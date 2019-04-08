@@ -54,7 +54,8 @@ class Program:
         # Patch the previously inserted offset
         self.code_list[index] = ClrUint(offset)
 
-    def make_closure(self, upvalues):
+    def make_closure(self, upvalues=None):
+        upvalues = upvalues or []
         self.code_list.append(OpCode.CLOSURE)
         self.code_list.append(len(upvalues))
         for upvalue in upvalues:
@@ -128,6 +129,24 @@ class Compiler(DeclVisitor):
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)
         # Define the function as the closure value
+        self.program.define_name(node.index_annotation)
+
+    def visit_struct_decl(self, node):
+        # Create the constructor
+        function = self.program.begin_function()
+        field_count = len(node.fields)
+        # Load all the fields
+        for i in range(field_count):
+            self.program.simple_op(OpCode.LOAD_PARAM)
+            self.program.simple_op(i)
+        # Create the struct value from the fields
+        self.program.simple_op(OpCode.STRUCT)
+        self.program.simple_op(field_count)
+        # Return the struct value
+        self.program.simple_op(OpCode.RETURN)
+        self.program.end_function(function)
+        self.program.make_closure()
+        # Define the constructor as this function value
         self.program.define_name(node.index_annotation)
 
     def visit_print_stmt(self, node):
