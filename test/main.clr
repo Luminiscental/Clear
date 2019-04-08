@@ -10,7 +10,12 @@ struct Rectangle {
 }
 
 func test(Point a, Rectangle b) int {
-    return a.x + b.y + b.a.x + b.a.y + b.b.x + b.b.y;
+    return a.x
+        + a.y
+        + b.a.x
+        + b.a.y
+        + b.b.x
+        + b.b.y;
 }
 
 val a = Point(1i, 2i);

@@ -117,12 +117,15 @@ class TypeResolver(DeclVisitor):
                 emit_error(f"Accessor must be an identifier! {node.right}")()
             property_token = node.right.name
             struct = self.structs[node.left.type_annotation.identifier]
-            field_names = [field_name.lexeme for _, field_name in struct]
+            field_names = dict(
+                (field_name.lexeme, field_type) for (field_type, field_name) in struct
+            )
             if property_token.lexeme not in field_names:
                 emit_error(
                     f"No such property {token_info(property_token)} on struct {node.left.type_annotation}"
                 )()
-            emit_error("Not implemented")()
+            field_type = field_names[property_token.lexeme]
+            node.type_annotation = field_type.as_annotation
         else:
             super().visit_binary_expr(node)
             left_type = node.left.type_annotation
