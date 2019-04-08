@@ -4,7 +4,7 @@ or file format specification values.
 """
 from enum import Enum
 
-DEBUG = False
+DEBUG = True
 DEBUG_ASSEMBLE = False
 
 

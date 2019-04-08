@@ -12,7 +12,7 @@ class TypeAnnotationType(Enum):
     IDENTIFIER = "<identifier>"
     UNRESOLVED = "<unresolved>"
 
-    def __str__(self):
+    def __repr__(self):
         return self.value
 
 
@@ -20,7 +20,7 @@ class TypeAnnotation:
     def __init__(self, kind=TypeAnnotationType.UNRESOLVED):
         self.kind = kind
 
-    def __str__(self):
+    def __repr__(self):
         return str(self.kind)
 
     def __eq__(self, other):
@@ -34,7 +34,7 @@ class IdentifierTypeAnnotation(TypeAnnotation):
         super().__init__(TypeAnnotationType.IDENTIFIER)
         self.identifier = identifier
 
-    def __str__(self):
+    def __repr__(self):
         return str(self.identifier)
 
     def __eq__(self, other):
@@ -50,7 +50,7 @@ class FunctionTypeAnnotation(TypeAnnotation):
         self.return_type = return_type
         self.signature = signature
 
-    def __str__(self):
+    def __repr__(self):
         return (
             "func(" + ", ".join(map(str, self.signature)) + ") " + str(self.return_type)
         )

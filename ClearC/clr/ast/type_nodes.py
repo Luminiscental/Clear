@@ -16,9 +16,11 @@ def parse_simple_type(parser):
     token = parser.get_prev()
     if token.lexeme not in SIMPLE_TYPES:
         if token.token_type == TokenType.IDENTIFIER:
-            return IdentifierTypeAnnotation(token)
-        err()
-    as_annotation = SIMPLE_TYPES[token.lexeme]
+            as_annotation = IdentifierTypeAnnotation(token.lexeme)
+        else:
+            err()
+    else:
+        as_annotation = SIMPLE_TYPES[token.lexeme]
     return SimpleType(token, as_annotation)
 
 

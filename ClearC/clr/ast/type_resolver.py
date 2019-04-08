@@ -29,6 +29,7 @@ class TypeResolver(DeclVisitor):
         super().__init__()
         self.scopes = [defaultdict(TypeInfo)]
         self.expected_returns = []
+        self.structs = {}
         self.level = 0
 
     def _declare_name(self, name, type_annotation, assignable=False):
@@ -78,6 +79,8 @@ class TypeResolver(DeclVisitor):
             )
             args = "(" + ", ".join(map(str, passed_signature)) + ")"
             if passed_signature != function_type.signature:
+                print(f"Function sig: {str(function_type.signature)}")
+                print(f"Passed sig: {str(passed_signature)}")
                 emit_error(
                     f"Could not find signature for function {token_info(node.target.name)} matching provided argument list {args}!"
                 )()
@@ -281,6 +284,22 @@ class TypeResolver(DeclVisitor):
         del self.expected_returns[-1]
         if node.block.return_annotation.kind != ReturnAnnotationType.ALWAYS:
             emit_error(f"Function does not always return {token_info(node.name)}!")()
+
+    def visit_struct_decl(self, node):
+        name = node.name.lexeme
+        if name in self.structs:
+            # TODO: Point to previous definition
+            emit_error(f"Redefinition of struct {node.name}!")()
+        self.structs[name] = node.fields
+        self._declare_name(
+            name,
+            FunctionTypeAnnotation(
+                return_type=IdentifierTypeAnnotation(name),
+                signature=[
+                    field_type.as_annotation for (field_type, field_name) in node.fields
+                ],
+            ),
+        )
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
