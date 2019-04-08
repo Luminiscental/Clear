@@ -136,7 +136,8 @@ class Compiler(DeclVisitor):
         function = self.program.begin_function()
         field_count = len(node.fields)
         # Load all the fields
-        for i in range(field_count):
+        # Reversed so that they are in order on the stack
+        for i in reversed(range(field_count)):
             self.program.simple_op(OpCode.LOAD_PARAM)
             self.program.simple_op(i)
         # Create the struct value from the fields
