@@ -225,6 +225,10 @@ class Compiler(DeclVisitor):
                 print(f"Loading name for {node.left}")
             # Assignment is an expression so we load the assigned value as well
             self.program.load_name(node.left.index_annotation)
+        elif node.operator.token_type == TokenType.DOT:
+            node.left.accept(self)
+            self.program.simple_op(OpCode.GET_FIELD)
+            self.program.simple_op(node.right.index_annotation.value)
         else:
             super().visit_binary_expr(node)
             {
