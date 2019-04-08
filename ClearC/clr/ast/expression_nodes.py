@@ -82,7 +82,7 @@ def parse_grouping(parser):
     return value
 
 
-class ExprNode:  # pylint: disable=too-few-public-methods
+class ExprNode:
     def __init__(self):
         self.type_annotation = TypeAnnotation()
         self.assignable = False
