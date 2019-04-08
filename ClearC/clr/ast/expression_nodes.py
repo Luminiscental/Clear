@@ -78,6 +78,7 @@ def parse_grouping(parser):
     parser.consume(
         TokenType.RIGHT_PAREN, parse_error("Expected ')' after expression!", parser)
     )
+    value.grouped = True
     return value
 
 
@@ -85,6 +86,21 @@ class ExprNode:  # pylint: disable=too-few-public-methods
     def __init__(self):
         self.type_annotation = TypeAnnotation()
         self.assignable = False
+        self.grouped = False
+
+    def pprint(self, content):
+        if self.grouped:
+            return "(" + content + ")"
+        return content
+
+
+def pprint(str_func):
+    def wrapped_str(self):
+        if self.grouped:
+            return "(" + str_func(self) + ")"
+        return str_func(self)
+
+    return wrapped_str
 
 
 class CallExpr(ExprNode):
@@ -106,8 +122,11 @@ class CallExpr(ExprNode):
                     parse_error("Expected comma to delimit arguments!", parser),
                 )
 
+    @pprint
     def __str__(self):
-        return str(self.target) + "(" + ", ".join(map(str, self.arguments)) + ")"
+        return super().pprint(
+            str(self.target) + "(" + ", ".join(map(str, self.arguments)) + ")"
+        )
 
     def accept(self, expr_visitor):
         expr_visitor.visit_call_expr(self)
@@ -120,6 +139,7 @@ class UnaryExpr(ExprNode):
         self.operator = parser.get_prev()
         self.target = parse_expr(parser, precedence=Precedence.UNARY)
 
+    @pprint
     def __str__(self):
         return str(self.operator) + str(self.target)
 
@@ -140,6 +160,7 @@ class BinaryExpr(ExprNode):
             precedence = precedence.next()
         self.right = parse_expr(parser, precedence)
 
+    @pprint
     def __str__(self):
         separator = " "
         if self.operator.token_type == TokenType.DOT:
@@ -165,6 +186,7 @@ class AndExpr(ExprNode):
         # and acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.AND)
 
+    @pprint
     def __str__(self):
         return str(self.left) + " and " + str(self.right)
 
@@ -181,6 +203,7 @@ class OrExpr(ExprNode):
         # or acts like a normal right-associative binary operator when parsing
         self.right = parse_expr(parser, precedence=Precedence.OR)
 
+    @pprint
     def __str__(self):
         return str(self.left) + " or " + str(self.right)
 
@@ -196,6 +219,7 @@ class IdentExpr(ExprNode):
         # Identifiers have indices, by default it is unresolved
         self.index_annotation = IndexAnnotation()
 
+    @pprint
     def __str__(self):
         return self.name.lexeme
 
@@ -215,6 +239,7 @@ class StringExpr(ExprNode):
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
         self.value = ClrStr(joined)
 
+    @pprint
     def __str__(self):
         return '"' + self.value.value.replace('"', '""') + '"'
 
@@ -240,6 +265,7 @@ class NumberExpr(ExprNode):
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
 
+    @pprint
     def __str__(self):
         return self.lexeme
 
@@ -253,6 +279,7 @@ class BooleanExpr(ExprNode):
         parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
         self.value = parser.get_prev().token_type == TokenType.TRUE
 
+    @pprint
     def __str__(self):
         return str(self.value)
 

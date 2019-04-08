@@ -15,6 +15,9 @@ class TypeAnnotationType(Enum):
     def __repr__(self):
         return self.value
 
+    def __str__(self):
+        return repr(self)
+
 
 class TypeAnnotation:
     def __init__(self, kind=TypeAnnotationType.UNRESOLVED):

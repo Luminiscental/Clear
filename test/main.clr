@@ -25,3 +25,8 @@ val rect = Rectangle(a, b);
 a = Point(-2i, a.y);
 
 print test(a, rect);
+
+(2i - 3i) * 2i = 3i;
+("x" + "y") = (2 + 1) / 3;
+var give_me_an_error = 2.3;
+give_me_an_error = "hello";
