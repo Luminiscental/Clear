@@ -9,6 +9,7 @@ class TypeAnnotationType(Enum):
     STR = "str"
     BOOL = "bool"
     FUNCTION = "<function>"
+    IDENTIFIER = "<identifier>"
     UNRESOLVED = "<unresolved>"
 
     def __str__(self):
@@ -26,6 +27,21 @@ class TypeAnnotation:
         if not isinstance(other, TypeAnnotation):
             return False
         return self.kind == other.kind
+
+
+class IdentifierTypeAnnotation(TypeAnnotation):
+    def __init__(self, identifier):
+        super().__init__(TypeAnnotationType.IDENTIFIER)
+        self.identifier = identifier
+
+    def __str__(self):
+        return str(self.identifier)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, IdentifierTypeAnnotation)
+            and self.identifier == other.identifier
+        )
 
 
 class FunctionTypeAnnotation(TypeAnnotation):

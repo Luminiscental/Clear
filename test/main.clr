@@ -4,10 +4,11 @@ struct Point {
     int y;
 }
 
-val y = Point(2i, 3i);
+struct Rectangle {
+    Point a;
+    Point b;
+}
 
-val x = y.x;
-val y = y.y;
-
-print "x = " + str(x);
-print "y = " + str(y);
+val a = Point(1i, 2i);
+val b = Point(2i, 3i);
+val rect = Rectangle(a, b);

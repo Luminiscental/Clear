@@ -12,6 +12,7 @@ from clr.ast.type_annotations import (
     STR_TYPE,
     BOOL_TYPE,
     ANY_TYPE,
+    IdentifierTypeAnnotation,
     FunctionTypeAnnotation,
 )
 from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType

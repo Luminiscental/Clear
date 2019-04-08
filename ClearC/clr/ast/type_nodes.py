@@ -1,7 +1,11 @@
 from collections import namedtuple
 from clr.errors import parse_error
 from clr.tokens import TokenType
-from clr.ast.type_annotations import FunctionTypeAnnotation, SIMPLE_TYPES
+from clr.ast.type_annotations import (
+    IdentifierTypeAnnotation,
+    FunctionTypeAnnotation,
+    SIMPLE_TYPES,
+)
 
 SimpleType = namedtuple("SimpleType", ("token", "as_annotation"))
 
@@ -9,9 +13,11 @@ SimpleType = namedtuple("SimpleType", ("token", "as_annotation"))
 def parse_simple_type(parser):
     err = parse_error("Expected simple type!", parser)
     parser.consume(TokenType.IDENTIFIER, err)
-    if parser.get_prev().lexeme not in SIMPLE_TYPES:
-        err()
     token = parser.get_prev()
+    if token.lexeme not in SIMPLE_TYPES:
+        if token.token_type == TokenType.IDENTIFIER:
+            return IdentifierTypeAnnotation(token)
+        err()
     as_annotation = SIMPLE_TYPES[token.lexeme]
     return SimpleType(token, as_annotation)
 
@@ -42,9 +48,6 @@ def parse_function_type(parser):
 
 
 def parse_type(parser):
-    if parser.get_current().lexeme in SIMPLE_TYPES:
-        return parse_simple_type(parser)
-    if parser.get_current().token_type == TokenType.FUNC:
+    if parser.check(TokenType.FUNC):
         return parse_function_type(parser)
-    parse_error("Expected type!", parser)()
-    return None  # unreachable
+    return parse_simple_type(parser)
