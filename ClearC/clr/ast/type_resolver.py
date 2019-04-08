@@ -55,6 +55,13 @@ class TypeResolver(DeclVisitor):
         del self.scopes[self.level]
         self.level -= 1
 
+    def visit_simple_type(self, node):
+        if (
+            node.as_annotation.kind == TypeAnnotationType.IDENTIFIER
+            and node.token.lexeme not in self.structs
+        ):
+            emit_error(f"Reference to undefined type {node.token}!")()
+
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # If it's a built-in don't call super() as we don't evaluate the target
@@ -255,6 +262,7 @@ class TypeResolver(DeclVisitor):
         # Iterate over the parameters and resolve to types
         arg_types = []
         for param_type, param_name in node.params:
+            param_type.accept(self)
             resolved_type = param_type.as_annotation
             if resolved_type.kind == TypeAnnotationType.UNRESOLVED:
                 emit_error(
@@ -262,6 +270,7 @@ class TypeResolver(DeclVisitor):
                 )()
             arg_types.append(resolved_type)
         # Resolve the return type
+        node.return_type.accept(self)
         return_type = node.return_type.as_annotation
         # Create an annotation for the function signature
         type_annotation = FunctionTypeAnnotation(
@@ -290,6 +299,7 @@ class TypeResolver(DeclVisitor):
             emit_error(f"Function does not always return {token_info(node.name)}!")()
 
     def visit_struct_decl(self, node):
+        super().visit_struct_decl(node)
         name = node.name.lexeme
         if name in self.structs:
             # TODO: Point to previous definition

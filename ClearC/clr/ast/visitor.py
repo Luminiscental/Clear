@@ -1,8 +1,17 @@
-from clr.errors import ClrCompileError
 from clr.ast.statement_nodes import StmtNode
 
 
-class ExprVisitor:
+class TypeVisitor:
+    def visit_simple_type(self, node):
+        pass
+
+    def visit_func_type(self, node):
+        for param in node.params:
+            param.accept(self)
+        node.return_type.accept(self)
+
+
+class ExprVisitor(TypeVisitor):
     def visit_call_expr(self, node):
         node.target.accept(self)
         for arg in node.arguments:
@@ -88,7 +97,11 @@ class DeclVisitor(StmtVisitor):
         node.initializer.accept(self)
 
     def visit_func_decl(self, node):
+        for param_type, _ in node.params:
+            param_type.accept(self)
+        node.return_type.accept(self)
         node.block.accept(self)
 
     def visit_struct_decl(self, node):
-        pass
+        for field_type, _ in node.fields:
+            field_type.accept(self)

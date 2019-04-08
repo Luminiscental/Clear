@@ -9,6 +9,12 @@ struct Rectangle {
     Point b;
 }
 
+func test(Point a, Rectangle b) int {
+    return 1i;
+}
+
 val a = Point(1i, 2i);
 val b = Point(2i, 3i);
 val rect = Rectangle(a, b);
+
+print test(a, rect);

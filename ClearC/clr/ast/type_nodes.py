@@ -1,4 +1,3 @@
-from collections import namedtuple
 from clr.errors import parse_error
 from clr.tokens import TokenType
 from clr.ast.type_annotations import (
@@ -7,7 +6,14 @@ from clr.ast.type_annotations import (
     SIMPLE_TYPES,
 )
 
-SimpleType = namedtuple("SimpleType", ("token", "as_annotation"))
+
+class SimpleType:
+    def __init__(self, token, as_annotation):
+        self.token = token
+        self.as_annotation = as_annotation
+
+    def accept(self, type_visitor):
+        type_visitor.visit_simple_type(self)
 
 
 def parse_simple_type(parser):
@@ -24,7 +30,14 @@ def parse_simple_type(parser):
     return SimpleType(token, as_annotation)
 
 
-FunctionType = namedtuple("FunctionType", ("params", "return_type", "as_annotation"))
+class FunctionType:
+    def __init__(self, params, return_type, as_annotation):
+        self.params = params
+        self.return_type = return_type
+        self.as_annotation = as_annotation
+
+    def accept(self, type_visitor):
+        type_visitor.visit_func_type(self)
 
 
 def parse_function_type(parser):
