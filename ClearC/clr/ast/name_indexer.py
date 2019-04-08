@@ -1,14 +1,14 @@
 from collections import defaultdict
 from clr.values import DEBUG
 from clr.errors import emit_error
-from clr.tokens import token_info
+from clr.tokens import TokenType, token_info
 from clr.ast.expression_nodes import IdentExpr
-from clr.ast.visitor import DeclVisitor
+from clr.ast.visitor import StructTrackingDeclVisitor
 from clr.ast.index_annotations import IndexAnnotation, IndexAnnotationType
 from clr.ast.type_annotations import BUILTINS
 
 
-class NameIndexer(DeclVisitor):
+class NameIndexer(StructTrackingDeclVisitor):
     def __init__(self):
         super().__init__()
         self.scopes = [defaultdict(IndexAnnotation)]
@@ -79,6 +79,18 @@ class NameIndexer(DeclVisitor):
         del self.scopes[self.level]
         self.level -= 1
 
+    def visit_binary_expr(self, node):
+        if node.operator.token_type == TokenType.DOT:
+            node.left.accept(self)
+            struct = self.structs[node.left.type_annotation.identifier]
+            field_names = [field_name.lexeme for (_, field_name) in struct]
+            index = field_names.index(node.right.name.lexeme)
+            node.right.index_annotation = IndexAnnotation(
+                IndexAnnotationType.PROPERTY, index
+            )
+        else:
+            super().visit_binary_expr(node)
+
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # If it's a built-in don't call super as we don't want to lookup the name
@@ -110,6 +122,7 @@ class NameIndexer(DeclVisitor):
         node.upvalues.extend(function.upvalues)
 
     def visit_struct_decl(self, node):
+        super().visit_struct_decl(node)
         # Declare the constructor
         node.index_annotation = self._declare_name(node.name.lexeme)
 
@@ -117,6 +130,8 @@ class NameIndexer(DeclVisitor):
 class FunctionNameIndexer(NameIndexer):
     def __init__(self, parent):
         super().__init__()
+        # Inherit structs from parent as a copy
+        self.structs = parent.structs.copy()
         self.parent = parent
         self.scopes.append(defaultdict(IndexAnnotation))
         # Default scope is not the global scope in a function

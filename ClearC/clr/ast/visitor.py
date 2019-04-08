@@ -105,3 +105,13 @@ class DeclVisitor(StmtVisitor):
     def visit_struct_decl(self, node):
         for field_type, _ in node.fields:
             field_type.accept(self)
+
+
+class StructTrackingDeclVisitor(DeclVisitor):
+    def __init__(self):
+        super().__init__()
+        self.structs = {}
+
+    def visit_struct_decl(self, node):
+        super().visit_struct_decl(node)
+        self.structs[node.name.lexeme] = node.fields

@@ -2,7 +2,7 @@ import itertools
 from collections import namedtuple, defaultdict
 from clr.tokens import TokenType, token_info
 from clr.errors import emit_error
-from clr.ast.visitor import DeclVisitor
+from clr.ast.visitor import StructTrackingDeclVisitor
 from clr.ast.type_annotations import (
     TypeAnnotation,
     TypeAnnotationType,
@@ -24,12 +24,11 @@ TypeInfo = namedtuple(
 )
 
 
-class TypeResolver(DeclVisitor):
+class TypeResolver(StructTrackingDeclVisitor):
     def __init__(self):
         super().__init__()
         self.scopes = [defaultdict(TypeInfo)]
         self.expected_returns = []
-        self.structs = {}
         self.level = 0
 
     def _declare_name(self, name, type_annotation, assignable=False):
@@ -117,14 +116,14 @@ class TypeResolver(DeclVisitor):
                 emit_error(f"Accessor must be an identifier! {node.right}")()
             property_token = node.right.name
             struct = self.structs[node.left.type_annotation.identifier]
-            field_names = dict(
+            fields = dict(
                 (field_name.lexeme, field_type) for (field_type, field_name) in struct
             )
-            if property_token.lexeme not in field_names:
+            if property_token.lexeme not in fields:
                 emit_error(
                     f"No such property {token_info(property_token)} on struct {node.left.type_annotation}"
                 )()
-            field_type = field_names[property_token.lexeme]
+            field_type = fields[property_token.lexeme]
             node.type_annotation = field_type.as_annotation
         else:
             super().visit_binary_expr(node)
@@ -318,12 +317,12 @@ class TypeResolver(DeclVisitor):
             emit_error(f"Function does not always return {token_info(node.name)}!")()
 
     def visit_struct_decl(self, node):
-        super().visit_struct_decl(node)
+        # Check before super() because super() adds it to self.structs
         name = node.name.lexeme
         if name in self.structs:
             # TODO: Point to previous definition
             emit_error(f"Redefinition of struct {node.name}!")()
-        self.structs[name] = node.fields
+        super().visit_struct_decl(node)
         self._declare_name(
             name,
             FunctionTypeAnnotation(
