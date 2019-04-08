@@ -163,6 +163,13 @@ void printValue(Value value, bool endLine) {
                     printValue(*upvalue->value, false);
 
                 } break;
+
+                case OBJ_STRUCT: {
+
+                    // TODO: Maybe pretty print these?
+                    printf("<st %p>", value.as.obj);
+
+                } break;
             }
 
         } break;

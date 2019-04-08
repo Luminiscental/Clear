@@ -923,6 +923,119 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+            case OP_STRUCT: {
+
+                uint8_t fieldCount;
+                if (readByte(vm, frame, &fieldCount) != INTERPRET_OK) {
+
+                    printf("|| Expected field count to create struct!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value *fields = ALLOCATE(Value, fieldCount);
+
+                for (size_t i = 0; i < fieldCount; i++) {
+
+                    Value field;
+                    if (pop(frame, &field) != INTERPRET_OK) {
+
+                        printf("|| Could not get field %zu to create struct!\n",
+                               i);
+                        FREE_ARRAY(Value, fields, fieldCount);
+                        return INTERPRET_ERR;
+                    }
+
+                    fields[i] = field;
+                }
+
+                Value structValue = makeStruct(vm, fields, fieldCount);
+
+                if (push(frame, structValue) != INTERPRET_OK) {
+
+                    printf("|| Could not push struct onto stack!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_GET_FIELD: {
+
+                uint8_t fieldIndex;
+                if (readByte(vm, frame, &fieldIndex) != INTERPRET_OK) {
+
+                    printf("|| Expected index of field to get!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value structValue;
+                if (pop(frame, &structValue) != INTERPRET_OK) {
+
+                    printf("|| Could not get struct to read field from!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (!isObjType(structValue, OBJ_STRUCT)) {
+
+                    printf("|| Provided value is not a struct!\n");
+                    return INTERPRET_ERR;
+                }
+
+                ObjStruct *objStruct = (ObjStruct *)structValue.as.obj;
+
+                Value field;
+                if (!getField(objStruct, fieldIndex, &field)) {
+
+                    printf("|| Could not find field on struct!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (push(frame, field) != INTERPRET_OK) {
+
+                    printf("|| Could not push field to stack!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_SET_FIELD: {
+
+                uint8_t fieldIndex;
+                if (readByte(vm, frame, &fieldIndex) != INTERPRET_OK) {
+
+                    printf("|| Expected index of field to set!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value fieldValue;
+                if (pop(frame, &fieldValue) != INTERPRET_OK) {
+
+                    printf("|| Could not get value to set field to!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value structValue;
+                if (pop(frame, &structValue) != INTERPRET_OK) {
+
+                    printf("|| Could not get struct to set field on!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (!isObjType(structValue, OBJ_STRUCT)) {
+
+                    printf("|| Provided value is not a struct!\n");
+                    return INTERPRET_ERR;
+                }
+
+                ObjStruct *objStruct = (ObjStruct *)structValue.as.obj;
+
+                if (!setField(objStruct, fieldIndex, fieldValue)) {
+
+                    printf("|| Could not find field on struct!\n");
+                    return INTERPRET_ERR;
+                }
+
+            } break;
+
             case OP_CALL: {
 
                 uint8_t arity;

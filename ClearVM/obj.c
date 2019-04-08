@@ -260,6 +260,47 @@ Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount) {
     return result;
 }
 
+Value makeStruct(VM *vm, Value *fields, size_t fieldCount) {
+
+    ObjStruct *objStruct = ALLOCATE_OBJ(vm, ObjStruct, OBJ_STRUCT);
+
+    objStruct->fields = fields;
+    objStruct->fieldCount = fieldCount;
+
+    Value result;
+
+    result.type = VAL_OBJ;
+    result.hash = (size_t)objStruct;
+    result.as.obj = (Obj *)objStruct;
+
+    return result;
+}
+
+bool getField(ObjStruct *objStruct, size_t index, Value *out) {
+
+    if (index >= objStruct->fieldCount) {
+
+        return false;
+    }
+
+    if (out != NULL)
+        *out = objStruct->fields[index];
+
+    return true;
+}
+
+bool setField(ObjStruct *objStruct, size_t index, Value replacement) {
+
+    if (index >= objStruct->fieldCount) {
+
+        return false;
+    }
+
+    objStruct->fields[index] = replacement;
+
+    return true;
+}
+
 bool isObjType(Value a, ObjType type) {
 
     return a.type == VAL_OBJ && a.as.obj->type == type;

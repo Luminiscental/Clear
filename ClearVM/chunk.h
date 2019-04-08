@@ -73,7 +73,12 @@ typedef enum {
     // Closures
     OP_CLOSURE = 40,
     OP_LOAD_UPVALUE = 41,
-    OP_SET_UPVALUE = 42
+    OP_SET_UPVALUE = 42,
+
+    // Structs
+    OP_STRUCT = 43,
+    OP_GET_FIELD = 44,
+    OP_SET_FIELD = 45
 
 } OpCode;
 

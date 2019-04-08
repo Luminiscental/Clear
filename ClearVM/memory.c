@@ -60,6 +60,14 @@ static void freeObject(Obj *object) {
             FREE(ObjUpvalue, objUpvalue);
 
         } break;
+
+        case OBJ_STRUCT: {
+
+            ObjStruct *objStruct = (ObjStruct *)object;
+            FREE_ARRAY(Value, objStruct->fields, objStruct->fieldCount);
+            FREE(ObjStruct, objStruct);
+
+        } break;
     }
 }
 

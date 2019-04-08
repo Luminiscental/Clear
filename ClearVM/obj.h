@@ -11,7 +11,8 @@ typedef enum eObjType {
     OBJ_STRING,
     OBJ_FUNCTION,
     OBJ_CLOSURE,
-    OBJ_UPVALUE
+    OBJ_UPVALUE,
+    OBJ_STRUCT
 
 } ObjType;
 
@@ -72,5 +73,17 @@ typedef struct sObjClosure {
 } ObjClosure;
 
 Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount);
+
+typedef struct sObjStruct {
+
+    Obj obj;
+    Value *fields;
+    size_t fieldCount;
+
+} ObjStruct;
+
+Value makeStruct(VM *vm, Value *fields, size_t fieldCount);
+bool getField(ObjStruct *objStruct, size_t index, Value *out);
+bool setField(ObjStruct *objStruct, size_t index, Value replacement);
 
 #endif

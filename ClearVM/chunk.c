@@ -465,6 +465,24 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         } break;
 
+        case OP_STRUCT: {
+
+            return indexInstruction("OP_STRUCT", chunk, offset);
+
+        } break;
+
+        case OP_GET_FIELD: {
+
+            return indexInstruction("OP_GET_FIELD", chunk, offset);
+
+        } break;
+
+        case OP_SET_FIELD: {
+
+            return indexInstruction("OP_SET_FIELD", chunk, offset);
+
+        } break;
+
         case OP_CLOCK: {
 
             return simpleInstruction("OP_CLOCK", offset);

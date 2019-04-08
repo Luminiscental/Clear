@@ -4,6 +4,9 @@ struct Point {
     int y;
 }
 
+// TODO: Are commas better for delimiting?
+val y = Point { x=2i; y=3i; };
+
 var y = 3;
 val x = y = 4;
 
