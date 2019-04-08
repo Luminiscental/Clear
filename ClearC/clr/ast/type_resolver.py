@@ -86,8 +86,6 @@ class TypeResolver(DeclVisitor):
             )
             args = "(" + ", ".join(map(str, passed_signature)) + ")"
             if passed_signature != function_type.signature:
-                print(f"Function sig: {str(function_type.signature)}")
-                print(f"Passed sig: {str(passed_signature)}")
                 emit_error(
                     f"Could not find signature for function {token_info(node.target.name)} matching provided argument list {args}!"
                 )()
@@ -108,35 +106,53 @@ class TypeResolver(DeclVisitor):
         node.type_annotation = target_type
 
     def visit_binary_expr(self, node):
-        super().visit_binary_expr(node)
-        left_type = node.left.type_annotation
-        right_type = node.right.type_annotation
-        if left_type.kind != right_type.kind:
-            emit_error(
-                f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}!"
-            )()
-        if (
-            left_type
-            not in {
-                TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
-                TokenType.MINUS: [NUM_TYPE, INT_TYPE],
-                TokenType.STAR: [NUM_TYPE, INT_TYPE],
-                TokenType.SLASH: [NUM_TYPE],
-                TokenType.EQUAL_EQUAL: ANY_TYPE,
-                TokenType.BANG_EQUAL: ANY_TYPE,
-                TokenType.LESS: [NUM_TYPE, INT_TYPE],
-                TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
-                TokenType.GREATER: [NUM_TYPE, INT_TYPE],
-                TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
-                TokenType.EQUAL: ANY_TYPE,
-            }[node.operator.token_type]
-        ):
-            emit_error(
-                f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}!"
-            )()
-        if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
-            emit_error(f"Unassignable expression {node.left}!")()
-        node.type_annotation = left_type
+        if node.operator.token_type == TokenType.DOT:
+            # If it's a property access don't visit the left node because it's just the property name
+            node.left.accept(self)
+            if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
+                emit_error(
+                    f"Non-struct type {node.left.type_annotation} does not have a property to access at {token_info(node.operator)}!"
+                )()
+            if not isinstance(node.right, IdentExpr):
+                emit_error(f"Accessor must be an identifier! {node.right}")()
+            property_token = node.right.name
+            struct = self.structs[node.left.type_annotation.identifier]
+            field_names = [field_name.lexeme for _, field_name in struct]
+            if property_token.lexeme not in field_names:
+                emit_error(
+                    f"No such property {token_info(property_token)} on struct {node.left.type_annotation}"
+                )()
+            emit_error("Not implemented")()
+        else:
+            super().visit_binary_expr(node)
+            left_type = node.left.type_annotation
+            right_type = node.right.type_annotation
+            if left_type.kind != right_type.kind:
+                emit_error(
+                    f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}!"
+                )()
+            if (
+                left_type
+                not in {
+                    TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
+                    TokenType.MINUS: [NUM_TYPE, INT_TYPE],
+                    TokenType.STAR: [NUM_TYPE, INT_TYPE],
+                    TokenType.SLASH: [NUM_TYPE],
+                    TokenType.EQUAL_EQUAL: ANY_TYPE,
+                    TokenType.BANG_EQUAL: ANY_TYPE,
+                    TokenType.LESS: [NUM_TYPE, INT_TYPE],
+                    TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
+                    TokenType.GREATER: [NUM_TYPE, INT_TYPE],
+                    TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
+                    TokenType.EQUAL: ANY_TYPE,
+                }[node.operator.token_type]
+            ):
+                emit_error(
+                    f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}!"
+                )()
+            if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
+                emit_error(f"Unassignable expression {node.left}!")()
+            node.type_annotation = left_type
 
     def visit_and_expr(self, node):
         super().visit_and_expr(node)
