@@ -227,7 +227,7 @@ class StringExpr(ExprNode):
         super().__init__()
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
         total = [parser.get_prev()]
-        # Adjacent string literals are combined and joined with " to allow effective escaping,
+        # Adjacent string literals are combined and joined by " to allow effective escaping,
         # don't judge me
         while parser.match(TokenType.STRING):
             total.append(parser.get_prev())
