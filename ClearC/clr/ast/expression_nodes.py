@@ -82,16 +82,11 @@ def parse_grouping(parser):
     return value
 
 
-class ExprNode:
+class ExprNode:  # pylint: disable=too-few-public-methods
     def __init__(self):
         self.type_annotation = TypeAnnotation()
         self.assignable = False
         self.grouped = False
-
-    def pprint(self, content):
-        if self.grouped:
-            return "(" + content + ")"
-        return content
 
 
 def pprint(str_func):
