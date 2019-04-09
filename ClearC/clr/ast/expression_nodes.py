@@ -253,6 +253,7 @@ class NumberExpr(ExprNode):
                 self.integral = True
             except ValueError:
                 parse_error("Integer literal must be an integer!", parser)()
+            self.lexeme += "i"
         else:
             try:
                 self.value = ClrNum(self.lexeme)
