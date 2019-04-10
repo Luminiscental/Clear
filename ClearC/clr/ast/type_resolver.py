@@ -11,6 +11,7 @@ from clr.ast.type_annotations import (
     INT_TYPE,
     STR_TYPE,
     BOOL_TYPE,
+    VOID_TYPE,
     ANY_TYPE,
     IdentifierTypeAnnotation,
     FunctionTypeAnnotation,
@@ -136,6 +137,10 @@ class TypeResolver(StructTrackingDeclVisitor):
                 emit_error(
                     f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}: `{node}`!"
                 )()
+            if left_type == VOID_TYPE:
+                emit_error(
+                    f"Cannot use call to void function `{node.left}` in expression: `{node}`!"
+                )
             if (
                 left_type
                 not in {
@@ -318,8 +323,18 @@ class TypeResolver(StructTrackingDeclVisitor):
         self.end_scope()
         # Stop expecting return statements
         del self.expected_returns[-1]
-        if node.block.return_annotation.kind != ReturnAnnotationType.ALWAYS:
+        if (
+            return_type != VOID_TYPE
+            and node.block.return_annotation.kind != ReturnAnnotationType.ALWAYS
+        ):
             emit_error(f"Function does not always return {token_info(node.name)}!")()
+        elif (
+            return_type == VOID_TYPE
+            and node.block.return_annotation.kind != ReturnAnnotationType.NEVER
+        ):
+            emit_error(
+                f"Non-void function contains return statements {token_info(node.name)}!"
+            )()
 
     def visit_struct_decl(self, node):
         # Check before super() because super() adds it to self.structs
@@ -343,6 +358,10 @@ class TypeResolver(StructTrackingDeclVisitor):
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
         type_annotation = node.initializer.type_annotation
+        if type_annotation == VOID_TYPE:
+            emit_error(
+                f"Cannot create variable {token_info(node.name)} from calling void function `{node.initializer}`!"
+            )()
         if node.name.lexeme in self.structs:
             emit_error(
                 f"Cannot create variable {token_info(node.name)} with same name as struct constructor!"

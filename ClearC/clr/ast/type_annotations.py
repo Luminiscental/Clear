@@ -10,6 +10,7 @@ class TypeAnnotationType(Enum):
     BOOL = "bool"
     FUNCTION = "<function>"
     IDENTIFIER = "<identifier>"
+    VOID = "<void>"
     UNRESOLVED = "<unresolved>"
 
     def __repr__(self):
@@ -78,6 +79,7 @@ INT_TYPE = TypeAnnotation(TypeAnnotationType.INT)
 NUM_TYPE = TypeAnnotation(TypeAnnotationType.NUM)
 STR_TYPE = TypeAnnotation(TypeAnnotationType.STR)
 BOOL_TYPE = TypeAnnotation(TypeAnnotationType.BOOL)
+VOID_TYPE = TypeAnnotation(TypeAnnotationType.VOID)
 
 SIMPLE_TYPES = {"int": INT_TYPE, "num": NUM_TYPE, "str": STR_TYPE, "bool": BOOL_TYPE}
 

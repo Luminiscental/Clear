@@ -200,6 +200,51 @@ static void closeUpvalues(VM *vm, Value *last) {
     }
 }
 
+static InterpretResult returnFromFrame(VM *vm, CallFrame *frame,
+                                       bool withValue) {
+
+    Value result;
+    if (withValue && pop(frame, &result) != INTERPRET_OK) {
+
+        printf("|| Could not pop value to return!\n");
+        return INTERPRET_ERR;
+    }
+
+    if (vm->frameDepth == 0) {
+
+        printf("|| Stack underflow! Cannot return from global "
+               "scope\n");
+        return INTERPRET_ERR;
+    }
+
+    CallFrame *caller = &vm->frames[vm->frameDepth - 1];
+
+    // Close any upvalues left in the function frame
+    closeUpvalues(vm, frame->stack);
+    // Close any upvalues of the parameters
+    closeUpvalues(vm, caller->stackTop - frame->arity);
+
+    for (size_t index = 0; index <= frame->arity; index++) {
+
+        if (pop(caller, NULL) != INTERPRET_OK) {
+
+            printf("|| Could not pop call context!\n");
+            return INTERPRET_ERR;
+        }
+    }
+
+    if (withValue && push(caller, result) != INTERPRET_OK) {
+
+        printf("|| Could not push function return value!\n");
+        return INTERPRET_ERR;
+    }
+
+    freeFrame(frame);
+    vm->frameDepth--;
+
+    return INTERPRET_OK;
+}
+
 void initVM(VM *vm) {
 
     vm->objects = NULL;
@@ -718,44 +763,21 @@ InterpretResult run(VM *vm) {
 
             case OP_RETURN: {
 
-                Value result;
-                if (pop(frame, &result) != INTERPRET_OK) {
+                if (returnFromFrame(vm, frame, true) != INTERPRET_OK) {
 
-                    printf("|| Could not pop value to return!\n");
+                    printf("|| Return operation failed!\n");
                     return INTERPRET_ERR;
                 }
 
-                if (vm->frameDepth == 0) {
+            } break;
 
-                    printf("|| Stack underflow! Cannot return from global "
-                           "scope\n");
+            case OP_RETURN_VOID: {
+
+                if (returnFromFrame(vm, frame, false) != INTERPRET_OK) {
+
+                    printf("|| Return operation failed!\n");
                     return INTERPRET_ERR;
                 }
-
-                CallFrame *caller = &vm->frames[vm->frameDepth - 1];
-
-                // Close any upvalues left in the function frame
-                closeUpvalues(vm, frame->stack);
-                // Close any upvalues of the parameters
-                closeUpvalues(vm, caller->stackTop - frame->arity);
-
-                for (size_t index = 0; index <= frame->arity; index++) {
-
-                    if (pop(caller, NULL) != INTERPRET_OK) {
-
-                        printf("|| Could not pop call context!\n");
-                        return INTERPRET_ERR;
-                    }
-                }
-
-                if (push(caller, result) != INTERPRET_OK) {
-
-                    printf("|| Could not push function return value!\n");
-                    return INTERPRET_ERR;
-                }
-
-                freeFrame(frame);
-                vm->frameDepth--;
 
             } break;
 

@@ -321,6 +321,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
         } break;
 
+        case OP_RETURN_VOID: {
+
+            return simpleInstruction("OP_RETURN_VOID", offset);
+
+        } break;
+
         case OP_POP: {
 
             return simpleInstruction("OP_POP", offset);

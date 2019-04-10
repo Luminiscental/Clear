@@ -119,9 +119,7 @@ class CallExpr(ExprNode):
 
     @pprint
     def __str__(self):
-        return super().pprint(
-            str(self.target) + "(" + ", ".join(map(str, self.arguments)) + ")"
-        )
+        return str(self.target) + "(" + ", ".join(map(str, self.arguments)) + ")"
 
     def accept(self, expr_visitor):
         expr_visitor.visit_call_expr(self)

@@ -69,6 +69,7 @@ typedef struct sCallFrame {
 
 void initFrame(VM *vm, CallFrame *caller, ObjClosure *closure, size_t arity,
                CallFrame *frame);
+void freeFrame(CallFrame *frame);
 
 typedef struct sVM {
 

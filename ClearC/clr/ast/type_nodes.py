@@ -4,7 +4,16 @@ from clr.ast.type_annotations import (
     IdentifierTypeAnnotation,
     FunctionTypeAnnotation,
     SIMPLE_TYPES,
+    VOID_TYPE,
 )
+
+
+class VoidType:
+    def __init__(self):
+        self.as_annotation = VOID_TYPE
+
+    def accept(self, type_visitor):
+        type_visitor.visit_void_type(self)
 
 
 class SimpleType:

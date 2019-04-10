@@ -36,49 +36,50 @@ typedef enum {
     OP_PRINT = 16,
     OP_PRINT_BLANK = 17,
     OP_RETURN = 18,
-    OP_POP = 19,
+    OP_RETURN_VOID = 19,
+    OP_POP = 20,
 
     // Arithmetic operators
-    OP_NEGATE = 20,
-    OP_ADD = 21,
-    OP_SUBTRACT = 22,
-    OP_MULTIPLY = 23,
-    OP_DIVIDE = 24,
+    OP_NEGATE = 21,
+    OP_ADD = 22,
+    OP_SUBTRACT = 23,
+    OP_MULTIPLY = 24,
+    OP_DIVIDE = 25,
 
     // Comparison operators
-    OP_LESS = 25,
-    OP_NLESS = 26,
-    OP_GREATER = 27,
-    OP_NGREATER = 28,
-    OP_EQUAL = 29,
-    OP_NEQUAL = 30,
+    OP_LESS = 26,
+    OP_NLESS = 27,
+    OP_GREATER = 28,
+    OP_NGREATER = 29,
+    OP_EQUAL = 30,
+    OP_NEQUAL = 31,
 
     // Boolean operators
-    OP_NOT = 31,
+    OP_NOT = 32,
 
     // Scoping
-    OP_PUSH_SCOPE = 32,
-    OP_POP_SCOPE = 33,
+    OP_PUSH_SCOPE = 33,
+    OP_POP_SCOPE = 34,
 
     // Control flow
-    OP_JUMP = 34,
-    OP_JUMP_IF_NOT = 35,
-    OP_LOOP = 36,
+    OP_JUMP = 35,
+    OP_JUMP_IF_NOT = 36,
+    OP_LOOP = 37,
 
     // Functions
-    OP_LOAD_PARAM = 37,
-    OP_START_FUNCTION = 38,
-    OP_CALL = 39,
+    OP_LOAD_PARAM = 38,
+    OP_START_FUNCTION = 39,
+    OP_CALL = 40,
 
     // Closures
-    OP_CLOSURE = 40,
-    OP_LOAD_UPVALUE = 41,
-    OP_SET_UPVALUE = 42,
+    OP_CLOSURE = 41,
+    OP_LOAD_UPVALUE = 42,
+    OP_SET_UPVALUE = 43,
 
     // Structs
-    OP_STRUCT = 43,
-    OP_GET_FIELD = 44,
-    OP_SET_FIELD = 45
+    OP_STRUCT = 44,
+    OP_GET_FIELD = 45,
+    OP_SET_FIELD = 46
 
 } OpCode;
 

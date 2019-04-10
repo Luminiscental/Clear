@@ -2,6 +2,9 @@ from clr.ast.statement_nodes import StmtNode
 
 
 class TypeVisitor:
+    def visit_void_type(self, node):
+        pass
+
     def visit_simple_type(self, node):
         pass
 

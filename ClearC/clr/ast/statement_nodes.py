@@ -4,7 +4,7 @@ from clr.ast.return_annotations import ReturnAnnotation
 from clr.ast.index_annotations import IndexAnnotation
 from clr.ast.expression_nodes import parse_expr
 from clr.ast.type_annotations import BUILTINS
-from clr.ast.type_nodes import parse_type
+from clr.ast.type_nodes import VoidType, parse_type
 
 
 def parse_stmt(parser):
@@ -224,8 +224,12 @@ class FuncDecl(DeclNode):
                     TokenType.COMMA,
                     parse_error("Expected comma to delimit parameters!", parser),
                 )
-        # Consume the return type
-        self.return_type = parse_type(parser)
+        if parser.check(TokenType.LEFT_BRACE):
+            # If there is no return type set it to None
+            self.return_type = VoidType()
+        else:
+            # Consume the return type
+            self.return_type = parse_type(parser)
         # Consume the definition block
         self.block = BlockStmt(parser)
         self.upvalues = []

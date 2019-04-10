@@ -35,9 +35,8 @@ var a = Point(1i, 2i);
 val b = Point(2i, 3i);
 var rect = Rectangle(a, b);
 
-func print_area() int {
+func print_area() {
     print "Area of rectangle " + rect_string(rect) + " = " + str(rect_area(rect));
-    return 0i;
 }
 
 print_area();

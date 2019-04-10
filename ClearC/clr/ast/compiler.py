@@ -4,7 +4,7 @@ from clr.assemble import assembled_size
 from clr.tokens import TokenType, token_info
 from clr.constants import ClrUint, Constants
 from clr.ast.index_annotations import IndexAnnotationType
-from clr.ast.type_annotations import BUILTINS
+from clr.ast.type_annotations import BUILTINS, VOID_TYPE
 from clr.ast.visitor import DeclVisitor
 from clr.ast.expression_nodes import IdentExpr
 
@@ -126,6 +126,8 @@ class Compiler(DeclVisitor):
         function = self.program.begin_function()
         for decl in node.block.declarations:
             decl.accept(self)
+        if node.return_type.as_annotation == VOID_TYPE:
+            self.program.simple_op(OpCode.RETURN_VOID)
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)
         # Define the function as the closure value
@@ -197,7 +199,8 @@ class Compiler(DeclVisitor):
 
     def visit_expr_stmt(self, node):
         super().visit_expr_stmt(node)
-        self.program.simple_op(OpCode.POP)
+        if node.value.type_annotation != VOID_TYPE:
+            self.program.simple_op(OpCode.POP)
 
     def start_scope(self):
         super().start_scope()
