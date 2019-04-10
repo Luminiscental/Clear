@@ -162,7 +162,24 @@ class TypeResolver(StructTrackingDeclVisitor):
                 )()
             if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
                 emit_error(f"Unassignable expression `{node.left}`: `{node}`!")()
-            node.type_annotation = left_type
+            if node.operator.token_type in {
+                TokenType.PLUS,
+                TokenType.MINUS,
+                TokenType.STAR,
+                TokenType.SLASH,
+                TokenType.BANG,
+                TokenType.EQUAL,
+            }:
+                node.type_annotation = left_type
+            elif node.operator.token_type in {
+                TokenType.EQUAL_EQUAL,
+                TokenType.BANG_EQUAL,
+                TokenType.GREATER,
+                TokenType.GREATER_EQUAL,
+                TokenType.LESS,
+                TokenType.LESS_EQUAL,
+            }:
+                node.type_annotation = BOOL_TYPE
 
     def visit_and_expr(self, node):
         super().visit_and_expr(node)
@@ -239,6 +256,10 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Return statement found outside of function {token_info(node.return_token)}!"
             )()
         expected = self.expected_returns[-1]
+        if expected == VOID_TYPE:
+            emit_error(
+                f"Return statement found in void function {token_info(node.return_token)}!"
+            )()
         if expected != node.value.type_annotation:
             emit_error(
                 f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation} at {token_info(node.return_token)}!"
@@ -253,6 +274,11 @@ class TypeResolver(StructTrackingDeclVisitor):
 
     def visit_if_stmt(self, node):
         super().visit_if_stmt(node)
+        for cond, _ in node.checks:
+            if cond.type_annotation != BOOL_TYPE:
+                emit_error(
+                    f"Expected boolean condition for if-block but got {cond.type_annotation} instead: `{cond}`!"
+                )()
         annotations = map(lambda pair: pair[1].return_annotation, node.checks)
         annotations = itertools.chain(
             annotations,
@@ -328,13 +354,6 @@ class TypeResolver(StructTrackingDeclVisitor):
             and node.block.return_annotation.kind != ReturnAnnotationType.ALWAYS
         ):
             emit_error(f"Function does not always return {token_info(node.name)}!")()
-        elif (
-            return_type == VOID_TYPE
-            and node.block.return_annotation.kind != ReturnAnnotationType.NEVER
-        ):
-            emit_error(
-                f"Non-void function contains return statements {token_info(node.name)}!"
-            )()
 
     def visit_struct_decl(self, node):
         # Check before super() because super() adds it to self.structs
