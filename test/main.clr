@@ -33,14 +33,19 @@ func rect_string(Rectangle rect) str {
 
 var a = Point(1i, 2i);
 val b = Point(2i, 3i);
-val rect = Rectangle(a, b);
+var rect = Rectangle(a, b);
 
-print "Area of rectangle " + rect_string(rect) + " = " + str(rect_area(rect));
+func print_area() int {
+    print "Area of rectangle " + rect_string(rect) + " = " + str(rect_area(rect));
+    return 0i;
+}
+
+print_area();
 
 a = Point(-2i, a.y);
-val rect = Rectangle(a, b);
+rect = Rectangle(a, b);
 
-print "Area of rectangle " + rect_string(rect) + " = " + str(rect_area(rect));
+print_area();
 
 // (2i - 3i) * 2i = 3i;
 // ("x" + "y") = (2 + 1) / 3;
