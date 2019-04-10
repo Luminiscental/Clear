@@ -109,7 +109,7 @@ class TypeResolver(StructTrackingDeclVisitor):
 
     def visit_binary_expr(self, node):
         if node.operator.token_type == TokenType.DOT:
-            # If it's a property access don't visit the left node because it's just the property name
+            # If it's a property access don't visit the right node because it's just the property name
             node.left.accept(self)
             if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
                 emit_error(
