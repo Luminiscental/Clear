@@ -1,17 +1,37 @@
 
 // TODO: Actual tests !!!
 
-struct DoesStuff {
-    num x;
-    func doStuff() {
-        print "Doing stuff...";
-    }
-    func makeNumber() num {
-        return 3.2;
-    }
+val pi = 3.14159265358979;
+func meth() void {
+    print "original";
 }
 
-val doer = DoesStuff(3.14);
-print "Value = " + str(doer.x);
-doer.doStuff();
-print "Value + Number = " + str(doer.x + doer.makeNumber());
+var callback = meth;
+
+// func print_callback() void {
+//     print "callback:";
+//     print callback;
+// }
+
+// print_callback();
+
+print "callback before:";
+callback();
+
+{
+    struct LocalStruct {
+        func meth() void {
+            print "pi = " + str(pi);
+        }
+    }
+
+    val a = LocalStruct();
+    //a.meth();
+    callback = a.meth;
+}
+
+// print_callback();
+
+print "callback after:";
+callback();
+

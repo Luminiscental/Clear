@@ -3,7 +3,7 @@ from clr.values import OpCode, DEBUG
 from clr.assemble import assembled_size
 from clr.tokens import TokenType, token_info
 from clr.constants import ClrUint, Constants
-from clr.ast.index_annotations import IndexAnnotationType
+from clr.ast.index_annotations import IndexAnnotation, IndexAnnotationType
 from clr.ast.type_annotations import BUILTINS, VOID_TYPE
 from clr.ast.visitor import DeclVisitor
 from clr.ast.expression_nodes import IdentExpr
@@ -121,34 +121,52 @@ class Compiler(DeclVisitor):
         super().visit_val_decl(node)
         self.program.define_name(node.index_annotation)
 
-    def visit_func_decl(self, node):
-        # No super as we handle scoping
+    def _make_function(self, node):
         function = self.program.begin_function()
         for decl in node.block.declarations:
             decl.accept(self)
         if node.return_type.as_annotation == VOID_TYPE:
             self.program.simple_op(OpCode.RETURN_VOID)
         self.program.end_function(function)
+
+    def visit_func_decl(self, node):
+        # No super as we handle scoping
+        self._make_function(node)
         self.program.make_closure(node.upvalues)
         # Define the function as the closure value
         self.program.define_name(node.index_annotation)
 
     def visit_struct_decl(self, node):
+        # No super as we handle methods
+        # Make all method function objects
+        for method in node.methods.values():
+            self._make_function(method)
+            self.program.define_name(method.index_annotation)
         # Create the constructor
         function = self.program.begin_function()
         field_count = len(node.fields)
         # Load all the fields
+        param_index = 0
         # Reversed so that they are in order on the stack
         for i in reversed(range(field_count)):
-            self.program.simple_op(OpCode.LOAD_PARAM)
-            self.program.simple_op(i)
+            if i in node.methods:
+                # If it's a method load the method and close it
+                method = node.methods[i]
+                # There is a different index for referencing it from within the constructor
+                self.program.load_name(method.constructor_index_annotation)
+                self.program.make_closure()
+            else:
+                # If it's a field load its parameter
+                self.program.simple_op(OpCode.LOAD_PARAM)
+                self.program.simple_op(param_index)
+                param_index += 1
         # Create the struct value from the fields
         self.program.simple_op(OpCode.STRUCT)
         self.program.simple_op(field_count)
         # Return the struct value
         self.program.simple_op(OpCode.RETURN)
         self.program.end_function(function)
-        self.program.make_closure()
+        self.program.make_closure(node.upvalues)
         # Define the constructor as this function value
         self.program.define_name(node.index_annotation)
 

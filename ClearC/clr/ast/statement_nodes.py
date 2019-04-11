@@ -225,12 +225,8 @@ class FuncDecl(DeclNode):
                     TokenType.COMMA,
                     parse_error("Expected comma to delimit parameters!", parser),
                 )
-        if parser.check(TokenType.LEFT_BRACE):
-            # If there is no return type set it to None
-            self.return_type = VoidType()
-        else:
-            # Consume the return type
-            self.return_type = parse_type(parser)
+        # Consume the return type
+        self.return_type = parse_type(parser)
         # Consume the definition block
         self.block = BlockStmt(parser)
         self.upvalues = []
@@ -252,19 +248,20 @@ class StructDecl(DeclNode):
         )
         self.name = parser.get_prev()
         self.fields = []
-        self.methods = []
+        self.methods = {}
+        # Upvalues for the constructor
+        self.upvalues = []
         parser.consume(
             TokenType.LEFT_BRACE, parse_error("Expected struct body!", parser)
         )
         # Consume the fields until we hit the closing brace
         while not parser.match(TokenType.RIGHT_BRACE):
             # Check if it's a method
-            if parser.check(TokenType.FUNC):
+            if parser.check(TokenType.FUNC) and parser.check_then(TokenType.IDENTIFIER):
                 # Parse the function
                 func_decl = FuncDecl(parser)
-                # Put a field-index, declaration pair for the method in self.methods
-                method_pair = (len(self.fields), func_decl)
-                self.methods.append(method_pair)
+                # Put the declaration for the method in self.methods as the value for this field's index
+                self.methods[len(self.fields)] = func_decl
                 # Create a field for the method of the right type and name
                 param_types = [param_type for (param_type, _) in func_decl.params]
                 func_type = FunctionType(param_types, func_decl.return_type)

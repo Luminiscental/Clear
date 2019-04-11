@@ -111,7 +111,7 @@ class DeclVisitor(StmtVisitor):
     def visit_struct_decl(self, node):
         for field_type, _ in node.fields:
             field_type.accept(self)
-        for _, method in node.methods:
+        for method in node.methods.values():
             self.visit_method_decl(method)
 
 

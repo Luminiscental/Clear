@@ -373,9 +373,9 @@ class TypeResolver(StructTrackingDeclVisitor):
                     # The field's type annotation
                     field_type.as_annotation
                     # for each field in the struct
-                    for (i, (field_type, field_name)) in enumerate(node.fields)
+                    for (i, (field_type, _)) in enumerate(node.fields)
                     # that isn't a method
-                    if (i not in [index for (index, _) in node.methods])
+                    if (i not in node.methods)
                 ],
             ),
         )
@@ -392,4 +392,6 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Cannot create variable {token_info(node.name)} with same name as struct constructor!"
             )()
-        self._declare_name(node.name.lexeme, node.type_annotation, assignable=node.mutable)
+        self._declare_name(
+            node.name.lexeme, node.type_annotation, assignable=node.mutable
+        )

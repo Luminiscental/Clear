@@ -35,6 +35,7 @@ class TokenType(Enum):
     INTEGER_SUFFIX = "i"
     # keywords
     AND = "and"
+    VOID = "void"
     STRUCT = "struct"
     ELSE = "else"
     FALSE = "false"
@@ -81,6 +82,7 @@ KEYWORD_TYPES = {
     "val": TokenType.VAL,
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
+    "void": TokenType.VOID,
 }
 
 SIMPLE_TOKENS = {

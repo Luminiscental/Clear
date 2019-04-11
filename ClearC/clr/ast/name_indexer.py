@@ -111,24 +111,40 @@ class NameIndexer(StructTrackingDeclVisitor):
         super().visit_val_decl(node)
         node.index_annotation = self._declare_name(node.name.lexeme)
 
-    def visit_func_decl(self, node):
-        # No super as we handle the params / scoping
+    def _index_function(self, node, is_method=False):
         node.index_annotation = self._declare_name(node.name.lexeme)
-        function = FunctionNameIndexer(self)
+        function = FunctionNameIndexer(self, is_method)
         for _, name in node.params:
             function.add_param(name.lexeme)
         for decl in node.block.declarations:
             decl.accept(function)
         node.upvalues.extend(function.upvalues)
+        self.errors.extend(function.errors)
+
+    def visit_func_decl(self, node):
+        # No super as we handle the params / scoping
+        self._index_function(node)
+
+    def visit_method_decl(self, node):
+        # No super as we don't delegate to visit_func_decl
+        self._index_function(node, is_method=True)
 
     def visit_struct_decl(self, node):
         super().visit_struct_decl(node)
+        # Index the constructors references
+        function = FunctionNameIndexer(self)
+        for method in node.methods.values():
+            method.constructor_index_annotation = function.lookup_name(
+                method.name.lexeme
+            )
         # Declare the constructor
         node.index_annotation = self._declare_name(node.name.lexeme)
+        node.upvalues.extend(function.upvalues)
+        self.errors.extend(function.errors)
 
 
 class FunctionNameIndexer(NameIndexer):
-    def __init__(self, parent):
+    def __init__(self, parent, is_method=False):
         super().__init__()
         # Inherit structs from parent as a copy
         self.structs = parent.structs.copy()
@@ -139,6 +155,7 @@ class FunctionNameIndexer(NameIndexer):
         self.params = []
         self.upvalues = []
         self.is_function = True
+        self.is_method = is_method
 
     def add_param(self, name):
         index = len(self.params)
@@ -162,6 +179,11 @@ class FunctionNameIndexer(NameIndexer):
                     # Globals can be referenced normally
                     result = lookup
                 else:
+                    if self.is_method:
+                        # TODO: Better reporting; maybe move to type resolver
+                        emit_error(
+                            f'Reference to value "{name}" is invalid within a method; methods can\'t have upvalues!'
+                        )()
                     upvalue_index = len(self.upvalues)
                     self.upvalues.append(lookup)
                     result = IndexAnnotation(IndexAnnotationType.UPVALUE, upvalue_index)

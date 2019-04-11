@@ -147,12 +147,14 @@ void printValue(Value value, bool endLine) {
 
                 case OBJ_FUNCTION: {
 
-                    printf("<fn %p>", value.as.obj);
+                    // fp: function prototype
+                    printf("<fp %p>", value.as.obj);
 
                 } break;
 
                 case OBJ_CLOSURE: {
 
+                    // fn: function
                     printf("<fn %p>", value.as.obj);
 
                 } break;
@@ -167,6 +169,7 @@ void printValue(Value value, bool endLine) {
                 case OBJ_STRUCT: {
 
                     // TODO: Maybe pretty print these?
+                    // st: struct
                     printf("<st %p>", value.as.obj);
 
                 } break;

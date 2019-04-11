@@ -73,4 +73,6 @@ def parse_function_type(parser):
 def parse_type(parser):
     if parser.check(TokenType.FUNC):
         return parse_function_type(parser)
+    if parser.match(TokenType.VOID):
+        return VoidType()
     return parse_simple_type(parser)

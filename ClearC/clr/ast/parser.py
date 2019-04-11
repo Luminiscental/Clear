@@ -7,6 +7,9 @@ class Parser:
         self.tokens = tokens
         self.errors = []
 
+    def get_next(self):
+        return self.tokens[self.index + 1]
+
     def get_current(self):
         return self.tokens[self.index]
 
@@ -24,6 +27,9 @@ class Parser:
 
     def check(self, token_type):
         return self.get_current().token_type == token_type
+
+    def check_then(self, token_type):
+        return self.get_next().token_type == token_type
 
     def check_one(self, possibilities):
         return self.get_current().token_type in possibilities
