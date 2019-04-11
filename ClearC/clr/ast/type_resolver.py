@@ -327,7 +327,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.return_type.accept(self)
         return_type = node.return_type.as_annotation
         # Create an annotation for the function signature
-        type_annotation = FunctionTypeAnnotation(
+        node.type_annotation = FunctionTypeAnnotation(
             return_type=return_type, signature=arg_types
         )
         # Declare the function
@@ -335,7 +335,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Cannot create function {token_info(node.name)} with same name as struct constructor!"
             )()
-        self._declare_name(node.name.lexeme, type_annotation)
+        self._declare_name(node.name.lexeme, node.type_annotation)
         # Start the function scope
         self.start_scope()
         # Iterate over the parameters and declare them
@@ -364,20 +364,27 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Redefinition of struct {node.name}! Struct shadowing is not allowed."
             )()
         super().visit_struct_decl(node)
+        # Declare the constructor
         self._declare_name(
             name,
             FunctionTypeAnnotation(
                 return_type=IdentifierTypeAnnotation(name),
                 signature=[
-                    field_type.as_annotation for (field_type, field_name) in node.fields
+                    # The field's type annotation
+                    field_type.as_annotation
+                    # for each field in the struct
+                    for (i, (field_type, field_name)) in enumerate(node.fields)
+                    # that isn't a method
+                    if (i not in [index for (index, _) in node.methods])
                 ],
             ),
         )
+        node.type_annotation = IdentifierTypeAnnotation(name)
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
-        type_annotation = node.initializer.type_annotation
-        if type_annotation == VOID_TYPE:
+        node.type_annotation = node.initializer.type_annotation
+        if node.type_annotation == VOID_TYPE:
             emit_error(
                 f"Cannot create variable {token_info(node.name)} from calling void function `{node.initializer}`!"
             )()
@@ -385,4 +392,4 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Cannot create variable {token_info(node.name)} with same name as struct constructor!"
             )()
-        self._declare_name(node.name.lexeme, type_annotation, assignable=node.mutable)
+        self._declare_name(node.name.lexeme, node.type_annotation, assignable=node.mutable)

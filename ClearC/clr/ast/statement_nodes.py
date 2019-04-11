@@ -3,8 +3,8 @@ from clr.errors import ClrCompileError, parse_error, emit_error, sync_errors
 from clr.ast.return_annotations import ReturnAnnotation
 from clr.ast.index_annotations import IndexAnnotation
 from clr.ast.expression_nodes import parse_expr
-from clr.ast.type_annotations import BUILTINS
-from clr.ast.type_nodes import VoidType, parse_type
+from clr.ast.type_annotations import TypeAnnotation, BUILTINS
+from clr.ast.type_nodes import VoidType, FunctionType, parse_type
 
 
 def parse_stmt(parser):
@@ -25,6 +25,7 @@ class StmtNode:  # pylint: disable=too-few-public-methods
     def __init__(self, parser):
         self.return_annotation = ReturnAnnotation()
         self.first_token = parser.get_current()
+        self.type_annotation = TypeAnnotation()
 
 
 class BlockStmt(StmtNode):
@@ -251,25 +252,39 @@ class StructDecl(DeclNode):
         )
         self.name = parser.get_prev()
         self.fields = []
+        self.methods = []
         parser.consume(
             TokenType.LEFT_BRACE, parse_error("Expected struct body!", parser)
         )
         # Consume the fields until we hit the closing brace
         while not parser.match(TokenType.RIGHT_BRACE):
-            # Consume a type for the field
-            field_type = parse_type(parser)
-            # And then a name for the field
-            parser.consume(
-                TokenType.IDENTIFIER, parse_error("Expected field name!", parser)
-            )
-            field_name = parser.get_prev()
-            # Field declarations end with a semicolon
-            parser.consume(
-                TokenType.SEMICOLON, parse_error("Expected semi-colon!", parser)
-            )
-            # Append the fields as (type, name) tuples
-            pair = (field_type, field_name)
-            self.fields.append(pair)
+            # Check if it's a method
+            if parser.check(TokenType.FUNC):
+                # Parse the function
+                func_decl = FuncDecl(parser)
+                # Put a field-index, declaration pair for the method in self.methods
+                method_pair = (len(self.fields), func_decl)
+                self.methods.append(method_pair)
+                # Create a field for the method of the right type and name
+                param_types = [param_type for (param_type, _) in func_decl.params]
+                func_type = FunctionType(param_types, func_decl.return_type)
+                func_pair = (func_type, func_decl.name)
+                self.fields.append(func_pair)
+            else:
+                # Consume a type for the field
+                field_type = parse_type(parser)
+                # And then a name for the field
+                parser.consume(
+                    TokenType.IDENTIFIER, parse_error("Expected field name!", parser)
+                )
+                field_name = parser.get_prev()
+                # Field declarations end with a semicolon
+                parser.consume(
+                    TokenType.SEMICOLON, parse_error("Expected semi-colon!", parser)
+                )
+                # Append the fields as (type, name) tuples
+                pair = (field_type, field_name)
+                self.fields.append(pair)
 
     @sync_errors
     def accept(self, decl_visitor):

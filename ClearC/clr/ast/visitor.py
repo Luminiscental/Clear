@@ -105,9 +105,14 @@ class DeclVisitor(StmtVisitor):
         node.return_type.accept(self)
         node.block.accept(self)
 
+    def visit_method_decl(self, node):
+        self.visit_func_decl(node)
+
     def visit_struct_decl(self, node):
         for field_type, _ in node.fields:
             field_type.accept(self)
+        for _, method in node.methods:
+            self.visit_method_decl(method)
 
 
 class StructTrackingDeclVisitor(DeclVisitor):

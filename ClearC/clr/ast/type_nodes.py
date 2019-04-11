@@ -40,10 +40,13 @@ def parse_simple_type(parser):
 
 
 class FunctionType:
-    def __init__(self, params, return_type, as_annotation):
+    def __init__(self, params, return_type):
         self.params = params
         self.return_type = return_type
-        self.as_annotation = as_annotation
+        self.as_annotation = FunctionTypeAnnotation(
+            return_type=return_type.as_annotation,
+            signature=list(map(lambda param: param.as_annotation, params)),
+        )
 
     def accept(self, type_visitor):
         type_visitor.visit_func_type(self)
@@ -64,11 +67,7 @@ def parse_function_type(parser):
                 parse_error("Expected comma to delimit parameters!", parser),
             )
     return_type = parse_type(parser)
-    as_annotation = FunctionTypeAnnotation(
-        return_type=return_type.as_annotation,
-        signature=list(map(lambda param: param.as_annotation, params)),
-    )
-    return FunctionType(params, return_type, as_annotation)
+    return FunctionType(params, return_type)
 
 
 def parse_type(parser):
