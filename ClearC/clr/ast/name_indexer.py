@@ -21,33 +21,34 @@ class NameIndexer(StructTrackingDeclVisitor):
         lookback = 0
         # Keep looking back up to the global scope
         while lookback <= self.level:
-            result = self.scopes[self.level - lookback][name]
+            scope = self.scopes[self.level - lookback]
             lookback += 1
-            # If the scope containes a resolved index for thei name we're done
-            if result.kind != IndexAnnotationType.UNRESOLVED:
-                if DEBUG:
-                    print(f"Found {name} with index {result}")
-                break
+            # If the scope contains a resolved index for the name we're done
+            if name in scope:
+                result = scope[name]
+                return result
         # If no resolved name was found the returned index is unresolved
-        return result
+        return IndexAnnotation()
+
+    def _declare_new(self):
+        if self.level > 0:
+            idx = self.local_index
+            self.local_index += 1
+            kind = IndexAnnotationType.LOCAL
+        else:
+            idx = self.global_index
+            self.global_index += 1
+            kind = IndexAnnotationType.GLOBAL
+        return IndexAnnotation(kind, idx)
 
     def _declare_name(self, name):
         prev = self.lookup_name(name)
-        # If the name already was not found as already declared make it a new index
         if prev.kind == IndexAnnotationType.UNRESOLVED:
-            if self.level > 0:
-                idx = self.local_index
-                self.local_index += 1
-                kind = IndexAnnotationType.LOCAL
-            else:
-                idx = self.global_index
-                self.global_index += 1
-                kind = IndexAnnotationType.GLOBAL
+            # If the name already was not found as already declared make it a new index
+            result = self._declare_new()
         else:
             # If it was already declared use the old value directly
-            idx = prev.value
-            kind = prev.kind
-        result = IndexAnnotation(kind, idx)
+            result = IndexAnnotation(prev.kind, prev.value)
         if DEBUG:
             print(f"Declared {name} as {result}")
         self.scopes[self.level][name] = result
@@ -99,6 +100,10 @@ class NameIndexer(StructTrackingDeclVisitor):
         else:
             super().visit_call_expr(node)
 
+    def visit_this_expr(self, node):
+        super().visit_this_expr(node)
+        node.index_annotation = IndexAnnotation(IndexAnnotationType.UPVALUE, 0)
+
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
         node.index_annotation = self.lookup_name(node.name.lexeme)
@@ -112,7 +117,11 @@ class NameIndexer(StructTrackingDeclVisitor):
         node.index_annotation = self._declare_name(node.name.lexeme)
 
     def _index_function(self, node, is_method=False):
-        node.index_annotation = self._declare_name(node.name.lexeme)
+        # If it's a method we don't associate it with a name so that it doesn't override anything
+        # and isn't accessible as its own object
+        node.index_annotation = (
+            self._declare_new() if is_method else self._declare_name(node.name.lexeme)
+        )
         function = FunctionNameIndexer(self, is_method)
         for _, name in node.params:
             function.add_param(name.lexeme)
@@ -134,8 +143,8 @@ class NameIndexer(StructTrackingDeclVisitor):
         # Index the constructors references
         function = FunctionNameIndexer(self)
         for method in node.methods.values():
-            method.constructor_index_annotation = function.lookup_name(
-                method.name.lexeme
+            method.constructor_index_annotation = function.lookup_index(
+                method.index_annotation
             )
         # Declare the constructor
         node.index_annotation = self._declare_name(node.name.lexeme)
@@ -162,6 +171,22 @@ class FunctionNameIndexer(NameIndexer):
         pair = (name, IndexAnnotation(kind=IndexAnnotationType.PARAM, value=index))
         self.params.append(pair)
 
+    def add_upvalue(self, index, name=""):
+        if self.is_method:
+            # TODO: Better reporting; maybe move to type resolver
+            emit_error(
+                f'Reference to value "{name}" is invalid within a method; methods can\'t have upvalues!'
+            )()
+        upvalue_index = len(self.upvalues)
+        self.upvalues.append(index)
+        return IndexAnnotation(IndexAnnotationType.UPVALUE, upvalue_index)
+
+    def lookup_index(self, index, name=""):
+        if index.kind == IndexAnnotationType.GLOBAL:
+            # Globals can be referenced normally
+            return index
+        return self.add_upvalue(index, name)
+
     def lookup_name(self, name):
         result = super().lookup_name(name)
         if result.kind == IndexAnnotationType.UNRESOLVED:
@@ -175,16 +200,5 @@ class FunctionNameIndexer(NameIndexer):
             if lookup.kind != IndexAnnotationType.UNRESOLVED:
                 if DEBUG:
                     print(f"upvalue candidate: {lookup}")
-                if lookup.kind == IndexAnnotationType.GLOBAL:
-                    # Globals can be referenced normally
-                    result = lookup
-                else:
-                    if self.is_method:
-                        # TODO: Better reporting; maybe move to type resolver
-                        emit_error(
-                            f'Reference to value "{name}" is invalid within a method; methods can\'t have upvalues!'
-                        )()
-                    upvalue_index = len(self.upvalues)
-                    self.upvalues.append(lookup)
-                    result = IndexAnnotation(IndexAnnotationType.UPVALUE, upvalue_index)
+                result = self.lookup_index(lookup, name)
         return result

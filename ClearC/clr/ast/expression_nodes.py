@@ -204,6 +204,20 @@ class OrExpr(ExprNode):
         expr_visitor.visit_or_expr(self)
 
 
+class ThisExpr(ExprNode):
+    def __init__(self, parser):
+        super().__init__()
+        parser.consume(TokenType.THIS, parse_error("Expected `this`!", parser))
+        self.token = parser.get_prev()
+
+    @pprint
+    def __str__(self):
+        return "this"
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_this_expr(self)
+
+
 class IdentExpr(ExprNode):
     def __init__(self, parser):
         super().__init__()
@@ -341,5 +355,6 @@ PRATT_TABLE = defaultdict(
         TokenType.AND: ParseRule(infix=AndExpr, precedence=Precedence.AND),
         TokenType.OR: ParseRule(infix=OrExpr, precedence=Precedence.OR),
         TokenType.EQUAL: ParseRule(infix=BinaryExpr, precedence=Precedence.ASSIGNMENT),
+        TokenType.THIS: ParseRule(prefix=ThisExpr),
     },
 )

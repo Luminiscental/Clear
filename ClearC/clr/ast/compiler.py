@@ -147,6 +147,8 @@ class Compiler(DeclVisitor):
         field_count = len(node.fields)
         # Load all the fields
         param_index = 0
+        # Index annotation for the instance
+        result_index = IndexAnnotation(IndexAnnotationType.LOCAL, 0)
         # Reversed so that they are in order on the stack
         for i in reversed(range(field_count)):
             if i in node.methods:
@@ -154,7 +156,8 @@ class Compiler(DeclVisitor):
                 method = node.methods[i]
                 # There is a different index for referencing it from within the constructor
                 self.program.load_name(method.constructor_index_annotation)
-                self.program.make_closure()
+                # Close the method over the instance
+                self.program.make_closure([result_index])
             else:
                 # If it's a field load its parameter
                 self.program.simple_op(OpCode.LOAD_PARAM)
@@ -163,7 +166,10 @@ class Compiler(DeclVisitor):
         # Create the struct value from the fields
         self.program.simple_op(OpCode.STRUCT)
         self.program.simple_op(field_count)
-        # Return the struct value
+        # Store the result as the instance local
+        self.program.define_name(result_index)
+        # Load it to return
+        self.program.load_name(result_index)
         self.program.simple_op(OpCode.RETURN)
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)
@@ -296,6 +302,10 @@ class Compiler(DeclVisitor):
     def visit_boolean_expr(self, node):
         super().visit_boolean_expr(node)
         self.program.simple_op(OpCode.TRUE if node.value else OpCode.FALSE)
+
+    def visit_this_expr(self, node):
+        super().visit_this_expr(node)
+        self.program.load_name(node.index_annotation)
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)

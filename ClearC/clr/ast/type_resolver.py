@@ -31,6 +31,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         self.scopes = [defaultdict(TypeInfo)]
         self.expected_returns = []
         self.level = 0
+        self.current_structs = []
 
     def _declare_name(self, name, type_annotation, assignable=False):
         self.scopes[self.level][name] = TypeInfo(type_annotation, assignable)
@@ -207,6 +208,13 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Incompatible type {right_type} for right operand to logic operator {token_info(node.operator)}: `{node}`!"
             )()
 
+    def visit_this_expr(self, node):
+        super().visit_this_expr(node)
+        if not self.current_structs:
+            emit_error(f"Cannot reference `this` outside of a method: `{node}`!")()
+        else:
+            node.type_annotation = IdentifierTypeAnnotation(self.current_structs[-1])
+
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
         if node.name.lexeme in BUILTINS:
@@ -363,7 +371,20 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Redefinition of struct {node.name}! Struct shadowing is not allowed."
             )()
+        # Check for name collisions
+        field_names = {}
+        for _, field_name in node.fields:
+            if field_name.lexeme in field_names:
+                emit_error(
+                    f"Duplicate field {token_info(field_name)} in struct {token_info(node.name)}: "
+                    f"ambiguous with {token_info(field_names[field_name.lexeme])}!"
+                )()
+            field_names[field_name.lexeme] = field_name
+        # Push the struct name onto self.current_structs
+        self.current_structs.append(node.name.lexeme)
         super().visit_struct_decl(node)
+        # Pop it
+        del self.current_structs[-1]
         # Declare the constructor
         self._declare_name(
             name,
