@@ -1,37 +1,53 @@
 
 // TODO: Actual tests !!!
 
-val pi = 3.14159265358979;
-func meth() void {
-    print "original";
+struct Point {
+    int x;
+    int y;
+
+    func to_str() str {
+        return "(" + str(this.x) + ", " + str(this.y) + ")";
+    }
 }
 
-var callback = meth;
+struct Rectangle {
+    Point a;
+    Point b;
 
-// func print_callback() void {
-//     print "callback:";
-//     print callback;
-// }
+    func to_str() str {
+        return this.a.to_str() + "->" + this.b.to_str();
+    }
 
-// print_callback();
-
-print "callback before:";
-callback();
-
-{
-    struct LocalStruct {
-        func meth() void {
-            print "pi = " + str(pi);
+    func width() int {
+        val result = this.a.x - this.b.x;
+        if result > 0i {
+            return result;
+        } else {
+            return -result;
         }
     }
 
-    val a = LocalStruct();
-    //a.meth();
-    callback = a.meth;
+    func height() int {
+        val result = this.a.y - this.b.y;
+        if result > 0i {
+            return result;
+        } else {
+            return -result;
+        }
+    }
+
+    func area() int {
+        return this.width() * this.height();
+    }
+
+    func display() void {
+        print this.to_str() + " has area " + str(this.area());
+    }
 }
 
-// print_callback();
+val unit_square = Rectangle(Point(0i, 0i), Point(1i, 1i));
+unit_square.display();
 
-print "callback after:";
-callback();
+val long_rect = Rectangle(Point(1i, 3i), Point(10i, 2i));
+long_rect.display();
 
