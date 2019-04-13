@@ -124,7 +124,7 @@ void printValue(Value value, bool endLine) {
             size_t length;
             char *rawString = makeRawStringFromNumber(value.as.number, &length);
             printf("%s", rawString);
-            FREE_ARRAY(char, rawString, length);
+            FREE_ARRAY(char, rawString, length + 1);
 
         } break;
 
