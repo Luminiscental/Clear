@@ -155,21 +155,17 @@ class TypeResolver(StructTrackingDeclVisitor):
                     TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
                     TokenType.GREATER: [NUM_TYPE, INT_TYPE],
                     TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
-                    TokenType.EQUAL: ANY_TYPE,
                 }[node.operator.token_type]
             ):
                 emit_error(
                     f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}: `{node}`!"
                 )()
-            if node.operator.token_type == TokenType.EQUAL and not node.left.assignable:
-                emit_error(f"Unassignable expression `{node.left}`: `{node}`!")()
             if node.operator.token_type in {
                 TokenType.PLUS,
                 TokenType.MINUS,
                 TokenType.STAR,
                 TokenType.SLASH,
                 TokenType.BANG,
-                TokenType.EQUAL,
             }:
                 node.type_annotation = left_type
             elif node.operator.token_type in {
@@ -181,6 +177,18 @@ class TypeResolver(StructTrackingDeclVisitor):
                 TokenType.LESS_EQUAL,
             }:
                 node.type_annotation = BOOL_TYPE
+
+    def visit_assign_expr(self, node):
+        super().visit_assign_expr(node)
+        if not node.left.assignable:
+            emit_error(f"Unassignable expression `{node.left}`: `{node}`!")()
+        left_type = node.left.type_annotation
+        right_type = node.right.type_annotation
+        if left_type.kind != right_type.kind:
+            emit_error(
+                f"`{node.left}` is of type {left_type}, so cannot assign `{node.right}` of type {right_type} to it: `{node}`!"
+            )()
+        node.type_annotation = left_type
 
     def visit_and_expr(self, node):
         super().visit_and_expr(node)

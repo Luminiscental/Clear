@@ -244,16 +244,17 @@ class Compiler(DeclVisitor):
             emit_error(f"Unknown unary operator! {token_info(node.operator)}"),
         )()
 
+    def visit_assign_expr(self, node):
+        # Don't call super as we don't want to evaluate the left hand side
+        node.right.accept(self)
+        self.program.define_name(node.left.index_annotation)
+        if DEBUG:
+            print(f"Loading name for {node.left}")
+        # Assignment is an expression so we load the assigned value as well
+        self.program.load_name(node.left.index_annotation)
+
     def visit_binary_expr(self, node):
-        if node.operator.token_type == TokenType.EQUAL:
-            # If it's an assignment don't call super as we don't want to evaluate the left hand side
-            node.right.accept(self)
-            self.program.define_name(node.left.index_annotation)
-            if DEBUG:
-                print(f"Loading name for {node.left}")
-            # Assignment is an expression so we load the assigned value as well
-            self.program.load_name(node.left.index_annotation)
-        elif node.operator.token_type == TokenType.DOT:
+        if node.operator.token_type == TokenType.DOT:
             node.left.accept(self)
             self.program.simple_op(OpCode.GET_FIELD)
             self.program.simple_op(node.right.index_annotation.value)

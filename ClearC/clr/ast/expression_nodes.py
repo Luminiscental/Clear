@@ -140,17 +140,29 @@ class UnaryExpr(ExprNode):
         expr_visitor.visit_unary_expr(self)
 
 
+class AssignExpr(ExprNode):
+    def __init__(self, left, parser):
+        super().__init__()
+        self.left = left
+        parser.consume(TokenType.EQUAL, parse_error("Expected assignment!", parser))
+        self.operator = parser.get_prev()
+        self.right = parse_expr(parser, Precedence.ASSIGNMENT)
+
+    @pprint
+    def __str__(self):
+        return str(self.left) + " = " + str(self.right)
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_assign_expr(self)
+
+
 class BinaryExpr(ExprNode):
     def __init__(self, left, parser):
         super().__init__()
         self.left = left
         parser.consume_one(BINARY_OPS, parse_error("Expected binary operator!", parser))
         self.operator = parser.get_prev()
-        precedence = get_rule(self.operator).precedence
-        # Right-associative operations bind to the right including repeated operations,
-        # left-associative operations don't
-        if self.operator.token_type not in LEFT_ASSOC_OPS:
-            precedence = precedence.next()
+        precedence = get_rule(self.operator).precedence.next()
         self.right = parse_expr(parser, precedence)
 
     @pprint
@@ -310,11 +322,8 @@ BINARY_OPS = {
     TokenType.GREATER_EQUAL,
     TokenType.GREATER,
     TokenType.LESS_EQUAL,
-    TokenType.EQUAL,
     TokenType.DOT,
 }
-
-LEFT_ASSOC_OPS = {TokenType.EQUAL}
 
 
 PRATT_TABLE = defaultdict(
@@ -354,7 +363,7 @@ PRATT_TABLE = defaultdict(
         TokenType.IDENTIFIER: ParseRule(prefix=IdentExpr),
         TokenType.AND: ParseRule(infix=AndExpr, precedence=Precedence.AND),
         TokenType.OR: ParseRule(infix=OrExpr, precedence=Precedence.OR),
-        TokenType.EQUAL: ParseRule(infix=BinaryExpr, precedence=Precedence.ASSIGNMENT),
+        TokenType.EQUAL: ParseRule(infix=AssignExpr, precedence=Precedence.ASSIGNMENT),
         TokenType.THIS: ParseRule(prefix=ThisExpr),
     },
 )

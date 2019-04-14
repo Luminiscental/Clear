@@ -45,6 +45,11 @@ struct Rectangle {
     }
 }
 
+var x = 2i;
+print x;
+print (x = 3i) + 1i;
+print x;
+
 val unit_square = Rectangle(Point(0i, 0i), Point(1i, 1i));
 unit_square.display();
 
