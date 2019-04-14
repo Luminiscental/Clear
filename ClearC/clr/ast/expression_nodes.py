@@ -156,6 +156,24 @@ class AssignExpr(ExprNode):
         expr_visitor.visit_assign_expr(self)
 
 
+class AccessExpr(ExprNode):
+    def __init__(self, left, parser):
+        super().__init__()
+        self.left = left
+        parser.consume(
+            TokenType.DOT, parse_error("Expected property accessor!", parser)
+        )
+        self.operator = parser.get_prev()
+        self.right = parse_expr(parser, Precedence.CALL.next())
+
+    @pprint
+    def __str__(self):
+        return str(self.left) + "." + str(self.right)
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_access_expr(self)
+
+
 class BinaryExpr(ExprNode):
     def __init__(self, left, parser):
         super().__init__()
@@ -167,16 +185,7 @@ class BinaryExpr(ExprNode):
 
     @pprint
     def __str__(self):
-        separator = " "
-        if self.operator.token_type == TokenType.DOT:
-            separator = ""
-        return (
-            str(self.left)
-            + separator
-            + str(self.operator)
-            + separator
-            + str(self.right)
-        )
+        return str(self.left) + " " + str(self.operator) + " " + str(self.right)
 
     def accept(self, expr_visitor):
         expr_visitor.visit_binary_expr(self)
@@ -322,7 +331,6 @@ BINARY_OPS = {
     TokenType.GREATER_EQUAL,
     TokenType.GREATER,
     TokenType.LESS_EQUAL,
-    TokenType.DOT,
 }
 
 
@@ -343,7 +351,7 @@ PRATT_TABLE = defaultdict(
         TokenType.TRUE: ParseRule(prefix=BooleanExpr),
         TokenType.FALSE: ParseRule(prefix=BooleanExpr),
         TokenType.BANG: ParseRule(prefix=UnaryExpr),
-        TokenType.DOT: ParseRule(infix=BinaryExpr, precedence=Precedence.CALL),
+        TokenType.DOT: ParseRule(infix=AccessExpr, precedence=Precedence.CALL),
         TokenType.EQUAL_EQUAL: ParseRule(
             infix=BinaryExpr, precedence=Precedence.EQUALITY
         ),

@@ -253,28 +253,28 @@ class Compiler(DeclVisitor):
         # Assignment is an expression so we load the assigned value as well
         self.program.load_name(node.left.index_annotation)
 
+    def visit_access_expr(self, node):
+        super().visit_access_expr(node)
+        self.program.simple_op(OpCode.GET_FIELD)
+        self.program.simple_op(node.right.index_annotation.value)
+
     def visit_binary_expr(self, node):
-        if node.operator.token_type == TokenType.DOT:
-            node.left.accept(self)
-            self.program.simple_op(OpCode.GET_FIELD)
-            self.program.simple_op(node.right.index_annotation.value)
-        else:
-            super().visit_binary_expr(node)
-            {
-                TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
-                TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
-                TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
-                TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
-                TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
-                TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
-                TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
-                TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
-                TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
-                TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
-            }.get(
-                node.operator.token_type,
-                emit_error(f"Unknown binary operator! {token_info(node.operator)}"),
-            )()
+        super().visit_binary_expr(node)
+        {
+            TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
+            TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
+            TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
+            TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
+            TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
+            TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
+            TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
+            TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
+            TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
+            TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
+        }.get(
+            node.operator.token_type,
+            emit_error(f"Unknown binary operator! {token_info(node.operator)}"),
+        )()
 
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:

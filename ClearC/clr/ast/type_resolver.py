@@ -109,74 +109,73 @@ class TypeResolver(StructTrackingDeclVisitor):
             )()
         node.type_annotation = target_type
 
+    def visit_access_expr(self, node):
+        super().visit_access_expr(node)
+        if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
+            emit_error(
+                f"Non-struct type {node.left.type_annotation} does not have a property to access at {token_info(node.operator)}: `{node}`!"
+            )()
+        if not isinstance(node.right, IdentExpr):
+            emit_error(f"Accessor {node.right} is not an identifier! `{node}`")()
+        property_token = node.right.name
+        struct = self.structs[node.left.type_annotation.identifier]
+        fields = dict(
+            (field_name.lexeme, field_type) for (field_type, field_name) in struct
+        )
+        if property_token.lexeme not in fields:
+            emit_error(
+                f"No such property {token_info(property_token)} on struct {node.left.type_annotation}: `{node}`"
+            )()
+        field_type = fields[property_token.lexeme]
+        node.type_annotation = field_type.as_annotation
+
     def visit_binary_expr(self, node):
-        if node.operator.token_type == TokenType.DOT:
-            # If it's a property access don't visit the right node because it's just the property name
-            node.left.accept(self)
-            if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
-                emit_error(
-                    f"Non-struct type {node.left.type_annotation} does not have a property to access at {token_info(node.operator)}: `{node}`!"
-                )()
-            if not isinstance(node.right, IdentExpr):
-                emit_error(f"Accessor {node.right} is not an identifier! `{node}`")()
-            property_token = node.right.name
-            struct = self.structs[node.left.type_annotation.identifier]
-            fields = dict(
-                (field_name.lexeme, field_type) for (field_type, field_name) in struct
+        super().visit_binary_expr(node)
+        left_type = node.left.type_annotation
+        right_type = node.right.type_annotation
+        if left_type.kind != right_type.kind:
+            emit_error(
+                f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}: `{node}`!"
+            )()
+        if left_type == VOID_TYPE:
+            emit_error(
+                f"Cannot use call to void function `{node.left}` in expression: `{node}`!"
             )
-            if property_token.lexeme not in fields:
-                emit_error(
-                    f"No such property {token_info(property_token)} on struct {node.left.type_annotation}: `{node}`"
-                )()
-            field_type = fields[property_token.lexeme]
-            node.type_annotation = field_type.as_annotation
-        else:
-            super().visit_binary_expr(node)
-            left_type = node.left.type_annotation
-            right_type = node.right.type_annotation
-            if left_type.kind != right_type.kind:
-                emit_error(
-                    f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}: `{node}`!"
-                )()
-            if left_type == VOID_TYPE:
-                emit_error(
-                    f"Cannot use call to void function `{node.left}` in expression: `{node}`!"
-                )
-            if (
-                left_type
-                not in {
-                    TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
-                    TokenType.MINUS: [NUM_TYPE, INT_TYPE],
-                    TokenType.STAR: [NUM_TYPE, INT_TYPE],
-                    TokenType.SLASH: [NUM_TYPE],
-                    TokenType.EQUAL_EQUAL: ANY_TYPE,
-                    TokenType.BANG_EQUAL: ANY_TYPE,
-                    TokenType.LESS: [NUM_TYPE, INT_TYPE],
-                    TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
-                    TokenType.GREATER: [NUM_TYPE, INT_TYPE],
-                    TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
-                }[node.operator.token_type]
-            ):
-                emit_error(
-                    f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}: `{node}`!"
-                )()
-            if node.operator.token_type in {
-                TokenType.PLUS,
-                TokenType.MINUS,
-                TokenType.STAR,
-                TokenType.SLASH,
-                TokenType.BANG,
-            }:
-                node.type_annotation = left_type
-            elif node.operator.token_type in {
-                TokenType.EQUAL_EQUAL,
-                TokenType.BANG_EQUAL,
-                TokenType.GREATER,
-                TokenType.GREATER_EQUAL,
-                TokenType.LESS,
-                TokenType.LESS_EQUAL,
-            }:
-                node.type_annotation = BOOL_TYPE
+        if (
+            left_type
+            not in {
+                TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
+                TokenType.MINUS: [NUM_TYPE, INT_TYPE],
+                TokenType.STAR: [NUM_TYPE, INT_TYPE],
+                TokenType.SLASH: [NUM_TYPE],
+                TokenType.EQUAL_EQUAL: ANY_TYPE,
+                TokenType.BANG_EQUAL: ANY_TYPE,
+                TokenType.LESS: [NUM_TYPE, INT_TYPE],
+                TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
+                TokenType.GREATER: [NUM_TYPE, INT_TYPE],
+                TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
+            }[node.operator.token_type]
+        ):
+            emit_error(
+                f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}: `{node}`!"
+            )()
+        if node.operator.token_type in {
+            TokenType.PLUS,
+            TokenType.MINUS,
+            TokenType.STAR,
+            TokenType.SLASH,
+            TokenType.BANG,
+        }:
+            node.type_annotation = left_type
+        elif node.operator.token_type in {
+            TokenType.EQUAL_EQUAL,
+            TokenType.BANG_EQUAL,
+            TokenType.GREATER,
+            TokenType.GREATER_EQUAL,
+            TokenType.LESS,
+            TokenType.LESS_EQUAL,
+        }:
+            node.type_annotation = BOOL_TYPE
 
     def visit_assign_expr(self, node):
         super().visit_assign_expr(node)

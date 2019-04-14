@@ -80,17 +80,14 @@ class NameIndexer(StructTrackingDeclVisitor):
         del self.scopes[self.level]
         self.level -= 1
 
-    def visit_binary_expr(self, node):
-        if node.operator.token_type == TokenType.DOT:
-            node.left.accept(self)
-            struct = self.structs[node.left.type_annotation.identifier]
-            field_names = [field_name.lexeme for (_, field_name) in struct]
-            index = field_names.index(node.right.name.lexeme)
-            node.right.index_annotation = IndexAnnotation(
-                IndexAnnotationType.PROPERTY, index
-            )
-        else:
-            super().visit_binary_expr(node)
+    def visit_access_expr(self, node):
+        super().visit_access_expr(node)
+        struct = self.structs[node.left.type_annotation.identifier]
+        field_names = [field_name.lexeme for (_, field_name) in struct]
+        index = field_names.index(node.right.name.lexeme)
+        node.right.index_annotation = IndexAnnotation(
+            IndexAnnotationType.PROPERTY, index
+        )
 
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:

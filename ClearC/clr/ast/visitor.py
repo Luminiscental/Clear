@@ -24,6 +24,9 @@ class ExprVisitor(TypeVisitor):
         node.left.accept(self)
         node.right.accept(self)
 
+    def visit_access_expr(self, node):
+        node.left.accept(self)
+
     def visit_unary_expr(self, node):
         node.target.accept(self)
 
