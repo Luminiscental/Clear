@@ -20,6 +20,10 @@ class ExprVisitor(TypeVisitor):
         for arg in node.arguments:
             arg.accept(self)
 
+    def visit_construct_expr(self, node):
+        # TODO:
+        pass
+
     def visit_assign_expr(self, node):
         node.left.accept(self)
         node.right.accept(self)

@@ -2,9 +2,9 @@ from clr.tokens import TokenType, token_info
 from clr.errors import ClrCompileError, parse_error, emit_error, sync_errors
 from clr.ast.return_annotations import ReturnAnnotation
 from clr.ast.index_annotations import IndexAnnotation
-from clr.ast.expression_nodes import parse_expr
+from clr.ast.expression_nodes import parse_expr, parse_grouping
 from clr.ast.type_annotations import TypeAnnotation, BUILTINS
-from clr.ast.type_nodes import VoidType, FunctionType, parse_type
+from clr.ast.type_nodes import FunctionType, parse_type
 
 
 def parse_stmt(parser):
@@ -99,11 +99,11 @@ class IfStmt(StmtNode):
     def __init__(self, parser):
         super().__init__(parser)
         parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
-        self.checks = [(parse_expr(parser), BlockStmt(parser))]
+        self.checks = [(parse_grouping(parser), BlockStmt(parser))]
         self.otherwise = None
         while parser.match(TokenType.ELSE):
             if parser.match(TokenType.IF):
-                other_cond = parse_expr(parser)
+                other_cond = parse_grouping(parser)
                 other_block = BlockStmt(parser)
                 self.checks.append((other_cond, other_block))
             else:

@@ -125,6 +125,45 @@ class CallExpr(ExprNode):
         expr_visitor.visit_call_expr(self)
 
 
+class ConstructExpr(ExprNode):
+    def __init__(self, left, parser):
+        super().__init__()
+        self.name = left
+        self.args = {}
+        parser.consume(
+            TokenType.LEFT_BRACE, parse_error("Expected constructor!", parser)
+        )
+        while not parser.match(TokenType.RIGHT_BRACE):
+            parser.consume(
+                TokenType.IDENTIFIER, parse_error("Expected field argument!", parser)
+            )
+            field_token = parser.get_prev()
+            if field_token.lexeme in self.args:
+                parse_error("Repeated field argument!", parser)()
+            parser.consume(
+                TokenType.EQUAL, parse_error("Expected field value!", parser)
+            )
+            field_value = parse_expr(parser)
+            self.args[field_token.lexeme] = field_value
+            if not parser.check(TokenType.RIGHT_BRACE):
+                parser.consume(
+                    TokenType.COMMA,
+                    parse_error("Field arguments must be comma delimited!", parser),
+                )
+
+    @pprint
+    def __str__(self):
+        return (
+            str(self.name)
+            + "{"
+            + ", ".join([name + " = " + str(value)] for name, value in self.args)
+            + "}"
+        )
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_construct_expr(self)
+
+
 class UnaryExpr(ExprNode):
     def __init__(self, parser):
         super().__init__()
@@ -337,6 +376,9 @@ BINARY_OPS = {
 PRATT_TABLE = defaultdict(
     ParseRule,
     {
+        TokenType.LEFT_BRACE: ParseRule(
+            infix=ConstructExpr, precedence=Precedence.CALL
+        ),
         TokenType.LEFT_PAREN: ParseRule(
             prefix=parse_grouping, infix=CallExpr, precedence=Precedence.CALL
         ),

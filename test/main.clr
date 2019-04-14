@@ -10,6 +10,11 @@ struct Point {
     }
 }
 
+print Point {
+    x = 3,
+    y = 2i
+};
+
 struct Rectangle {
     Point a;
     Point b;
@@ -20,7 +25,7 @@ struct Rectangle {
 
     func width() int {
         val result = this.a.x - this.b.x;
-        if result > 0i {
+        if (result > 0i) {
             return result;
         } else {
             return -result;
@@ -29,7 +34,7 @@ struct Rectangle {
 
     func height() int {
         val result = this.a.y - this.b.y;
-        if result > 0i {
+        if (result > 0i) {
             return result;
         } else {
             return -result;
