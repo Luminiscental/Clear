@@ -10,6 +10,8 @@ struct Point {
     }
 }
 
+2("a", "b");
+
 print Point {
     x = 3,
     y = 2i
