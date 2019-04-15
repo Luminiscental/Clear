@@ -21,8 +21,8 @@ class ExprVisitor(TypeVisitor):
             arg.accept(self)
 
     def visit_construct_expr(self, node):
-        # TODO:
-        pass
+        for _, field_value in node.args.items():
+            field_value.accept(self)
 
     def visit_assign_expr(self, node):
         node.left.accept(self)
@@ -135,5 +135,5 @@ class StructTrackingDeclVisitor(DeclVisitor):
         self.structs = {}
 
     def visit_struct_decl(self, node):
-        self.structs[node.name.lexeme] = node.fields
+        self.structs[node.name.lexeme] = node
         super().visit_struct_decl(node)

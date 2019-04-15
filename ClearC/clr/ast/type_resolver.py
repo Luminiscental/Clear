@@ -65,6 +65,34 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Reference to undefined type `{node}`! {token_info(node.token)}"
             )()
 
+    def visit_construct_expr(self, node):
+        super().visit_construct_expr(node)
+        if node.name.lexeme not in self.structs:
+            emit_error(f"No such struct `{node.name}`: `{node}`!")()
+        struct = self.structs[node.name.lexeme]
+        node.type_annotation = IdentifierTypeAnnotation(node.name.lexeme)
+        specified_fields = set()
+        field_names = {
+            field_name.lexeme: field_type
+            for i, (field_type, field_name) in enumerate(struct.fields)
+            if i not in struct.methods
+        }
+        for field_name, field_value in node.args.items():
+            if field_name not in field_names:
+                emit_error(
+                    f"Invalid field assignment to {field_name} in struct constructor, `{node.name}` is not a field: `{node}`!"
+                )()
+            if field_value.type_annotation != field_names[field_name].as_annotation:
+                emit_error(
+                    f"Incompatible type {field_value.type_annotation} for field {field_name} whose type is {field_names[field_name]}: `{node}`!"
+                )()
+            specified_fields.add(field_name)
+        for field_name in field_names:
+            if field_name not in specified_fields:
+                emit_error(
+                    f"Field {field_name} was not specified in constructor: `{node}`!"
+                )()
+
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # If it's a built-in don't call super() as we don't evaluate the target
@@ -119,9 +147,9 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(f"Accessor {node.right} is not an identifier! `{node}`")()
         property_token = node.right.name
         struct = self.structs[node.left.type_annotation.identifier]
-        fields = dict(
-            (field_name.lexeme, field_type) for (field_type, field_name) in struct
-        )
+        fields = {
+            field_name.lexeme: field_type for (field_type, field_name) in struct.fields
+        }
         if property_token.lexeme not in fields:
             emit_error(
                 f"No such property {token_info(property_token)} on struct {node.left.type_annotation}: `{node}`"

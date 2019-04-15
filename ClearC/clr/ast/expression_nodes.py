@@ -128,7 +128,9 @@ class CallExpr(ExprNode):
 class ConstructExpr(ExprNode):
     def __init__(self, left, parser):
         super().__init__()
-        self.name = left
+        if not isinstance(left, IdentExpr):
+            parse_error(f"Invalid constructor type `{left}`!", parser)()
+        self.name = left.name
         self.args = {}
         parser.consume(
             TokenType.LEFT_BRACE, parse_error("Expected constructor!", parser)
@@ -155,9 +157,11 @@ class ConstructExpr(ExprNode):
     def __str__(self):
         return (
             str(self.name)
-            + "{"
-            + ", ".join([name + " = " + str(value)] for name, value in self.args)
-            + "}"
+            + " { "
+            + ", ".join(
+                [str(name) + " = " + str(value) for name, value in self.args.items()]
+            )
+            + " }"
         )
 
     def accept(self, expr_visitor):

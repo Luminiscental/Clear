@@ -83,7 +83,7 @@ class NameIndexer(StructTrackingDeclVisitor):
     def visit_access_expr(self, node):
         super().visit_access_expr(node)
         struct = self.structs[node.left.type_annotation.identifier]
-        field_names = [field_name.lexeme for (_, field_name) in struct]
+        field_names = [field_name.lexeme for (_, field_name) in struct.fields]
         index = field_names.index(node.right.name.lexeme)
         node.right.index_annotation = IndexAnnotation(
             IndexAnnotationType.PROPERTY, index
