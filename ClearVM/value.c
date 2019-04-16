@@ -77,6 +77,9 @@ bool valuesEqual(Value a, Value b) {
                 return false;
 
             // Objects are compared by identity.
+            // Because strings are interned this means strings are compared by
+            // value.
+            // TODO: Compare structs deeply?
             return a.as.obj == b.as.obj;
 
         } break;

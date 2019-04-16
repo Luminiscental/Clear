@@ -288,6 +288,14 @@ class Compiler(DeclVisitor):
             self.program.simple_op(OpCode.CALL)
             self.program.simple_op(len(node.arguments))
 
+    def visit_construct_expr(self, node):
+        # Load the constructor before calling super() as callable comes before arguments
+        self.program.load_name(node.constructor_index_annotation)
+        super().visit_construct_expr(node)
+        # Call the constructor
+        self.program.simple_op(OpCode.CALL)
+        self.program.simple_op(len(node.args))
+
     def _visit_constant_expr(self, node):
         const_index = self.constants.add(node.value)
         self.program.load_constant(const_index)

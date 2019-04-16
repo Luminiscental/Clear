@@ -90,7 +90,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         for field_name in field_names:
             if field_name not in specified_fields:
                 emit_error(
-                    f"Field {field_name} was not specified in constructor: `{node}`!"
+                    f"Field {field_name} of {token_info(node.name)} was not specified in constructor: `{node}`!"
                 )()
 
     def visit_call_expr(self, node):
@@ -258,9 +258,15 @@ class TypeResolver(StructTrackingDeclVisitor):
             )()
         (node.type_annotation, node.assignable) = self._lookup_name(node.name.lexeme)
         if node.type_annotation.kind == TypeAnnotationType.UNRESOLVED:
-            emit_error(
+            err_msg = (
                 f"Reference to undefined identifier {token_info(node.name)}: `{node}`!"
-            )()
+            )
+            if node.name.lexeme in self.structs:
+                err_msg += (
+                    f"\nMaybe you meant to use a construct expression? e.g. `{node.name.lexeme}"
+                    " { ... }`"
+                )
+            emit_error(err_msg)()
 
     def visit_string_expr(self, node):
         super().visit_string_expr(node)
@@ -375,8 +381,9 @@ class TypeResolver(StructTrackingDeclVisitor):
         )
         # Declare the function
         if node.name.lexeme in self.structs:
+            struct = self.structs[node.name.lexeme]
             emit_error(
-                f"Cannot create function {token_info(node.name)} with same name as struct constructor!"
+                f"Cannot create function {token_info(node.name)} with same name as struct {token_info(struct.name)}!"
             )()
         self._declare_name(node.name.lexeme, node.type_annotation)
         # Start the function scope
@@ -420,21 +427,6 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_struct_decl(node)
         # Pop it
         del self.current_structs[-1]
-        # Declare the constructor
-        self._declare_name(
-            name,
-            FunctionTypeAnnotation(
-                return_type=IdentifierTypeAnnotation(name),
-                signature=[
-                    # The field's type annotation
-                    field_type.as_annotation
-                    # for each field in the struct
-                    for (i, (field_type, _)) in enumerate(node.fields)
-                    # that isn't a method
-                    if (i not in node.methods)
-                ],
-            ),
-        )
         node.type_annotation = IdentifierTypeAnnotation(name)
 
     def visit_val_decl(self, node):
@@ -445,8 +437,9 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Cannot create variable {token_info(node.name)} from calling void function `{node.initializer}`!"
             )()
         if node.name.lexeme in self.structs:
+            struct = self.structs[node.name.lexeme]
             emit_error(
-                f"Cannot create variable {token_info(node.name)} with same name as struct constructor!"
+                f"Cannot create variable {token_info(node.name)} with same name as struct {token_info(struct.name)}!"
             )()
         self._declare_name(
             node.name.lexeme, node.type_annotation, assignable=node.mutable

@@ -1,6 +1,15 @@
 
 // TODO: Actual tests !!!
 
+struct Unit {}
+val unit1 = Unit {};
+val unit2 = Unit {};
+
+print unit1 == unit1;
+print unit2 == unit2;
+print unit1 == unit2;
+print;
+
 struct Point {
     int x;
     int y;
@@ -9,13 +18,6 @@ struct Point {
         return "(" + str(this.x) + ", " + str(this.y) + ")";
     }
 }
-
-2("a", "b");
-
-print Point {
-    x = 3,
-    y = 2i
-};
 
 struct Rectangle {
     Point a;
@@ -52,14 +54,9 @@ struct Rectangle {
     }
 }
 
-var x = 2i;
-print x;
-print (x = 3i) + 1i;
-print x;
-
-val unit_square = Rectangle(Point(0i, 0i), Point(1i, 1i));
+val unit_square = Rectangle { a=Point { x=0i, y=0i }, b=Point { x=1i, y=1i } };
 unit_square.display();
 
-val long_rect = Rectangle(Point(1i, 3i), Point(10i, 2i));
+val long_rect = Rectangle { a=Point { x=1i, y=3i }, b=Point { x=10i, y=2i } };
 long_rect.display();
 

@@ -132,6 +132,7 @@ class ConstructExpr(ExprNode):
             parse_error(f"Invalid constructor type `{left}`!", parser)()
         self.name = left.name
         self.args = {}
+        self.constructor_index_annotation = IndexAnnotation()
         parser.consume(
             TokenType.LEFT_BRACE, parse_error("Expected constructor!", parser)
         )

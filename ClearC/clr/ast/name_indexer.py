@@ -1,7 +1,7 @@
-from collections import defaultdict
+from collections import OrderedDict, defaultdict
 from clr.values import DEBUG
 from clr.errors import emit_error
-from clr.tokens import TokenType, token_info
+from clr.tokens import token_info
 from clr.ast.expression_nodes import IdentExpr
 from clr.ast.visitor import StructTrackingDeclVisitor
 from clr.ast.index_annotations import IndexAnnotation, IndexAnnotationType
@@ -96,6 +96,20 @@ class NameIndexer(StructTrackingDeclVisitor):
                 arg.accept(self)
         else:
             super().visit_call_expr(node)
+
+    def visit_construct_expr(self, node):
+        super().visit_construct_expr(node)
+        # Lookup the constructor
+        node.constructor_index_annotation = self.lookup_name(node.name.lexeme)
+        struct = self.structs[node.name.lexeme]
+        field_names = {}
+        for i, field in enumerate(struct.fields):
+            _, field_name = field
+            field_names[field_name.lexeme] = i
+        # Order the field specifiers so that they are in order to call the constructor
+        node.args = OrderedDict(
+            sorted(node.args.items(), key=lambda arg: field_names[arg[0]])
+        )
 
     def visit_this_expr(self, node):
         super().visit_this_expr(node)
