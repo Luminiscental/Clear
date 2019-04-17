@@ -30,6 +30,51 @@ struct Point {
     }
 }
 
+var shared = 0i;
+
+struct TestFac {
+
+    func display() void {
+        print "shared is " + str(shared);
+    }
+
+    func inc() void {
+        shared = shared + 1i;
+        this.display();
+    }
+
+    func dec() void {
+        shared = shared - 1i;
+        this.display();
+    }
+
+    func fac(int n) int {
+        if (n == 0i) {
+            return 1i;
+        } else {
+            return n * this.fac(n - 1i);
+        }
+    }
+}
+
+val test1 = TestFac {};
+val test2 = TestFac {};
+
+print "test1.fac(10i) = " + str(test1.fac(10i));
+print;
+
+print "inc1";
+test1.inc();
+print "inc2";
+test2.inc();
+print "dec1";
+test1.dec();
+print "inc2";
+test2.inc();
+print "dec2";
+test2.dec();
+print;
+
 struct Rectangle {
     Point a;
     Point b;
