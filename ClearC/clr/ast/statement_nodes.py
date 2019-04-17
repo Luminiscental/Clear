@@ -275,10 +275,12 @@ class StructDecl(DeclNode):
                     TokenType.IDENTIFIER, parse_error("Expected field name!", parser)
                 )
                 field_name = parser.get_prev()
-                # Field declarations end with a semicolon
-                parser.consume(
-                    TokenType.SEMICOLON, parse_error("Expected semi-colon!", parser)
-                )
+                # If we haven't hit the end there must be a comma before the next field
+                if not parser.check(TokenType.RIGHT_BRACE):
+                    parser.consume(
+                        TokenType.COMMA,
+                        parse_error("Expected comma to delimit parameters!", parser),
+                    )
                 # Append the fields as (type, name) tuples
                 pair = (field_type, field_name)
                 self.fields.append(pair)

@@ -142,14 +142,13 @@ class Compiler(DeclVisitor):
         for method in node.methods.values():
             self._make_function(method)
             self.program.define_name(method.index_annotation)
+        # Index annotation for the instance, used for closing methods
+        result_index = IndexAnnotation(IndexAnnotationType.LOCAL, 0)
         # Create the constructor
         function = self.program.begin_function()
         field_count = len(node.fields)
-        # Load all the fields
-        param_index = 0
-        # Index annotation for the instance
-        result_index = IndexAnnotation(IndexAnnotationType.LOCAL, 0)
-        # Reversed so that they are in order on the stack
+        # Load all the fields, reversed so that they are in order on the stack
+        param_index = len([i for i in range(field_count) if i not in node.methods]) - 1
         for i in reversed(range(field_count)):
             if i in node.methods:
                 # If it's a method load the method and close it
@@ -162,7 +161,7 @@ class Compiler(DeclVisitor):
                 # If it's a field load its parameter
                 self.program.simple_op(OpCode.LOAD_PARAM)
                 self.program.simple_op(param_index)
-                param_index += 1
+                param_index -= 1
         # Create the struct value from the fields
         self.program.simple_op(OpCode.STRUCT)
         self.program.simple_op(field_count)

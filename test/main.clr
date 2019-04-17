@@ -1,6 +1,37 @@
 
 // TODO: Actual tests !!!
 
+struct Many {
+    int a,
+    int b,
+
+    func c() void {
+        print "Hello World!";
+    }
+
+    func d() int {
+        return 1i + 1i;
+    }
+
+    str msg,
+
+    func displayMessage() void {
+        print this.msg;
+    }
+
+    bool last
+}
+
+val manyInstance = Many { a=1i, b=2i, msg="This is a message.", last=true };
+manyInstance.c();
+val makeTwo = manyInstance.d;
+print "makeTwo() = " + str(makeTwo());
+manyInstance.displayMessage();
+print manyInstance.last;
+print str(manyInstance.last);
+print "last? " + str(manyInstance.last);
+print;
+
 struct Unit {}
 val unit1 = Unit {};
 val unit2 = Unit {};
@@ -22,8 +53,8 @@ print "Done!";
 print;
 
 struct Point {
-    int x;
-    int y;
+    int x,
+    int y,
 
     func to_str() str {
         return "(" + str(this.x) + ", " + str(this.y) + ")";
@@ -76,8 +107,8 @@ test2.dec();
 print;
 
 struct Rectangle {
-    Point a;
-    Point b;
+    Point a,
+    Point b,
 
     func to_str() str {
         return this.a.to_str() + "->" + this.b.to_str();
