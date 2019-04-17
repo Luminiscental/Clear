@@ -85,7 +85,7 @@ class WhileStmt(StmtNode):
             TokenType.WHILE, parse_error("Expected while statement!", parser)
         )
         if not parser.check(TokenType.LEFT_BRACE):
-            self.condition = parse_expr(parser)
+            self.condition = parse_grouping(parser)
         else:
             self.condition = None
         self.block = BlockStmt(parser)
