@@ -10,6 +10,17 @@ print unit2 == unit2;
 print unit1 == unit2;
 print;
 
+print "Counting down:";
+
+var i = 10i;
+while (i > 0i) {
+    print str(i) + "...";
+    i = i - 1i;
+}
+
+print "Done!";
+print;
+
 struct Point {
     int x;
     int y;
