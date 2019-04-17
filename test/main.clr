@@ -27,8 +27,6 @@ manyInstance.c();
 val makeTwo = manyInstance.d;
 print "makeTwo() = " + str(makeTwo());
 manyInstance.displayMessage();
-print manyInstance.last;
-print str(manyInstance.last);
 print "last? " + str(manyInstance.last);
 print;
 
