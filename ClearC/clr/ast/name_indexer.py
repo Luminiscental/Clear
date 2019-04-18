@@ -225,4 +225,8 @@ class FunctionNameIndexer(NameIndexer):
                 if DEBUG:
                     print(f"upvalue candidate: {lookup}")
                 result = self.lookup_index(lookup)
+        # Update name lookup because upvalues don’t get added,
+        # so it’s needed here to avoid making a new upvalue
+        # for every reference to a variable.
+        self.scopes[self.level][name] = result
         return result
