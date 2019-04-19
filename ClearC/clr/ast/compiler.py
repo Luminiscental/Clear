@@ -3,7 +3,7 @@ from clr.values import OpCode, DEBUG
 from clr.assemble import assembled_size
 from clr.tokens import TokenType, token_info
 from clr.constants import ClrUint, Constants
-from clr.ast.index_annotations import IndexAnnotation, IndexAnnotationType
+from clr.ast.index_annotations import IndexAnnotationType, INDEX_OF_THIS
 from clr.ast.type_annotations import BUILTINS, VOID_TYPE
 from clr.ast.visitor import DeclVisitor
 from clr.ast.expression_nodes import IdentExpr
@@ -142,8 +142,6 @@ class Compiler(DeclVisitor):
         for method in node.methods.values():
             self._make_function(method)
             self.program.define_name(method.index_annotation)
-        # Index annotation for the instance, used for closing methods
-        result_index = IndexAnnotation(IndexAnnotationType.LOCAL, 0)
         # Create the constructor
         function = self.program.begin_function()
         field_count = len(node.fields)
@@ -156,7 +154,7 @@ class Compiler(DeclVisitor):
                 # There is a different index for referencing it from within the constructor
                 self.program.load_name(method.constructor_index_annotation)
                 # Close the method over the instance
-                self.program.make_closure([result_index])
+                self.program.make_closure(method.upvalues)
             else:
                 # If it's a field load its parameter
                 self.program.simple_op(OpCode.LOAD_PARAM)
@@ -166,9 +164,9 @@ class Compiler(DeclVisitor):
         self.program.simple_op(OpCode.STRUCT)
         self.program.simple_op(field_count)
         # Store the result as the instance local
-        self.program.define_name(result_index)
+        self.program.define_name(INDEX_OF_THIS)
         # Load it to return
-        self.program.load_name(result_index)
+        self.program.load_name(INDEX_OF_THIS)
         self.program.simple_op(OpCode.RETURN)
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)

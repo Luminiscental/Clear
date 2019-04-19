@@ -62,6 +62,7 @@ typedef struct sObjUpvalue {
 } ObjUpvalue;
 
 Value makeUpvalue(VM *vm, Value *slot);
+ObjUpvalue *makeClosedUpvalue(VM *vm, Value value);
 
 typedef struct sObjClosure {
 

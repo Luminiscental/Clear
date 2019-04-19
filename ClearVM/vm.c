@@ -915,19 +915,49 @@ InterpretResult run(VM *vm) {
 
                     if (upvalueKind == OP_LOAD_LOCAL) {
 
+#ifdef DEBUG_TRACE
+
+                        printf("---> OP_LOAD_LOCAL: ");
+                        printValue(frame->stack[index], true);
+
+#endif
+
                         closure->upvalues[i] = (ObjUpvalue *)captureUpvalue(
                                                    vm, frame->stack + index)
                                                    .as.obj;
 
                     } else if (upvalueKind == OP_LOAD_UPVALUE) {
 
+#ifdef DEBUG_TRACE
+
+                        printf("---> OP_LOAD_UPVALUE: ");
+                        printValue(*frame->closure->upvalues[index]->value,
+                                   true);
+
+#endif
+
                         closure->upvalues[i] = frame->closure->upvalues[index];
 
                     } else if (upvalueKind == OP_LOAD_PARAM) {
 
-                        closure->upvalues[i] = (ObjUpvalue *)captureUpvalue(
-                                                   vm, frame->params + index)
-                                                   .as.obj;
+#ifdef DEBUG_TRACE
+
+                        printf("---> OP_LOAD_PARAM: ");
+                        printValue(frame->params[index], true);
+
+#endif
+
+                        closure->upvalues[i] =
+                            makeClosedUpvalue(vm, frame->params[index]);
+
+                        // Parameters are closed straight away since they aren't
+                        // modifiable
+                        //
+                        // (otherwise would've been this, except there is a bug
+                        // with it) closure->upvalues[i] = (ObjUpvalue
+                        // *)captureUpvalue(
+                        //                           vm, frame->params + index)
+                        //                           .as.obj;
 
                     } else {
 

@@ -20,3 +20,8 @@ class IndexAnnotation:
 
     def __repr__(self):
         return f"IndexAnnotation(kind={self.kind}, value={self.value})"
+
+
+# Index within the constructor function of the produced instance,
+# used for indexing the `this` upvalue of methods
+INDEX_OF_THIS = IndexAnnotation(kind=IndexAnnotationType.LOCAL, value=0)

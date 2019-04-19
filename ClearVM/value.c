@@ -173,7 +173,16 @@ void printValue(Value value, bool endLine) {
 
                     // TODO: Maybe pretty print these?
                     // st: struct
-                    printf("<st %p>", value.as.obj);
+                    printf("<st %p> - ", value.as.obj);
+
+                    ObjStruct *structObj = (ObjStruct *)value.as.obj;
+
+                    for (size_t i = 0; i < structObj->fieldCount; i++) {
+
+                        printf("[ ");
+                        printValue(structObj->fields[i], false);
+                        printf(" ]");
+                    }
 
                 } break;
             }

@@ -238,6 +238,27 @@ Value makeUpvalue(VM *vm, Value *slot) {
     return result;
 }
 
+ObjUpvalue *makeClosedUpvalue(VM *vm, Value value) {
+
+    ObjUpvalue *upvalue = ALLOCATE_OBJ(vm, ObjUpvalue, OBJ_UPVALUE);
+
+    upvalue->closedValue = value;
+    upvalue->value = &upvalue->closedValue;
+    upvalue->next = NULL;
+
+    if (vm->openUpvalues == NULL) {
+
+        vm->openUpvalues = upvalue;
+
+    } else {
+
+        upvalue->next = vm->openUpvalues;
+        vm->openUpvalues = upvalue;
+    }
+
+    return upvalue;
+}
+
 Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount) {
 
     ObjClosure *closure = ALLOCATE_OBJ(vm, ObjClosure, OBJ_CLOSURE);

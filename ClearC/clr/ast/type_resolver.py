@@ -119,7 +119,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             args = "(" + ", ".join(map(str, passed_signature)) + ")"
             if passed_signature != function_type.signature:
                 emit_error(
-                    f"Could not find signature for function {token_info(node.target.name)} matching provided argument list {args}: `{node}`!"
+                    f"Could not find signature for function `{node.target}` matching provided argument list {args}: `{node}`!"
                 )()
             node.type_annotation = function_type.return_type
 

@@ -4,7 +4,11 @@ from clr.errors import emit_error
 from clr.tokens import token_info
 from clr.ast.expression_nodes import IdentExpr
 from clr.ast.visitor import StructTrackingDeclVisitor
-from clr.ast.index_annotations import IndexAnnotation, IndexAnnotationType
+from clr.ast.index_annotations import (
+    IndexAnnotation,
+    IndexAnnotationType,
+    INDEX_OF_THIS,
+)
 from clr.ast.type_annotations import BUILTINS
 
 
@@ -113,7 +117,7 @@ class NameIndexer(StructTrackingDeclVisitor):
 
     def visit_this_expr(self, node):
         super().visit_this_expr(node)
-        node.index_annotation = IndexAnnotation(IndexAnnotationType.UPVALUE, 0)
+        node.index_annotation = self.lookup_name("this")
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
@@ -130,10 +134,14 @@ class NameIndexer(StructTrackingDeclVisitor):
     def _index_function(self, node, is_method=False):
         # If it's a method we don't associate it with a name so that it doesn't override anything
         # and isn't accessible as its own object
-        node.index_annotation = (
-            self._declare_new() if is_method else self._declare_name(node.name.lexeme)
-        )
+        if not is_method:
+            node.index_annotation = self._declare_name(node.name.lexeme)
         function = FunctionNameIndexer(self, is_method)
+        if is_method:
+            function.scopes[function.level]["this"] = IndexAnnotation(
+                kind=IndexAnnotationType.UPVALUE, value=0
+            )
+            function.upvalues = [INDEX_OF_THIS]
         for _, name in node.params:
             function.add_param(name.lexeme)
         for decl in node.block.declarations:
@@ -150,17 +158,27 @@ class NameIndexer(StructTrackingDeclVisitor):
         self._index_function(node, is_method=True)
 
     def visit_struct_decl(self, node):
-        super().visit_struct_decl(node)
-        # Index the constructors references
-        function = FunctionNameIndexer(self)
+        # Declare the methods before the constructor as they are created before it when compiling
         for method in node.methods.values():
-            method.constructor_index_annotation = function.lookup_index(
+            method.index_annotation = self._declare_new()
+        # Declare the constructor before calling super() so that it can be referenced in methods
+        node.index_annotation = self._declare_name(node.name.lexeme)
+        # Call super(), visiting all the methods/fields
+        super().visit_struct_decl(node)
+        # Index the constructor's references
+        constructor = FunctionNameIndexer(self)
+        for method in node.methods.values():
+            # Method upvalues are actually closed in the constructor,
+            # so need indexed with the extra scope level accounted for.
+            method.upvalues = method.upvalues[0:1] + [
+                constructor.lookup_index(index) for index in method.upvalues[1:]
+            ]
+            # Similar for the actual index to get the method function object in the constructor
+            method.constructor_index_annotation = constructor.lookup_index(
                 method.index_annotation
             )
-        # Declare the constructor
-        node.index_annotation = self._declare_name(node.name.lexeme)
-        node.upvalues.extend(function.upvalues)
-        self.errors.extend(function.errors)
+        node.upvalues.extend(constructor.upvalues)
+        self.errors.extend(constructor.errors)
 
 
 class FunctionNameIndexer(NameIndexer):
@@ -182,21 +200,16 @@ class FunctionNameIndexer(NameIndexer):
         pair = (name, IndexAnnotation(kind=IndexAnnotationType.PARAM, value=index))
         self.params.append(pair)
 
-    def add_upvalue(self, index, name=""):
-        if self.is_method:
-            # TODO: Better reporting; maybe move to type resolver
-            emit_error(
-                f'Reference to value "{name}" is invalid within a method; methods can\'t have upvalues!'
-            )()
+    def add_upvalue(self, index):
         upvalue_index = len(self.upvalues)
         self.upvalues.append(index)
         return IndexAnnotation(IndexAnnotationType.UPVALUE, upvalue_index)
 
-    def lookup_index(self, index, name=""):
+    def lookup_index(self, index):
         if index.kind == IndexAnnotationType.GLOBAL:
             # Globals can be referenced normally
             return index
-        return self.add_upvalue(index, name)
+        return self.add_upvalue(index)
 
     def lookup_name(self, name):
         result = super().lookup_name(name)
@@ -211,5 +224,5 @@ class FunctionNameIndexer(NameIndexer):
             if lookup.kind != IndexAnnotationType.UNRESOLVED:
                 if DEBUG:
                     print(f"upvalue candidate: {lookup}")
-                result = self.lookup_index(lookup, name)
+                result = self.lookup_index(lookup)
         return result
