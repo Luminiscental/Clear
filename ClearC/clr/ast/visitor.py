@@ -83,7 +83,8 @@ class StmtVisitor(ExprVisitor):
         node.value.accept(self)
 
     def visit_ret_stmt(self, node):
-        node.value.accept(self)
+        if node.value is not None:
+            node.value.accept(self)
 
     def visit_while_stmt(self, node):
         if node.condition is not None:

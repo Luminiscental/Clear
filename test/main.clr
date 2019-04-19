@@ -78,15 +78,19 @@ func secondCallback(Event event) void {
 }
 
 func keyHandler(Event event) void {
-    if (event.type == EVENT_TYPE_KEY) {
-        print "Key Event: [" + str(event.value) + "]";
+    if (event.type != EVENT_TYPE_KEY) {
+        return;
     }
+
+    print "Key Event: [" + str(event.value) + "]";
 }
 
 func mouseHandler(Event event) void {
-    if (event.type == EVENT_TYPE_MOUSE) {
-        print "Mouse Event: [" + str(event.value) + "]";
+    if (event.type != EVENT_TYPE_MOUSE) {
+        return;
     }
+
+    print "Mouse Event: [" + str(event.value) + "]";
 }
 
 val dispatcher = EventDispatcher { dispatch=firstCallback }

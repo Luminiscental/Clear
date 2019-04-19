@@ -66,11 +66,14 @@ class RetStmt(StmtNode):
             TokenType.RETURN, parse_error("Expected return statement!", parser)
         )
         self.return_token = parser.get_prev()
-        self.value = parse_expr(parser)
-        parser.consume(
-            TokenType.SEMICOLON,
-            parse_error("Expected semicolon after return statement!", parser),
-        )
+        if not parser.match(TokenType.SEMICOLON):
+            self.value = parse_expr(parser)
+            parser.consume(
+                TokenType.SEMICOLON,
+                parse_error("Expected semicolon after return statement!", parser),
+            )
+        else:
+            self.value = None
 
     @sync_errors
     def accept(self, stmt_visitor):

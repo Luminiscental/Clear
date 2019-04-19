@@ -216,7 +216,10 @@ class Compiler(DeclVisitor):
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
-        self.program.simple_op(OpCode.RETURN)
+        if node.value is None:
+            self.program.simple_op(OpCode.RETURN_VOID)
+        else:
+            self.program.simple_op(OpCode.RETURN)
 
     def visit_expr_stmt(self, node):
         super().visit_expr_stmt(node)

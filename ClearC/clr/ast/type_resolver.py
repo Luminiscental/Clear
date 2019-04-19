@@ -305,14 +305,20 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Return statement found outside of function {token_info(node.return_token)}!"
             )()
         expected = self.expected_returns[-1]
-        if expected == VOID_TYPE:
-            emit_error(
-                f"Return statement found in void function {token_info(node.return_token)}!"
-            )()
-        if expected != node.value.type_annotation:
-            emit_error(
-                f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation} at {token_info(node.return_token)}!"
-            )()
+        if node.value is None:
+            if expected != VOID_TYPE:
+                emit_error(
+                    f"Missing return value for return statement in non-void function {token_info(node.return_token)}!"
+                )
+        else:
+            if expected == VOID_TYPE:
+                emit_error(
+                    f"Return statement found in void function {token_info(node.return_token)}!"
+                )()
+            if expected != node.value.type_annotation:
+                emit_error(
+                    f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation} at {token_info(node.return_token)}!"
+                )()
         node.return_annotation = ReturnAnnotation(ReturnAnnotationType.ALWAYS, expected)
 
     def visit_while_stmt(self, node):
