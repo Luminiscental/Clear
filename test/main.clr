@@ -46,13 +46,39 @@
 // -----------------------------------------------
 // First-class functions / struct usage e.t.c.
 
+struct Timer {
+    str blockName,
+    num startTime,
+
+    func endBlock() void {
+        val endTime = clock();
+        val dt = endTime - this.startTime;
+
+        print "[" + this.blockName + "] Finished in " + str(dt) + "s";
+    }
+}
+
+
+func startBlock(str name) Timer {
+    return Timer {
+        blockName=name,
+        startTime=clock()
+    };
+}
+
+var timer = startBlock("Event struct declaration");
+
 struct Event {
     int type,
     int value
 }
 
+timer.endBlock();
+
 val EVENT_TYPE_KEY = 0i;
 val EVENT_TYPE_MOUSE = 1i;
+
+timer = startBlock("EventDispatcher struct declaration");
 
 struct EventDispatcher {
     func(Event) void dispatch,
@@ -69,9 +95,15 @@ struct EventDispatcher {
     }
 }
 
+timer.endBlock();
+
+timer = startBlock("Make simple first callback");
+
 func firstCallback(Event event) void {
     print "first!";
 }
+
+timer.endBlock();
 
 func secondCallback(Event event) void {
     print "second!";
@@ -93,13 +125,22 @@ func mouseHandler(Event event) void {
     print "Mouse Event: [" + str(event.value) + "]";
 }
 
+timer = startBlock("Make EventDispatcher with 4 subscribers");
+
 val dispatcher = EventDispatcher { dispatch=firstCallback }
     .subscribe(secondCallback)
     .subscribe(keyHandler)
     .subscribe(mouseHandler);
 
+timer.endBlock();
+
 val testEvent = Event { type=EVENT_TYPE_KEY, value=7i };
+
+timer = startBlock("Dispatch test event");
+
 dispatcher.dispatch(testEvent);
+
+timer.endBlock();
 
 func dispatchMouseEvent(int value) void {
     val event = Event { type=EVENT_TYPE_MOUSE, value=value };

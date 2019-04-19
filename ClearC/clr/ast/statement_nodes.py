@@ -250,6 +250,8 @@ class StructDecl(DeclNode):
             TokenType.IDENTIFIER, parse_error("Expected struct name!", parser)
         )
         self.name = parser.get_prev()
+        if self.name.lexeme in BUILTINS:
+            emit_error(f"Invalid struct name {token_info(self.name)}, this is reserved for the built-in function {self.name.lexeme}()")()
         self.fields = []
         self.methods = {}
         # Upvalues for the constructor
