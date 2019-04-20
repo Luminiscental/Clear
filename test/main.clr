@@ -2,6 +2,23 @@
 // TODO: Actual tests !!!
 
 // -----------------------------------------------
+// Recursive and Higher Order Functions:
+
+func makeFac() func(int) int {
+    func fac(int n) int {
+        if (n <= 0i) {
+            return 1i;
+        }
+        return n * fac(n - 1i);
+    }
+
+    return fac;
+}
+
+print "10! = " + str(makeFac()(10i));
+print;
+
+// -----------------------------------------------
 // Optional Types:
 
 struct LinkedListInt {

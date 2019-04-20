@@ -629,7 +629,10 @@ InterpretResult run(VM *vm) {
 
                 } else if (index < frame->stackTop - frame->stack) {
 
+                    // Preserve memory of upvalues pointing here when modifying
+                    ObjUpvalue *refs = frame->stack[index].references;
                     frame->stack[index] = val;
+                    frame->stack[index].references = refs;
 
                 } else {
 
@@ -881,6 +884,12 @@ InterpretResult run(VM *vm) {
 
 #endif
 
+                        if (index >= frame->localState.localIndex) {
+
+                            printf("|| Local upvalue out of range!\n");
+                            return INTERPRET_ERR;
+                        }
+
                         closure->upvalues[i] =
                             (ObjUpvalue *)makeUpvalue(vm, frame->stack + index)
                                 .as.obj;
@@ -895,6 +904,12 @@ InterpretResult run(VM *vm) {
 
 #endif
 
+                        if (index >= frame->closure->upvalueCount) {
+
+                            printf("|| Upvalue to copy out of range!\n");
+                            return INTERPRET_ERR;
+                        }
+
                         closure->upvalues[i] = frame->closure->upvalues[index];
 
                     } else if (upvalueKind == OP_LOAD_PARAM) {
@@ -905,6 +920,12 @@ InterpretResult run(VM *vm) {
                         printValue(frame->params[index], true);
 
 #endif
+
+                        if (index >= frame->arity) {
+
+                            printf("|| Parameter upvalue out of range!\n");
+                            return INTERPRET_ERR;
+                        }
 
                         closure->upvalues[i] =
                             makeClosedUpvalue(vm, frame->params[index]);

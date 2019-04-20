@@ -132,6 +132,10 @@ class Compiler(DeclVisitor):
     def visit_func_decl(self, node):
         # No super as we handle scoping
         self._make_function(node)
+        # Store the function object as a local to close over
+        self.program.define_name(node.index_annotation)
+        # Close the function
+        self.program.load_name(node.index_annotation)
         self.program.make_closure(node.upvalues)
         # Define the function as the closure value
         self.program.define_name(node.index_annotation)
