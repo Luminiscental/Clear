@@ -149,12 +149,8 @@ class Compiler(DeclVisitor):
         param_index = len([i for i in range(field_count) if i not in node.methods]) - 1
         for i in reversed(range(field_count)):
             if i in node.methods:
-                # If it's a method load the method and close it
-                method = node.methods[i]
-                # There is a different index for referencing it from within the constructor
-                self.program.load_name(method.constructor_index_annotation)
-                # Close the method over the instance
-                self.program.make_closure(method.upvalues)
+                # If it's a method temporarily put a dummy value until the struct is created
+                self.program.simple_op(OpCode.FALSE)
             else:
                 # If it's a field load its parameter
                 self.program.simple_op(OpCode.LOAD_PARAM)
@@ -165,7 +161,19 @@ class Compiler(DeclVisitor):
         self.program.simple_op(field_count)
         # Store the result as the instance local
         self.program.define_name(INDEX_OF_THIS)
-        # Load it to return
+        # Patch in and close all the methods
+        for i in reversed(range(field_count)):
+            if i in node.methods:
+                method = node.methods[i]
+                # Load the instance for the later SET_FIELD op
+                self.program.load_name(INDEX_OF_THIS)
+                # Close the method
+                self.program.load_name(method.constructor_index_annotation)
+                self.program.make_closure(method.upvalues)
+                # Put it in the field
+                self.program.simple_op(OpCode.SET_FIELD)
+                self.program.simple_op(i)
+        # Load the struct to return
         self.program.load_name(INDEX_OF_THIS)
         self.program.simple_op(OpCode.RETURN)
         self.program.end_function(function)

@@ -79,8 +79,6 @@ typedef struct sVM {
     Obj *objects;
     GlobalState globalState;
 
-    ObjUpvalue *openUpvalues;
-
     CallFrame frames[FRAMES_MAX];
     size_t frameDepth;
 

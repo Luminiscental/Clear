@@ -143,60 +143,16 @@ static InterpretResult call(VM *vm, ObjClosure *closure, uint8_t arity) {
     return INTERPRET_OK;
 }
 
-static Value captureUpvalue(VM *vm, Value *local) {
+static void closeUpvalues(Value *value) {
 
-    if (vm->openUpvalues == NULL) {
+    while (value->references != NULL) {
 
-        Value result = makeUpvalue(vm, local);
-        vm->openUpvalues = (ObjUpvalue *)result.as.obj;
-
-        return result;
-    }
-
-    ObjUpvalue *prevUpvalue = NULL;
-    ObjUpvalue *upvalue = vm->openUpvalues;
-
-    while (upvalue != NULL && upvalue->value > local) {
-
-        prevUpvalue = upvalue;
-        upvalue = upvalue->next;
-    }
-
-    if (upvalue != NULL && upvalue->value == local) {
-
-        Value result;
-
-        result.type = VAL_OBJ;
-        result.as.obj = (Obj *)upvalue;
-
-        return result;
-    }
-
-    Value result = makeUpvalue(vm, local);
-    ObjUpvalue *created = (ObjUpvalue *)result.as.obj;
-
-    if (prevUpvalue == NULL) {
-
-        vm->openUpvalues = created;
-
-    } else {
-
-        prevUpvalue->next = created;
-    }
-
-    return result;
-}
-
-static void closeUpvalues(VM *vm, Value *last) {
-
-    while (vm->openUpvalues != NULL && vm->openUpvalues->value >= last) {
-
-        ObjUpvalue *upvalue = vm->openUpvalues;
+        ObjUpvalue *upvalue = value->references;
 
         upvalue->closedValue = *upvalue->value;
         upvalue->value = &upvalue->closedValue;
 
-        vm->openUpvalues = upvalue->next;
+        value->references = upvalue->next;
     }
 }
 
@@ -210,6 +166,11 @@ static InterpretResult returnFromFrame(VM *vm, CallFrame *frame,
         return INTERPRET_ERR;
     }
 
+    while (frame->stackTop > frame->stack) {
+
+        pop(frame, NULL);
+    }
+
     if (vm->frameDepth == 0) {
 
         printf("|| Stack underflow! Cannot return from global "
@@ -218,11 +179,6 @@ static InterpretResult returnFromFrame(VM *vm, CallFrame *frame,
     }
 
     CallFrame *caller = &vm->frames[vm->frameDepth - 1];
-
-    // Close any upvalues left in the function frame
-    closeUpvalues(vm, frame->stack);
-    // Close any upvalues of the parameters
-    closeUpvalues(vm, caller->stackTop - frame->arity);
 
     for (size_t index = 0; index <= frame->arity; index++) {
 
@@ -248,7 +204,6 @@ static InterpretResult returnFromFrame(VM *vm, CallFrame *frame,
 void initVM(VM *vm) {
 
     vm->objects = NULL;
-    vm->openUpvalues = NULL;
 
     initTable(&vm->strings);
     initGlobalState(&vm->globalState);
@@ -286,6 +241,8 @@ InterpretResult pop(CallFrame *frame, Value *out) {
 
         if (out != NULL)
             *out = *popped;
+
+        closeUpvalues(popped);
 
         return INTERPRET_OK;
     }
@@ -564,8 +521,6 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                closeUpvalues(vm, frame->stackTop - popped);
-
                 for (size_t i = 0; i < popped; i++) {
 
                     if (pop(frame, NULL) != INTERPRET_OK) {
@@ -634,7 +589,7 @@ InterpretResult run(VM *vm) {
                 if (getGlobal(&vm->globalState, index, &value) !=
                     INTERPRET_OK) {
 
-                    printf("|| Undefined identifier!\n");
+                    printf("|| Undefined global %d!\n", index);
                     return INTERPRET_ERR;
                 }
 
@@ -926,9 +881,9 @@ InterpretResult run(VM *vm) {
 
 #endif
 
-                        closure->upvalues[i] = (ObjUpvalue *)captureUpvalue(
-                                                   vm, frame->stack + index)
-                                                   .as.obj;
+                        closure->upvalues[i] =
+                            (ObjUpvalue *)makeUpvalue(vm, frame->stack + index)
+                                .as.obj;
 
                     } else if (upvalueKind == OP_LOAD_UPVALUE) {
 
@@ -956,12 +911,6 @@ InterpretResult run(VM *vm) {
 
                         // Parameters are closed straight away since they aren't
                         // modifiable
-                        //
-                        // (otherwise would've been this, except there is a bug
-                        // with it) closure->upvalues[i] = (ObjUpvalue
-                        // *)captureUpvalue(
-                        //                           vm, frame->params + index)
-                        //                           .as.obj;
 
                     } else {
 

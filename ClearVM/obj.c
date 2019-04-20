@@ -88,7 +88,7 @@ Value makeStringFromLiteral(VM *vm, const char *string) {
         return interned->key;
     }
 
-    Value result;
+    Value result = {};
 
     char *copyStr = ALLOCATE(char, length + 1);
     strcpy(copyStr, string);
@@ -175,7 +175,7 @@ Value makeString(VM *vm, size_t length, char *string) {
         return interned->key;
     }
 
-    Value result;
+    Value result = {};
 
     ObjString *stringObj = allocateString(vm, length, string);
 
@@ -213,7 +213,7 @@ Value makeFunction(VM *vm, uint8_t *code, size_t size) {
     objFunc->size = size;
     objFunc->ip = code;
 
-    Value result;
+    Value result = {};
 
     result.type = VAL_OBJ;
     result.hash = (size_t)objFunc;
@@ -226,10 +226,12 @@ Value makeUpvalue(VM *vm, Value *slot) {
 
     ObjUpvalue *upvalue = ALLOCATE_OBJ(vm, ObjUpvalue, OBJ_UPVALUE);
 
+    upvalue->next = slot->references;
     upvalue->value = slot;
-    upvalue->next = NULL;
 
-    Value result;
+    slot->references = upvalue;
+
+    Value result = {};
 
     result.type = VAL_OBJ;
     result.hash = (size_t)upvalue;
@@ -245,16 +247,6 @@ ObjUpvalue *makeClosedUpvalue(VM *vm, Value value) {
     upvalue->closedValue = value;
     upvalue->value = &upvalue->closedValue;
     upvalue->next = NULL;
-
-    if (vm->openUpvalues == NULL) {
-
-        vm->openUpvalues = upvalue;
-
-    } else {
-
-        upvalue->next = vm->openUpvalues;
-        vm->openUpvalues = upvalue;
-    }
 
     return upvalue;
 }
@@ -272,7 +264,7 @@ Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount) {
         closure->upvalues[i] = NULL;
     }
 
-    Value result;
+    Value result = {};
 
     result.type = VAL_OBJ;
     result.hash = (size_t)closure;
@@ -288,7 +280,7 @@ Value makeStruct(VM *vm, Value *fields, size_t fieldCount) {
     objStruct->fields = fields;
     objStruct->fieldCount = fieldCount;
 
-    Value result;
+    Value result = {};
 
     result.type = VAL_OBJ;
     result.hash = (size_t)objStruct;

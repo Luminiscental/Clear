@@ -7,6 +7,7 @@ typedef struct sVM VM;
 typedef enum eObjType ObjType;
 typedef struct sObj Obj;
 typedef struct sObjString ObjString;
+typedef struct sObjUpvalue ObjUpvalue;
 
 #define NUMBER_PRECISION 0.0000001
 #define NUMBER_PLACES 7
@@ -24,6 +25,7 @@ typedef struct {
 
     ValueType type;
     uint32_t hash;
+    ObjUpvalue *references;
 
     union {
 

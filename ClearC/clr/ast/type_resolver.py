@@ -465,9 +465,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         this_token = Token(token_type=TokenType.THIS, lexeme="this", line=-1)
         prefixed_block = []
         for _, field_name in struct.fields:
-            if field_name.lexeme in map(
-                lambda _, param_name: param_name.lexeme, node.params
-            ):
+            if field_name.lexeme in map(lambda pair: pair[1].lexeme, node.params):
                 continue
             name_token = Token(
                 token_type=TokenType.IDENTIFIER, lexeme=field_name.lexeme, line=-1

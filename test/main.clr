@@ -142,7 +142,7 @@ struct EventDispatcher {
 
     func subscribe(func(Event) void subscriber) EventDispatcher {
         func combinedDispatch(Event event) void {
-            this.dispatch(event); // TODO: Fix implicit declarations to not interfere with closure
+            dispatch(event);
             subscriber(event);
         }
 

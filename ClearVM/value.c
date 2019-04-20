@@ -10,7 +10,7 @@
 
 Value makeInteger(int32_t integer) {
 
-    Value result;
+    Value result = {};
 
     result.type = VAL_INTEGER;
     result.hash = integer;
@@ -21,7 +21,7 @@ Value makeInteger(int32_t integer) {
 
 Value makeBoolean(bool boolean) {
 
-    Value result;
+    Value result = {};
 
     result.type = VAL_BOOL;
     result.hash = boolean ? 1 : 0;
@@ -32,7 +32,7 @@ Value makeBoolean(bool boolean) {
 
 Value makeNumber(double number) {
 
-    Value result;
+    Value result = {};
 
     result.type = VAL_NUMBER;
     result.hash = *((uint32_t *)&number);
