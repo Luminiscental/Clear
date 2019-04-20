@@ -5,6 +5,7 @@
 // Recursive and Higher Order Functions:
 
 func makeFac() func(int) int {
+
     func fac(int n) int {
         if (n <= 0i) {
             return 1i;
@@ -28,23 +29,24 @@ struct LinkedListInt {
     func to_str() str {
         return str(value) + next? ", " + next.to_str() : "";
     }
+
+    func push(int value) LinkedListInt {
+        return LinkedListInt {
+            value=value,
+            next=this
+        };
+    }
 }
 
-val test = LinkedListInt {
-    value=2i,
-    next=LinkedListInt {
-        value=3i,
-        next=LinkedListInt {
-            value=-1i,
-            next=LinkedListInt {
-                value=7i,
-                next=nil
-            }
-        }
-    }
-};
+val testList = LinkedListInt { value=2i, next=nil }
+    .push(3i)
+    .push(-1i)
+    .push(7i)
+    .push(25i)
+    .push(makeFac()(7i))
+    .push(-12i);
 
-print "List: " + test.to_str();
+print "List: " + testList.to_str();
 print;
 
 // -----------------------------------------------
