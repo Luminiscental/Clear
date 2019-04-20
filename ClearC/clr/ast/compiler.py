@@ -276,6 +276,21 @@ class Compiler(DeclVisitor):
             emit_error(f"Unknown binary operator! {token_info(node.operator)}"),
         )()
 
+    def visit_unpack_expr(self, node):
+        # No super as we need the jumps in the right place
+        node.target.accept(self)
+        # If the target isn't present jump to the default case
+        jump_to_default = self.program.begin_jump(conditional=True)
+        # Otherwise load the present value
+        node.present_value.accept(self)
+        # Then skip past the default block, leaving the present value on the stack
+        jump_past_default = self.program.begin_jump(conditional=False)
+        # Start the default block
+        self.program.end_jump(jump_to_default, leave_value=False)
+        node.default_value.accept(self)
+        # End the default block, keeping the value of the present case when the default is skipped
+        self.program.end_jump(jump_past_default, leave_value=True)
+
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
             # Don't call super if it's a built-in because we don't want to evaluate the name
@@ -312,9 +327,12 @@ class Compiler(DeclVisitor):
         super().visit_boolean_expr(node)
         self.program.simple_op(OpCode.TRUE if node.value else OpCode.FALSE)
 
-    def visit_this_expr(self, node):
-        super().visit_this_expr(node)
-        self.program.load_name(node.index_annotation)
+    def visit_keyword_expr(self, node):
+        super().visit_keyword_expr(node)
+        if node.token.token_type == TokenType.THIS:
+            self.program.load_name(node.index_annotation)
+        elif node.token.token_type == TokenType.NIL:
+            self.program.simple_op(OpCode.FALSE)
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)

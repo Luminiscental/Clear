@@ -9,36 +9,40 @@ from clr.ast.type_nodes import FunctionType, parse_type
 
 def parse_stmt(parser):
     if parser.check(TokenType.PRINT):
-        return PrintStmt(parser)
+        return PrintStmt.parse(parser)
     if parser.check(TokenType.LEFT_BRACE):
-        return BlockStmt(parser)
+        return BlockStmt.parse(parser)
     if parser.check(TokenType.IF):
-        return IfStmt(parser)
+        return IfStmt.parse(parser)
     if parser.check(TokenType.WHILE):
-        return WhileStmt(parser)
+        return WhileStmt.parse(parser)
     if parser.check(TokenType.RETURN):
-        return RetStmt(parser)
-    return ExprStmt(parser)
+        return RetStmt.parse(parser)
+    return ExprStmt.parse(parser)
 
 
 class StmtNode:  # pylint: disable=too-few-public-methods
-    def __init__(self, parser):
+    def __init__(self):
         self.return_annotation = ReturnAnnotation()
-        self.first_token = parser.get_current()
         self.type_annotation = TypeAnnotation()
 
 
 class BlockStmt(StmtNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, declarations):
+        super().__init__()
+        self.declarations = declarations
+
+    @staticmethod
+    def parse(parser):
         parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
         opener = parser.get_prev()
-        self.declarations = []
+        declarations = []
         while not parser.match(TokenType.RIGHT_BRACE):
             if parser.match(TokenType.EOF):
                 emit_error(f"Unclosed block! {token_info(opener)}")()
             decl = parse_decl(parser)
-            self.declarations.append(decl)
+            declarations.append(decl)
+        return BlockStmt(declarations)
 
     @sync_errors
     def accept(self, stmt_visitor):
@@ -46,13 +50,18 @@ class BlockStmt(StmtNode):
 
 
 class ExprStmt(StmtNode):
-    def __init__(self, parser):
-        super().__init__(parser)
-        self.value = parse_expr(parser)
+    def __init__(self, value):
+        super().__init__()
+        self.value = value
+
+    @staticmethod
+    def parse(parser):
+        value = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
             parse_error("Expected semicolon to end expression statement!", parser),
         )
+        return ExprStmt(value)
 
     @sync_errors
     def accept(self, stmt_visitor):
@@ -60,20 +69,26 @@ class ExprStmt(StmtNode):
 
 
 class RetStmt(StmtNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, return_token, value):
+        super().__init__()
+        self.return_token = return_token
+        self.value = value
+
+    @staticmethod
+    def parse(parser):
         parser.consume(
             TokenType.RETURN, parse_error("Expected return statement!", parser)
         )
-        self.return_token = parser.get_prev()
+        return_token = parser.get_prev()
         if not parser.match(TokenType.SEMICOLON):
-            self.value = parse_expr(parser)
+            value = parse_expr(parser)
             parser.consume(
                 TokenType.SEMICOLON,
                 parse_error("Expected semicolon after return statement!", parser),
             )
         else:
-            self.value = None
+            value = None
+        return RetStmt(return_token, value)
 
     @sync_errors
     def accept(self, stmt_visitor):
@@ -81,17 +96,23 @@ class RetStmt(StmtNode):
 
 
 class WhileStmt(StmtNode):
-    def __init__(self, parser):
-        # TODO: Break statements
-        super().__init__(parser)
+    def __init__(self, condition, block):
+        super().__init__()
+        self.condition = condition
+        self.block = block
+
+    @staticmethod
+    def parse(parser):
+        # TODO: Break statements, for loops
         parser.consume(
             TokenType.WHILE, parse_error("Expected while statement!", parser)
         )
         if not parser.check(TokenType.LEFT_BRACE):
-            self.condition = parse_grouping(parser)
+            condition = parse_grouping(parser)
         else:
-            self.condition = None
-        self.block = BlockStmt(parser)
+            condition = None
+        block = BlockStmt.parse(parser)
+        return WhileStmt(condition, block)
 
     @sync_errors
     def accept(self, stmt_visitor):
@@ -99,19 +120,25 @@ class WhileStmt(StmtNode):
 
 
 class IfStmt(StmtNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, checks, otherwise):
+        super().__init__()
+        self.checks = checks
+        self.otherwise = otherwise
+
+    @staticmethod
+    def parse(parser):
         parser.consume(TokenType.IF, parse_error("Expected if statement!", parser))
-        self.checks = [(parse_grouping(parser), BlockStmt(parser))]
-        self.otherwise = None
+        checks = [(parse_grouping(parser), BlockStmt.parse(parser))]
+        otherwise = None
         while parser.match(TokenType.ELSE):
             if parser.match(TokenType.IF):
                 other_cond = parse_grouping(parser)
-                other_block = BlockStmt(parser)
-                self.checks.append((other_cond, other_block))
+                other_block = BlockStmt.parse(parser)
+                checks.append((other_cond, other_block))
             else:
-                self.otherwise = BlockStmt(parser)
+                otherwise = BlockStmt.parse(parser)
                 break
+        return IfStmt(checks, otherwise)
 
     @sync_errors
     def accept(self, stmt_visitor):
@@ -119,19 +146,24 @@ class IfStmt(StmtNode):
 
 
 class PrintStmt(StmtNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, value):
+        super().__init__()
+        self.value = value
+
+    @staticmethod
+    def parse(parser):
         parser.consume(
             TokenType.PRINT, parse_error("Expected print statement!", parser)
         )
         if not parser.match(TokenType.SEMICOLON):
-            self.value = parse_expr(parser)
+            value = parse_expr(parser)
             parser.consume(
                 TokenType.SEMICOLON,
                 parse_error("Expected semicolon for print statement!", parser),
             )
         else:
-            self.value = None
+            value = None
+        return PrintStmt(value)
 
     @sync_errors
     def accept(self, stmt_visitor):
@@ -141,11 +173,11 @@ class PrintStmt(StmtNode):
 def parse_decl(parser):
     try:
         if parser.check_one(VAL_TOKENS):
-            return ValDecl(parser)
+            return ValDecl.parse(parser)
         if parser.check(TokenType.FUNC):
-            return FuncDecl(parser)
+            return FuncDecl.parse(parser)
         if parser.check(TokenType.STRUCT):
-            return StructDecl(parser)
+            return StructDecl.parse(parser)
         return parse_stmt(parser)
     except ClrCompileError as error:
         if not parser.match(TokenType.EOF):
@@ -154,36 +186,43 @@ def parse_decl(parser):
 
 
 class DeclNode(StmtNode):  # pylint: disable=too-few-public-methods
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self):
+        super().__init__()
         self.index_annotation = IndexAnnotation()
 
 
 class ValDecl(DeclNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, mutable, name, initializer):
+        super().__init__()
+        self.mutable = mutable
+        self.name = name
+        self.initializer = initializer
+
+    @staticmethod
+    def parse(parser):
         parser.consume_one(
             VAL_TOKENS, parse_error("Expected value declaration!", parser)
         )
-        self.mutable = parser.get_prev().token_type == TokenType.VAR
+        mutable = parser.get_prev().token_type == TokenType.VAR
         # Consume the variable name
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
         )
-        self.name = parser.get_prev()
-        if self.name.lexeme in BUILTINS:
+        name = parser.get_prev()
+        if name.lexeme in BUILTINS:
             emit_error(
-                f"Invalid identifier name {self.name.lexeme}! This is reserved for the built-in function {self.name.lexeme}(). {token_info(self.name)}"
+                f"Invalid identifier name {name.lexeme}! This is reserved for the built-in function {name.lexeme}(). {token_info(name)}"
             )()
         parser.consume(
             TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
         )
         # Consume the expression to initialize with
-        self.initializer = parse_expr(parser)
+        initializer = parse_expr(parser)
         parser.consume(
             TokenType.SEMICOLON,
             parse_error("Expected semicolon after value declaration!", parser),
         )
+        return ValDecl(mutable, name, initializer)
 
     @sync_errors
     def accept(self, decl_visitor):
@@ -191,8 +230,16 @@ class ValDecl(DeclNode):
 
 
 class FuncDecl(DeclNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, name, params, return_type, block):
+        super().__init__()
+        self.name = name
+        self.params = params
+        self.return_type = return_type
+        self.block = block
+        self.upvalues = []
+
+    @staticmethod
+    def parse(parser):
         parser.consume(
             TokenType.FUNC, parse_error("Expected function declaration!", parser)
         )
@@ -200,16 +247,16 @@ class FuncDecl(DeclNode):
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected function name!", parser)
         )
-        self.name = parser.get_prev()
-        if self.name.lexeme in BUILTINS:
+        name = parser.get_prev()
+        if name.lexeme in BUILTINS:
             emit_error(
-                f"Invalid identifier name {self.name.lexeme}! This is reserved for the built-in function {self.name.lexeme}(). {token_info(self.name)}"
+                f"Invalid identifier name {name.lexeme}! This is reserved for the built-in function {name.lexeme}(). {token_info(name)}"
             )()
         parser.consume(
             TokenType.LEFT_PAREN,
             parse_error("Expected '(' to start function parameters!", parser),
         )
-        self.params = []
+        params = []
         # Consume parameters until we hit the closing paren
         while not parser.match(TokenType.RIGHT_PAREN):
             # Consume a type for the parameter
@@ -221,7 +268,7 @@ class FuncDecl(DeclNode):
             param_name = parser.get_prev()
             # Append the parameters as (type, name) tuples
             pair = (param_type, param_name)
-            self.params.append(pair)
+            params.append(pair)
             # If we haven't hit the end there must be a comma before the next parameter
             if not parser.check(TokenType.RIGHT_PAREN):
                 parser.consume(
@@ -229,10 +276,10 @@ class FuncDecl(DeclNode):
                     parse_error("Expected comma to delimit parameters!", parser),
                 )
         # Consume the return type
-        self.return_type = parse_type(parser)
+        return_type = parse_type(parser)
         # Consume the definition block
-        self.block = BlockStmt(parser)
-        self.upvalues = []
+        block = BlockStmt.parse(parser)
+        return FuncDecl(name, params, return_type, block)
 
     @sync_errors
     def accept(self, decl_visitor):
@@ -240,8 +287,16 @@ class FuncDecl(DeclNode):
 
 
 class StructDecl(DeclNode):
-    def __init__(self, parser):
-        super().__init__(parser)
+    def __init__(self, name, fields, methods):
+        super().__init__()
+        self.name = name
+        self.fields = fields
+        self.methods = methods
+        # Upvalues for the constructor
+        self.upvalues = []
+
+    @staticmethod
+    def parse(parser):
         parser.consume(
             TokenType.STRUCT, parse_error("Expected struct declaration!", parser)
         )
@@ -249,13 +304,13 @@ class StructDecl(DeclNode):
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected struct name!", parser)
         )
-        self.name = parser.get_prev()
-        if self.name.lexeme in BUILTINS:
-            emit_error(f"Invalid struct name {token_info(self.name)}, this is reserved for the built-in function {self.name.lexeme}()")()
-        self.fields = []
-        self.methods = {}
-        # Upvalues for the constructor
-        self.upvalues = []
+        name = parser.get_prev()
+        if name.lexeme in BUILTINS:
+            emit_error(
+                f"Invalid struct name {token_info(name)}, this is reserved for the built-in function {name.lexeme}()"
+            )()
+        fields = []
+        methods = {}
         parser.consume(
             TokenType.LEFT_BRACE, parse_error("Expected struct body!", parser)
         )
@@ -264,14 +319,14 @@ class StructDecl(DeclNode):
             # Check if it's a method
             if parser.check(TokenType.FUNC) and parser.check_then(TokenType.IDENTIFIER):
                 # Parse the function
-                func_decl = FuncDecl(parser)
+                func_decl = FuncDecl.parse(parser)
                 # Put the declaration for the method in self.methods as the value for this field's index
-                self.methods[len(self.fields)] = func_decl
+                methods[len(fields)] = func_decl
                 # Create a field for the method of the right type and name
                 param_types = [param_type for (param_type, _) in func_decl.params]
                 func_type = FunctionType(param_types, func_decl.return_type)
                 func_pair = (func_type, func_decl.name)
-                self.fields.append(func_pair)
+                fields.append(func_pair)
             else:
                 # Consume a type for the field
                 field_type = parse_type(parser)
@@ -288,7 +343,8 @@ class StructDecl(DeclNode):
                     )
                 # Append the fields as (type, name) tuples
                 pair = (field_type, field_name)
-                self.fields.append(pair)
+                fields.append(pair)
+        return StructDecl(name, fields, methods)
 
     @sync_errors
     def accept(self, decl_visitor):

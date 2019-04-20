@@ -1,7 +1,7 @@
 from collections import OrderedDict, defaultdict
 from clr.values import DEBUG
 from clr.errors import emit_error
-from clr.tokens import token_info
+from clr.tokens import TokenType, token_info
 from clr.ast.expression_nodes import IdentExpr
 from clr.ast.visitor import StructTrackingDeclVisitor
 from clr.ast.index_annotations import (
@@ -115,9 +115,10 @@ class NameIndexer(StructTrackingDeclVisitor):
             sorted(node.args.items(), key=lambda arg: field_names[arg[0]])
         )
 
-    def visit_this_expr(self, node):
-        super().visit_this_expr(node)
-        node.index_annotation = self.lookup_name("this")
+    def visit_keyword_expr(self, node):
+        super().visit_keyword_expr(node)
+        if node.token.token_type == TokenType.THIS:
+            node.index_annotation = self.lookup_name("this")
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)

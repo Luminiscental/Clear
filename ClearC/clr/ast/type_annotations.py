@@ -9,8 +9,10 @@ class TypeAnnotationType(Enum):
     STR = "str"
     BOOL = "bool"
     FUNCTION = "<function>"
+    OPTIONAL = "<optional>"
     IDENTIFIER = "<identifier>"
     VOID = "<void>"
+    NIL = "<nil>"
     UNRESOLVED = "<unresolved>"
 
     def __repr__(self):
@@ -32,6 +34,13 @@ class TypeAnnotation:
             return False
         return self.kind == other.kind
 
+    def matches(self, other):
+        if self == other:
+            return True
+        if isinstance(other, OptionalTypeAnnotation):
+            return self.matches(other.target) or self.matches(NIL_TYPE)
+        return False
+
 
 class IdentifierTypeAnnotation(TypeAnnotation):
     def __init__(self, identifier):
@@ -46,6 +55,18 @@ class IdentifierTypeAnnotation(TypeAnnotation):
             isinstance(other, IdentifierTypeAnnotation)
             and self.identifier == other.identifier
         )
+
+
+class OptionalTypeAnnotation(TypeAnnotation):
+    def __init__(self, target):
+        super().__init__(TypeAnnotationType.OPTIONAL)
+        self.target = target
+
+    def __repr__(self):
+        return str(self.target) + "?"
+
+    def __eq__(self, other):
+        return isinstance(other, OptionalTypeAnnotation) and self.target == other.target
 
 
 class FunctionTypeAnnotation(TypeAnnotation):
@@ -69,7 +90,10 @@ class FunctionTypeAnnotation(TypeAnnotation):
 
 class AnyType:
     def __contains__(self, item):
-        return isinstance(item, TypeAnnotation)
+        return (
+            isinstance(item, TypeAnnotation)
+            and not item.kind == TypeAnnotationType.VOID
+        )
 
 
 ANY_TYPE = AnyType()
@@ -79,6 +103,7 @@ INT_TYPE = TypeAnnotation(TypeAnnotationType.INT)
 NUM_TYPE = TypeAnnotation(TypeAnnotationType.NUM)
 STR_TYPE = TypeAnnotation(TypeAnnotationType.STR)
 BOOL_TYPE = TypeAnnotation(TypeAnnotationType.BOOL)
+NIL_TYPE = TypeAnnotation(TypeAnnotationType.NIL)
 VOID_TYPE = TypeAnnotation(TypeAnnotationType.VOID)
 
 SIMPLE_TYPES = {"int": INT_TYPE, "num": NUM_TYPE, "str": STR_TYPE, "bool": BOOL_TYPE}

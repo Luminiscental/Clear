@@ -530,14 +530,18 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
+                // Non-boolean values are truthy for this
+                bool jump;
                 if (condition.type != VAL_BOOL) {
 
-                    printf("|| Expected boolean as jump condition!\n");
-                    return INTERPRET_ERR;
+                    jump = true;
+
+                } else {
+
+                    jump = condition.as.boolean;
                 }
 
-                if (jumpIfFalse(vm, frame, condition.as.boolean) !=
-                    INTERPRET_OK) {
+                if (jumpIfFalse(vm, frame, jump) != INTERPRET_OK) {
 
                     printf("|| Could not jump!\n");
                     return INTERPRET_ERR;

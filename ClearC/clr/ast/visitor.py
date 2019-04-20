@@ -8,6 +8,9 @@ class TypeVisitor:
     def visit_simple_type(self, node):
         pass
 
+    def visit_optional_type(self, node):
+        node.target.accept(self)
+
     def visit_func_type(self, node):
         for param in node.params:
             param.accept(self)
@@ -38,6 +41,11 @@ class ExprVisitor(TypeVisitor):
         node.left.accept(self)
         node.right.accept(self)
 
+    def visit_unpack_expr(self, node):
+        node.target.accept(self)
+        node.present_value.accept(self)
+        node.default_value.accept(self)
+
     def visit_and_expr(self, node):
         node.left.accept(self)
         node.right.accept(self)
@@ -46,7 +54,7 @@ class ExprVisitor(TypeVisitor):
         node.left.accept(self)
         node.right.accept(self)
 
-    def visit_this_expr(self, node):
+    def visit_keyword_expr(self, node):
         pass
 
     def visit_ident_expr(self, node):

@@ -2,6 +2,7 @@ from clr.errors import parse_error
 from clr.tokens import TokenType
 from clr.ast.type_annotations import (
     IdentifierTypeAnnotation,
+    OptionalTypeAnnotation,
     FunctionTypeAnnotation,
     SIMPLE_TYPES,
     VOID_TYPE,
@@ -32,7 +33,7 @@ class SimpleType:
 
 
 def parse_simple_type(parser):
-    err = parse_error("Expected simple type!", parser)
+    err = parse_error("Expected type!", parser)
     parser.consume(TokenType.IDENTIFIER, err)
     token = parser.get_prev()
     if token.lexeme not in SIMPLE_TYPES:
@@ -43,6 +44,18 @@ def parse_simple_type(parser):
     else:
         as_annotation = SIMPLE_TYPES[token.lexeme]
     return SimpleType(token, as_annotation)
+
+
+class OptionalType:
+    def __init__(self, target):
+        self.target = target
+        self.as_annotation = OptionalTypeAnnotation(target.as_annotation)
+
+    def __repr__(self):
+        return str(self.target) + "?"
+
+    def accept(self, type_visitor):
+        type_visitor.visit_optional_type(self)
 
 
 class FunctionType:
@@ -81,7 +94,13 @@ def parse_function_type(parser):
 
 def parse_type(parser):
     if parser.check(TokenType.FUNC):
-        return parse_function_type(parser)
-    if parser.match(TokenType.VOID):
-        return VoidType()
-    return parse_simple_type(parser)
+        result = parse_function_type(parser)
+    elif parser.match(TokenType.VOID):
+        result = VoidType()
+    else:
+        result = parse_simple_type(parser)
+
+    if parser.match(TokenType.QUESTION_MARK):
+        return OptionalType(result)
+
+    return result

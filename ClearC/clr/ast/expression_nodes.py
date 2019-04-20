@@ -99,23 +99,29 @@ def pprint(str_func):
 
 
 class CallExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, target, arguments):
         super().__init__()
-        self.target = left
+        self.target = target
+        self.arguments = arguments
+
+    @staticmethod
+    def parse(left, parser):
+        target = left
         parser.consume(
             TokenType.LEFT_PAREN, parse_error("Expected '(' to call!", parser)
         )
-        self.arguments = []
+        arguments = []
         # Consume arguments until we hit the closing paren
         while not parser.match(TokenType.RIGHT_PAREN):
             # Consume an expression for each argument
-            self.arguments.append(parse_expr(parser))
+            arguments.append(parse_expr(parser))
             # If we haven't hit the end consume a comma before the next argument
             if not parser.check(TokenType.RIGHT_PAREN):
                 parser.consume(
                     TokenType.COMMA,
                     parse_error("Expected comma to delimit arguments!", parser),
                 )
+        return CallExpr(target, arguments)
 
     @pprint
     def __str__(self):
@@ -126,13 +132,18 @@ class CallExpr(ExprNode):
 
 
 class ConstructExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, name, args):
         super().__init__()
+        self.name = name
+        self.args = args
+        self.constructor_index_annotation = IndexAnnotation()
+
+    @staticmethod
+    def parse(left, parser):
         if not isinstance(left, IdentExpr):
             parse_error(f"Invalid constructor type `{left}`!", parser)()
-        self.name = left.name
-        self.args = {}
-        self.constructor_index_annotation = IndexAnnotation()
+        name = left.name
+        args = {}
         parser.consume(
             TokenType.LEFT_BRACE, parse_error("Expected constructor!", parser)
         )
@@ -141,18 +152,19 @@ class ConstructExpr(ExprNode):
                 TokenType.IDENTIFIER, parse_error("Expected field argument!", parser)
             )
             field_token = parser.get_prev()
-            if field_token.lexeme in self.args:
+            if field_token.lexeme in args:
                 parse_error("Repeated field argument!", parser)()
             parser.consume(
                 TokenType.EQUAL, parse_error("Expected field value!", parser)
             )
             field_value = parse_expr(parser)
-            self.args[field_token.lexeme] = field_value
+            args[field_token.lexeme] = field_value
             if not parser.check(TokenType.RIGHT_BRACE):
                 parser.consume(
                     TokenType.COMMA,
                     parse_error("Field arguments must be comma delimited!", parser),
                 )
+        return ConstructExpr(name, args)
 
     @pprint
     def __str__(self):
@@ -170,11 +182,17 @@ class ConstructExpr(ExprNode):
 
 
 class UnaryExpr(ExprNode):
-    def __init__(self, parser):
+    def __init__(self, operator, target):
         super().__init__()
+        self.operator = operator
+        self.target = target
+
+    @staticmethod
+    def parse(parser):
         parser.consume_one(UNARY_OPS, parse_error("Expected unary operator!", parser))
-        self.operator = parser.get_prev()
-        self.target = parse_expr(parser, precedence=Precedence.UNARY)
+        operator = parser.get_prev()
+        target = parse_expr(parser, precedence=Precedence.UNARY)
+        return UnaryExpr(operator, target)
 
     @pprint
     def __str__(self):
@@ -185,12 +203,18 @@ class UnaryExpr(ExprNode):
 
 
 class AssignExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, left, right, operator):
         super().__init__()
         self.left = left
+        self.right = right
+        self.operator = operator
+
+    @staticmethod
+    def parse(left, parser):
         parser.consume(TokenType.EQUAL, parse_error("Expected assignment!", parser))
-        self.operator = parser.get_prev()
-        self.right = parse_expr(parser, Precedence.ASSIGNMENT)
+        operator = parser.get_prev()
+        right = parse_expr(parser, Precedence.ASSIGNMENT)
+        return AssignExpr(left, right, operator)
 
     @pprint
     def __str__(self):
@@ -201,14 +225,18 @@ class AssignExpr(ExprNode):
 
 
 class AccessExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, left, right):
         super().__init__()
         self.left = left
+        self.right = right
+
+    @staticmethod
+    def parse(left, parser):
         parser.consume(
             TokenType.DOT, parse_error("Expected property accessor!", parser)
         )
-        self.operator = parser.get_prev()
-        self.right = parse_expr(parser, Precedence.CALL.next())
+        right = parse_expr(parser, Precedence.CALL.next())
+        return AccessExpr(left, right)
 
     @pprint
     def __str__(self):
@@ -219,13 +247,19 @@ class AccessExpr(ExprNode):
 
 
 class BinaryExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, left, right, operator):
         super().__init__()
         self.left = left
+        self.right = right
+        self.operator = operator
+
+    @staticmethod
+    def parse(left, parser):
         parser.consume_one(BINARY_OPS, parse_error("Expected binary operator!", parser))
-        self.operator = parser.get_prev()
-        precedence = get_rule(self.operator).precedence.next()
-        self.right = parse_expr(parser, precedence)
+        operator = parser.get_prev()
+        precedence = get_rule(operator).precedence.next()
+        right = parse_expr(parser, precedence)
+        return BinaryExpr(left, right, operator)
 
     @pprint
     def __str__(self):
@@ -235,14 +269,51 @@ class BinaryExpr(ExprNode):
         expr_visitor.visit_binary_expr(self)
 
 
+class UnpackExpr(ExprNode):
+    def __init__(self, target, present_value, default_value):
+        super().__init__()
+        self.target = target
+        self.present_value = present_value
+        self.default_value = default_value
+
+    @staticmethod
+    def parse(left, parser):
+        parser.consume(
+            TokenType.QUESTION_MARK, parse_error("Expected optional unpacking!", parser)
+        )
+        present_value = parse_expr(parser)
+        parser.consume(TokenType.COLON, parse_error("Expected default case!", parser))
+        default_value = parse_expr(parser)
+        return UnpackExpr(left, present_value, default_value)
+
+    @pprint
+    def __str__(self):
+        return (
+            str(self.target)
+            + "? "
+            + str(self.present_value)
+            + " : "
+            + str(self.default_value)
+        )
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_unpack_expr(self)
+
+
 class AndExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, left, right, operator):
         super().__init__()
         self.left = left
+        self.right = right
+        self.operator = operator
+
+    @staticmethod
+    def parse(left, parser):
         parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
-        self.operator = parser.get_prev()
+        operator = parser.get_prev()
         # and acts like a normal right-associative binary operator when parsing
-        self.right = parse_expr(parser, precedence=Precedence.AND)
+        right = parse_expr(parser, precedence=Precedence.AND)
+        return AndExpr(left, right, operator)
 
     @pprint
     def __str__(self):
@@ -253,13 +324,19 @@ class AndExpr(ExprNode):
 
 
 class OrExpr(ExprNode):
-    def __init__(self, left, parser):
+    def __init__(self, left, right, operator):
         super().__init__()
         self.left = left
+        self.right = right
+        self.operator = operator
+
+    @staticmethod
+    def parse(left, parser):
         parser.consume(TokenType.OR, parse_error("Expected or operator!", parser))
-        self.operator = parser.get_prev()
+        operator = parser.get_prev()
         # or acts like a normal right-associative binary operator when parsing
-        self.right = parse_expr(parser, precedence=Precedence.OR)
+        right = parse_expr(parser, precedence=Precedence.OR)
+        return OrExpr(left, right, operator)
 
     @pprint
     def __str__(self):
@@ -269,27 +346,39 @@ class OrExpr(ExprNode):
         expr_visitor.visit_or_expr(self)
 
 
-class ThisExpr(ExprNode):
-    def __init__(self, parser):
+class KeywordExpr(ExprNode):
+    def __init__(self, token):
         super().__init__()
-        parser.consume(TokenType.THIS, parse_error("Expected `this`!", parser))
-        self.token = parser.get_prev()
+        self.token = token
+
+    @staticmethod
+    def parse(parser):
+        parser.consume_one(
+            KEYWORD_EXPRESSIONS, parse_error("Expected keyword expression!", parser)
+        )
+        token = parser.get_prev()
+        return KeywordExpr(token)
 
     @pprint
     def __str__(self):
-        return "this"
+        return self.token.lexeme
 
     def accept(self, expr_visitor):
-        expr_visitor.visit_this_expr(self)
+        expr_visitor.visit_keyword_expr(self)
 
 
 class IdentExpr(ExprNode):
-    def __init__(self, parser):
+    def __init__(self, name):
         super().__init__()
-        parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
-        self.name = parser.get_prev()
+        self.name = name
         # Identifiers have indices, by default it is unresolved
         self.index_annotation = IndexAnnotation()
+
+    @staticmethod
+    def parse(parser):
+        parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
+        name = parser.get_prev()
+        return IdentExpr(name)
 
     @pprint
     def __str__(self):
@@ -300,8 +389,12 @@ class IdentExpr(ExprNode):
 
 
 class StringExpr(ExprNode):
-    def __init__(self, parser):
+    def __init__(self, value):
         super().__init__()
+        self.value = value
+
+    @staticmethod
+    def parse(parser):
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
         total = [parser.get_prev()]
         # Adjacent string literals are combined and joined by " to allow effective escaping,
@@ -309,7 +402,8 @@ class StringExpr(ExprNode):
         while parser.match(TokenType.STRING):
             total.append(parser.get_prev())
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
-        self.value = ClrStr(joined)
+        value = ClrStr(joined)
+        return StringExpr(value)
 
     @pprint
     def __str__(self):
@@ -320,23 +414,30 @@ class StringExpr(ExprNode):
 
 
 class NumberExpr(ExprNode):
-    def __init__(self, parser):
+    def __init__(self, lexeme, value, integral):
         super().__init__()
+        self.lexeme = lexeme
+        self.value = value
+        self.integral = integral
+
+    @staticmethod
+    def parse(parser):
         parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
-        self.lexeme = parser.get_prev().lexeme
+        lexeme = parser.get_prev().lexeme
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
-                self.value = ClrInt(self.lexeme)
-                self.integral = True
+                value = ClrInt(lexeme)
+                integral = True
             except ValueError:
                 parse_error("Integer literal must be an integer!", parser)()
-            self.lexeme += "i"
+            lexeme += "i"
         else:
             try:
-                self.value = ClrNum(self.lexeme)
-                self.integral = False
+                value = ClrNum(lexeme)
+                integral = False
             except ValueError:
                 parse_error("Number literal must be a number!", parser)()
+        return NumberExpr(lexeme, value, integral)
 
     @pprint
     def __str__(self):
@@ -347,10 +448,15 @@ class NumberExpr(ExprNode):
 
 
 class BooleanExpr(ExprNode):
-    def __init__(self, parser):
+    def __init__(self, value):
         super().__init__()
+        self.value = value
+
+    @staticmethod
+    def parse(parser):
         parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
-        self.value = parser.get_prev().token_type == TokenType.TRUE
+        value = parser.get_prev().token_type == TokenType.TRUE
+        return BooleanExpr(value)
 
     @pprint
     def __str__(self):
@@ -359,6 +465,8 @@ class BooleanExpr(ExprNode):
     def accept(self, expr_visitor):
         expr_visitor.visit_boolean_expr(self)
 
+
+KEYWORD_EXPRESSIONS = {TokenType.THIS, TokenType.NIL}
 
 BOOLEANS = {TokenType.TRUE, TokenType.FALSE}
 
@@ -382,43 +490,53 @@ PRATT_TABLE = defaultdict(
     ParseRule,
     {
         TokenType.LEFT_BRACE: ParseRule(
-            infix=ConstructExpr, precedence=Precedence.CALL
+            infix=ConstructExpr.parse, precedence=Precedence.CALL
         ),
         TokenType.LEFT_PAREN: ParseRule(
-            prefix=parse_grouping, infix=CallExpr, precedence=Precedence.CALL
+            prefix=parse_grouping, infix=CallExpr.parse, precedence=Precedence.CALL
         ),
         TokenType.MINUS: ParseRule(
-            prefix=UnaryExpr, infix=BinaryExpr, precedence=Precedence.TERM
+            prefix=UnaryExpr.parse, infix=BinaryExpr.parse, precedence=Precedence.TERM
         ),
-        TokenType.PLUS: ParseRule(infix=BinaryExpr, precedence=Precedence.TERM),
-        TokenType.SLASH: ParseRule(infix=BinaryExpr, precedence=Precedence.FACTOR),
-        TokenType.STAR: ParseRule(infix=BinaryExpr, precedence=Precedence.FACTOR),
-        TokenType.NUMBER: ParseRule(prefix=NumberExpr),
-        TokenType.STRING: ParseRule(prefix=StringExpr),
-        TokenType.TRUE: ParseRule(prefix=BooleanExpr),
-        TokenType.FALSE: ParseRule(prefix=BooleanExpr),
-        TokenType.BANG: ParseRule(prefix=UnaryExpr),
-        TokenType.DOT: ParseRule(infix=AccessExpr, precedence=Precedence.CALL),
+        TokenType.PLUS: ParseRule(infix=BinaryExpr.parse, precedence=Precedence.TERM),
+        TokenType.SLASH: ParseRule(
+            infix=BinaryExpr.parse, precedence=Precedence.FACTOR
+        ),
+        TokenType.STAR: ParseRule(infix=BinaryExpr.parse, precedence=Precedence.FACTOR),
+        TokenType.NUMBER: ParseRule(prefix=NumberExpr.parse),
+        TokenType.STRING: ParseRule(prefix=StringExpr.parse),
+        TokenType.TRUE: ParseRule(prefix=BooleanExpr.parse),
+        TokenType.FALSE: ParseRule(prefix=BooleanExpr.parse),
+        TokenType.BANG: ParseRule(prefix=UnaryExpr.parse),
+        TokenType.DOT: ParseRule(infix=AccessExpr.parse, precedence=Precedence.CALL),
         TokenType.EQUAL_EQUAL: ParseRule(
-            infix=BinaryExpr, precedence=Precedence.EQUALITY
+            infix=BinaryExpr.parse, precedence=Precedence.EQUALITY
         ),
         TokenType.BANG_EQUAL: ParseRule(
-            infix=BinaryExpr, precedence=Precedence.EQUALITY
+            infix=BinaryExpr.parse, precedence=Precedence.EQUALITY
         ),
-        TokenType.LESS: ParseRule(infix=BinaryExpr, precedence=Precedence.COMPARISON),
+        TokenType.LESS: ParseRule(
+            infix=BinaryExpr.parse, precedence=Precedence.COMPARISON
+        ),
         TokenType.GREATER_EQUAL: ParseRule(
-            infix=BinaryExpr, precedence=Precedence.COMPARISON
+            infix=BinaryExpr.parse, precedence=Precedence.COMPARISON
         ),
         TokenType.GREATER: ParseRule(
-            infix=BinaryExpr, precedence=Precedence.COMPARISON
+            infix=BinaryExpr.parse, precedence=Precedence.COMPARISON
         ),
         TokenType.LESS_EQUAL: ParseRule(
-            infix=BinaryExpr, precedence=Precedence.COMPARISON
+            infix=BinaryExpr.parse, precedence=Precedence.COMPARISON
         ),
-        TokenType.IDENTIFIER: ParseRule(prefix=IdentExpr),
-        TokenType.AND: ParseRule(infix=AndExpr, precedence=Precedence.AND),
-        TokenType.OR: ParseRule(infix=OrExpr, precedence=Precedence.OR),
-        TokenType.EQUAL: ParseRule(infix=AssignExpr, precedence=Precedence.ASSIGNMENT),
-        TokenType.THIS: ParseRule(prefix=ThisExpr),
+        TokenType.QUESTION_MARK: ParseRule(
+            infix=UnpackExpr.parse, precedence=Precedence.CALL
+        ),
+        TokenType.IDENTIFIER: ParseRule(prefix=IdentExpr.parse),
+        TokenType.AND: ParseRule(infix=AndExpr.parse, precedence=Precedence.AND),
+        TokenType.OR: ParseRule(infix=OrExpr.parse, precedence=Precedence.OR),
+        TokenType.EQUAL: ParseRule(
+            infix=AssignExpr.parse, precedence=Precedence.ASSIGNMENT
+        ),
+        TokenType.THIS: ParseRule(prefix=KeywordExpr.parse),
+        TokenType.NIL: ParseRule(prefix=KeywordExpr.parse),
     },
 )

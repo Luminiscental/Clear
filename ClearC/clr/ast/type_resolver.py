@@ -1,6 +1,6 @@
 import itertools
 from collections import namedtuple, defaultdict
-from clr.tokens import TokenType, token_info
+from clr.tokens import Token, TokenType, token_info
 from clr.errors import emit_error
 from clr.ast.visitor import StructTrackingDeclVisitor
 from clr.ast.type_annotations import (
@@ -11,14 +11,15 @@ from clr.ast.type_annotations import (
     INT_TYPE,
     STR_TYPE,
     BOOL_TYPE,
+    NIL_TYPE,
     VOID_TYPE,
     ANY_TYPE,
     IdentifierTypeAnnotation,
     FunctionTypeAnnotation,
 )
 from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType
-from clr.ast.expression_nodes import IdentExpr
-from clr.ast.statement_nodes import StmtNode
+from clr.ast.expression_nodes import AccessExpr, KeywordExpr, IdentExpr
+from clr.ast.statement_nodes import StmtNode, BlockStmt, ValDecl
 
 TypeInfo = namedtuple(
     "TypeInfo", ("annotation", "assignable"), defaults=(TypeAnnotation(), False)
@@ -82,7 +83,9 @@ class TypeResolver(StructTrackingDeclVisitor):
                 emit_error(
                     f"Invalid field assignment to {field_name} in struct constructor, `{node.name}` is not a field: `{node}`!"
                 )()
-            if field_value.type_annotation != field_names[field_name].as_annotation:
+            if not field_value.type_annotation.matches(
+                field_names[field_name].as_annotation
+            ):
                 emit_error(
                     f"Incompatible type {field_value.type_annotation} for field {field_name} whose type is {field_names[field_name]}: `{node}`!"
                 )()
@@ -113,14 +116,13 @@ class TypeResolver(StructTrackingDeclVisitor):
                 emit_error(
                     f"Attempt to call a non-callable expression `{node.target}`: `{node}`! (type is {function_type})"
                 )()
-            passed_signature = list(
-                map(lambda arg: arg.type_annotation, node.arguments)
-            )
-            args = "(" + ", ".join(map(str, passed_signature)) + ")"
-            if passed_signature != function_type.signature:
-                emit_error(
-                    f"Could not find signature for function `{node.target}` matching provided argument list {args}: `{node}`!"
-                )()
+            for i, (arg, param_type) in enumerate(
+                zip(node.arguments, function_type.signature)
+            ):
+                if not arg.type_annotation.matches(param_type):
+                    emit_error(
+                        f"Incompatible type {arg.type_annotation} passed as argument {i+1}; expected {param_type}! `{node}`"
+                    )()
             node.type_annotation = function_type.return_type
 
     def visit_unary_expr(self, node):
@@ -161,14 +163,10 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_binary_expr(node)
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type.kind != right_type.kind:
+        if left_type != right_type:
             emit_error(
                 f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}: `{node}`!"
             )()
-        if left_type == VOID_TYPE:
-            emit_error(
-                f"Cannot use call to void function `{node.left}` in expression: `{node}`!"
-            )
         if (
             left_type
             not in {
@@ -205,13 +203,50 @@ class TypeResolver(StructTrackingDeclVisitor):
         }:
             node.type_annotation = BOOL_TYPE
 
+    def visit_unpack_expr(self, node):
+        # No super as we handle the optional becoming non-optional in the present case
+        node.target.accept(self)
+        if node.target.type_annotation.kind == TypeAnnotationType.OPTIONAL:
+            if not isinstance(node.target, IdentExpr):
+                emit_error(
+                    f"Cannot unpack unnamed optional value `{node.target}`: `{node}`!"
+                )()
+            original_info = self._lookup_name(node.target.name)
+            # Re-declare the optional value as non-optional over the present case
+            self._declare_name(
+                node.target.name.lexeme,
+                node.target.type_annotation.target,
+                original_info.assignable,
+            )
+            node.present_value.accept(self)
+            # Revert the re-declaration
+            self._declare_name(
+                node.target.name.lexeme,
+                original_info.annotation,
+                original_info.assignable,
+            )
+            node.default_value.accept(self)
+        elif node.target.type_annotation.matches(BOOL_TYPE):
+            node.present_value.accept(self)
+            node.default_value.accept(self)
+        else:
+            emit_error(
+                f"Invalid type {node.target.type_annotation} for optional unpacking: `{node}`!"
+            )()
+
+        if node.present_value.type_annotation != node.default_value.type_annotation:
+            emit_error(
+                f"Expected type {node.present_value.type_annotation} as result of default case, but got {node.default_value.type_annotation}: `{node}`!"
+            )()
+        node.type_annotation = node.present_value.type_annotation
+
     def visit_assign_expr(self, node):
         super().visit_assign_expr(node)
         if not node.left.assignable:
             emit_error(f"Unassignable expression `{node.left}`: `{node}`!")()
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type.kind != right_type.kind:
+        if not right_type.matches(left_type):
             emit_error(
                 f"`{node.left}` is of type {left_type}, so cannot assign `{node.right}` of type {right_type} to it: `{node}`!"
             )()
@@ -229,26 +264,40 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Incompatible type {right_type} for right operand to logic operator {token_info(node.operator)}: `{node}`!"
             )()
+        node.type_annotation = BOOL_TYPE
 
     def visit_or_expr(self, node):
         super().visit_or_expr(node)
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type != BOOL_TYPE:
-            emit_error(
-                f"Incompatible type {left_type} for left operand to logic operator {token_info(node.operator)}: `{node}`!"
-            )()
-        if right_type != BOOL_TYPE:
-            emit_error(
-                f"Incompatible type {right_type} for right operand to logic operator {token_info(node.operator)}: `{node}`!"
-            )()
-
-    def visit_this_expr(self, node):
-        super().visit_this_expr(node)
-        if not self.current_structs:
-            emit_error(f"Cannot reference `this` outside of a method: `{node}`!")()
+        if left_type.kind == TypeAnnotationType.OPTIONAL:
+            if not right_type.matches(left_type):
+                emit_error(
+                    f"Incompatible type {right_type} for optional unpacking of {left_type} in {token_info(node.operator)} expression: `{node}`!"
+                )()
+            node.type_annotation = left_type.target
         else:
-            node.type_annotation = IdentifierTypeAnnotation(self.current_structs[-1])
+            if not left_type.matches(BOOL_TYPE):
+                emit_error(
+                    f"Incompatible type {left_type} for left operand to logic operator {token_info(node.operator)}: `{node}`!"
+                )()
+            if not right_type.matches(BOOL_TYPE):
+                emit_error(
+                    f"Incompatible type {right_type} for right operand to logic operator {token_info(node.operator)}: `{node}`!"
+                )()
+            node.type_annotation = BOOL_TYPE
+
+    def visit_keyword_expr(self, node):
+        super().visit_keyword_expr(node)
+        if node.token.token_type == TokenType.THIS:
+            if not self.current_structs:
+                emit_error(f"Cannot reference `this` outside of a method: `{node}`!")()
+            else:
+                node.type_annotation = IdentifierTypeAnnotation(
+                    self.current_structs[-1].name.lexeme
+                )
+        elif node.token.token_type == TokenType.NIL:
+            node.type_annotation = NIL_TYPE
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
@@ -315,7 +364,7 @@ class TypeResolver(StructTrackingDeclVisitor):
                 emit_error(
                     f"Return statement found in void function {token_info(node.return_token)}!"
                 )()
-            if expected != node.value.type_annotation:
+            if not node.value.type_annotation.matches(expected):
                 emit_error(
                     f"Incompatible return type! Expected {expected} but was given {node.value.type_annotation} at {token_info(node.return_token)}!"
                 )()
@@ -330,7 +379,7 @@ class TypeResolver(StructTrackingDeclVisitor):
     def visit_if_stmt(self, node):
         super().visit_if_stmt(node)
         for cond, _ in node.checks:
-            if cond.type_annotation != BOOL_TYPE:
+            if not cond.type_annotation.matches(BOOL_TYPE):
                 emit_error(
                     f"Expected boolean condition for if-block but got {cond.type_annotation} instead: `{cond}`!"
                 )()
@@ -411,6 +460,25 @@ class TypeResolver(StructTrackingDeclVisitor):
         ):
             emit_error(f"Function does not always return {token_info(node.name)}!")()
 
+    def visit_method_decl(self, node):
+        struct = self.current_structs[-1]
+        this_token = Token(token_type=TokenType.THIS, lexeme="this", line=-1)
+        prefixed_block = []
+        for _, field_name in struct.fields:
+            if field_name.lexeme in map(
+                lambda _, param_name: param_name.lexeme, node.params
+            ):
+                continue
+            name_token = Token(
+                token_type=TokenType.IDENTIFIER, lexeme=field_name.lexeme, line=-1
+            )
+            field_value = AccessExpr(KeywordExpr(this_token), IdentExpr(name_token))
+            implicit_decl = ValDecl(False, name_token, field_value)
+            prefixed_block.append(implicit_decl)
+        prefixed_block.extend(node.block.declarations)
+        node.block = BlockStmt(prefixed_block)
+        super().visit_method_decl(node)
+
     def visit_struct_decl(self, node):
         # Check before super() because super() adds it to self.structs
         name = node.name.lexeme
@@ -429,7 +497,7 @@ class TypeResolver(StructTrackingDeclVisitor):
                 )()
             field_names[field_name.lexeme] = field_name
         # Push the struct name onto self.current_structs
-        self.current_structs.append(node.name.lexeme)
+        self.current_structs.append(node)
         super().visit_struct_decl(node)
         # Pop it
         del self.current_structs[-1]

@@ -2,6 +2,35 @@
 // TODO: Actual tests !!!
 
 // -----------------------------------------------
+// Optional Types:
+
+struct LinkedListInt {
+    int value,
+    LinkedListInt? next,
+
+    func to_str() str {
+        return str(value) + next? ", " + next.to_str() : "";
+    }
+}
+
+val test = LinkedListInt {
+    value=2i,
+    next=LinkedListInt {
+        value=3i,
+        next=LinkedListInt {
+            value=-1i,
+            next=LinkedListInt {
+                value=7i,
+                next=nil
+            }
+        }
+    }
+};
+
+print "List: " + test.to_str();
+print;
+
+// -----------------------------------------------
 // Method Closures:
 
 {
@@ -52,9 +81,9 @@ struct Timer {
 
     func endBlock() void {
         val endTime = clock();
-        val dt = endTime - this.startTime;
+        val dt = endTime - startTime;
 
-        print "[" + this.blockName + "] Finished in " + str(dt) + "s";
+        print "[" + blockName + "] Finished in " + str(dt) + "s";
     }
 }
 
@@ -66,7 +95,7 @@ func startBlock(str name) Timer {
     };
 }
 
-var timer = startBlock("Event struct declaration");
+val timer = startBlock("Event struct declaration");
 
 struct Event {
     int type,
@@ -78,26 +107,7 @@ timer.endBlock();
 val EVENT_TYPE_KEY = 0i;
 val EVENT_TYPE_MOUSE = 1i;
 
-timer = startBlock("EventDispatcher struct declaration");
-
-struct EventDispatcher {
-    func(Event) void dispatch,
-
-    func subscribe(func(Event) void subscriber) EventDispatcher {
-        func combinedDispatch(Event event) void {
-            this.dispatch(event);
-            subscriber(event);
-        }
-
-        return EventDispatcher {
-            dispatch=combinedDispatch
-        };
-    }
-}
-
-timer.endBlock();
-
-timer = startBlock("Make simple first callback");
+val timer = startBlock("Make simple first callback");
 
 func firstCallback(Event event) void {
     print "first!";
@@ -125,7 +135,26 @@ func mouseHandler(Event event) void {
     print "Mouse Event: [" + str(event.value) + "]";
 }
 
-timer = startBlock("Make EventDispatcher with 4 subscribers");
+val timer = startBlock("EventDispatcher struct declaration");
+
+struct EventDispatcher {
+    func(Event) void dispatch,
+
+    func subscribe(func(Event) void subscriber) EventDispatcher {
+        func combinedDispatch(Event event) void {
+            this.dispatch(event); // TODO: Fix implicit declarations to not interfere with closure
+            subscriber(event);
+        }
+
+        return EventDispatcher {
+            dispatch=combinedDispatch
+        };
+    }
+}
+
+timer.endBlock();
+
+val timer = startBlock("Make EventDispatcher with 4 subscribers");
 
 val dispatcher = EventDispatcher { dispatch=firstCallback }
     .subscribe(secondCallback)
@@ -136,7 +165,7 @@ timer.endBlock();
 
 val testEvent = Event { type=EVENT_TYPE_KEY, value=7i };
 
-timer = startBlock("Dispatch test event");
+val timer = startBlock("Dispatch test event");
 
 dispatcher.dispatch(testEvent);
 

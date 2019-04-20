@@ -18,9 +18,11 @@ class TokenType(Enum):
     MINUS = "-"
     PLUS = "+"
     SEMICOLON = ";"
+    COLON = ":"
     SLASH = "/"
     STAR = "*"
     BANG = "!"
+    QUESTION_MARK = "?"
     BANG_EQUAL = "!="
     EQUAL = "="
     EQUAL_EQUAL = "=="
@@ -45,12 +47,12 @@ class TokenType(Enum):
     OR = "or"
     PRINT = "print"
     RETURN = "return"
-    SUPER = "super"
     THIS = "this"
     TRUE = "true"
     VAL = "val"
     VAR = "var"
     WHILE = "while"
+    NIL = "nil"
     # special
     SPACE = "<whitespace>"
     EOF = "<eof>"
@@ -76,13 +78,13 @@ KEYWORD_TYPES = {
     "or": TokenType.OR,
     "print": TokenType.PRINT,
     "return": TokenType.RETURN,
-    "super": TokenType.SUPER,
     "this": TokenType.THIS,
     "true": TokenType.TRUE,
     "val": TokenType.VAL,
     "var": TokenType.VAR,
     "while": TokenType.WHILE,
     "void": TokenType.VOID,
+    "nil": TokenType.NIL,
 }
 
 SIMPLE_TOKENS = {
@@ -91,12 +93,14 @@ SIMPLE_TOKENS = {
     "*": TokenType.STAR,
     "/": TokenType.SLASH,
     ";": TokenType.SEMICOLON,
+    ":": TokenType.COLON,
     ",": TokenType.COMMA,
     ".": TokenType.DOT,
     "(": TokenType.LEFT_PAREN,
     ")": TokenType.RIGHT_PAREN,
     "{": TokenType.LEFT_BRACE,
     "}": TokenType.RIGHT_BRACE,
+    "?": TokenType.QUESTION_MARK,
 }
 
 SuffixType = namedtuple("SuffixType", "present nonpresent")
