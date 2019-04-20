@@ -295,13 +295,38 @@ class Compiler(DeclVisitor):
         jump_to_default = self.program.begin_jump(conditional=True)
         # Otherwise load the present value
         node.present_value.accept(self)
-        # Then skip past the default block, leaving the present value on the stack
-        jump_past_default = self.program.begin_jump(conditional=False)
-        # Start the default block
-        self.program.end_jump(jump_to_default, leave_value=False)
-        node.default_value.accept(self)
-        # End the default block, keeping the value of the present case when the default is skipped
-        self.program.end_jump(jump_past_default, leave_value=True)
+        # If there is a default value deal with skipping it
+        if node.default_value is not None:
+            # Then skip past the default block, leaving the present value on the stack
+            jump_past_default = self.program.begin_jump(conditional=False)
+            # Start the default block
+            self.program.end_jump(jump_to_default, leave_value=False)
+            node.default_value.accept(self)
+            # End the default block, keeping the value of the present case when the default is skipped
+            self.program.end_jump(jump_past_default, leave_value=True)
+        else:
+            # If there is no default just end the jump that skips the present case
+            self.program.end_jump(jump_to_default, leave_value=False)
+
+    def visit_if_expr(self, node):
+        # No super because we need the jumps in the right place
+        # Create a list of jumps that skip to the end once a block completes
+        final_jumps = []
+        for cond, block in node.checks:
+            cond.accept(self)
+            # If the condition is false jump to the next block
+            jump = self.program.begin_jump(conditional=True)
+            block.accept(self)
+            # Otherwise jump to the end after the block completes
+            final_jumps.append(self.program.begin_jump())
+            # The jump to the next block goes after the jump to the end to avoid it
+            self.program.end_jump(jump)
+        # If we haven't jumped to the end then all the previous blocks didn't execute so run the
+        # else block
+        node.otherwise.accept(self)
+        for final_jump in final_jumps:
+            # All the final jumps end here after everything
+            self.program.end_jump(final_jump)
 
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:

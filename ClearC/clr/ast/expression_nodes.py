@@ -269,6 +269,52 @@ class BinaryExpr(ExprNode):
         expr_visitor.visit_binary_expr(self)
 
 
+class IfExpr(ExprNode):
+    def __init__(self, checks, otherwise):
+        super().__init__()
+        self.checks = checks
+        self.otherwise = otherwise
+
+    @staticmethod
+    def parse(parser):
+        parser.consume(TokenType.IF, parse_error("Expected if expression!", parser))
+        initial_cond = parse_grouping(parser)
+        parser.consume(TokenType.LEFT_BRACE, parse_error("Expected if block!", parser))
+        initial_value = parse_expr(parser)
+        parser.consume(
+            TokenType.RIGHT_BRACE, parse_error("Expected '}' to end block!", parser)
+        )
+        checks = [(initial_cond, initial_value)]
+        while parser.match(TokenType.ELSE):
+            if parser.match(TokenType.IF):
+                other_cond = parse_grouping(parser)
+                parser.consume(
+                    TokenType.LEFT_BRACE, parse_error("Expected else-if block!", parser)
+                )
+                other_value = parse_expr(parser)
+                parser.consume(
+                    TokenType.RIGHT_BRACE,
+                    parse_error("Expected '}' to end block!", parser),
+                )
+                checks.append((other_cond, other_value))
+            else:
+                parser.consume(
+                    TokenType.LEFT_BRACE, parse_error("Expected else block!", parser)
+                )
+                otherwise = parse_expr(parser)
+                parser.consume(
+                    TokenType.RIGHT_BRACE,
+                    parse_error("Expected '}' to end block!", parser),
+                )
+                break
+        else:
+            parse_error("Expected final else block for if expression!", parser)
+        return IfExpr(checks, otherwise)
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_if_expr(self)
+
+
 class UnpackExpr(ExprNode):
     def __init__(self, target, present_value, default_value):
         super().__init__()
@@ -282,8 +328,9 @@ class UnpackExpr(ExprNode):
             TokenType.QUESTION_MARK, parse_error("Expected optional unpacking!", parser)
         )
         present_value = parse_expr(parser)
-        parser.consume(TokenType.COLON, parse_error("Expected default case!", parser))
-        default_value = parse_expr(parser)
+        default_value = None
+        if parser.match(TokenType.COLON):
+            default_value = parse_expr(parser)
         return UnpackExpr(left, present_value, default_value)
 
     @pprint
@@ -538,5 +585,6 @@ PRATT_TABLE = defaultdict(
         ),
         TokenType.THIS: ParseRule(prefix=KeywordExpr.parse),
         TokenType.NIL: ParseRule(prefix=KeywordExpr.parse),
+        TokenType.IF: ParseRule(prefix=IfExpr.parse),
     },
 )

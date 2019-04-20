@@ -7,16 +7,19 @@
 func makeFac() func(int) int {
 
     func fac(int n) int {
-        if (n <= 0i) {
-            return 1i;
-        }
-        return n * fac(n - 1i);
+        return if (n <= 0i) {
+            1i
+        } else {
+            n * fac(n - 1i)
+        };
     }
 
     return fac;
 }
 
-print "10! = " + str(makeFac()(10i));
+val fac = makeFac();
+
+print "10! = " + str(fac(10i));
 print;
 
 // -----------------------------------------------
@@ -36,6 +39,11 @@ struct LinkedListInt {
             next=this
         };
     }
+
+    func for_each(func(int) void consume) void {
+        consume(value);
+        next? next.for_each(consume);
+    }
 }
 
 val testList = LinkedListInt { value=2i, next=nil }
@@ -43,10 +51,19 @@ val testList = LinkedListInt { value=2i, next=nil }
     .push(-1i)
     .push(7i)
     .push(25i)
-    .push(makeFac()(7i))
+    .push(fac(7i))
     .push(-12i);
 
 print "List: " + testList.to_str();
+
+var sum = 0i;
+func add_int(int x) void {
+    sum = sum + x;
+}
+
+testList.for_each(add_int);
+print "sum(List): " + str(sum);
+
 print;
 
 // -----------------------------------------------

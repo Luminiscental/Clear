@@ -206,39 +206,59 @@ class TypeResolver(StructTrackingDeclVisitor):
     def visit_unpack_expr(self, node):
         # No super as we handle the optional becoming non-optional in the present case
         node.target.accept(self)
-        if node.target.type_annotation.kind == TypeAnnotationType.OPTIONAL:
-            if not isinstance(node.target, IdentExpr):
-                emit_error(
-                    f"Cannot unpack unnamed optional value `{node.target}`: `{node}`!"
-                )()
-            original_info = self._lookup_name(node.target.name)
-            # Re-declare the optional value as non-optional over the present case
-            self._declare_name(
-                node.target.name.lexeme,
-                node.target.type_annotation.target,
-                original_info.assignable,
-            )
-            node.present_value.accept(self)
-            # Revert the re-declaration
-            self._declare_name(
-                node.target.name.lexeme,
-                original_info.annotation,
-                original_info.assignable,
-            )
-            node.default_value.accept(self)
-        elif node.target.type_annotation.matches(BOOL_TYPE):
-            node.present_value.accept(self)
-            node.default_value.accept(self)
-        else:
+        if node.target.type_annotation.kind != TypeAnnotationType.OPTIONAL:
             emit_error(
                 f"Invalid type {node.target.type_annotation} for optional unpacking: `{node}`!"
             )()
 
-        if node.present_value.type_annotation != node.default_value.type_annotation:
+        if not isinstance(node.target, IdentExpr):
             emit_error(
-                f"Expected type {node.present_value.type_annotation} as result of default case, but got {node.default_value.type_annotation}: `{node}`!"
+                f"Cannot unpack unnamed optional value `{node.target}`: `{node}`!"
             )()
+        original_info = self._lookup_name(node.target.name)
+        # Re-declare the optional value as non-optional over the present case
+        self._declare_name(
+            node.target.name.lexeme,
+            node.target.type_annotation.target,
+            original_info.assignable,
+        )
+        node.present_value.accept(self)
+        # Revert the re-declaration
+        self._declare_name(
+            node.target.name.lexeme, original_info.annotation, original_info.assignable
+        )
+        if node.default_value is not None:
+            node.default_value.accept(self)
+
+            if node.present_value.type_annotation != node.default_value.type_annotation:
+                emit_error(
+                    f"Expected type {node.present_value.type_annotation} as result of default case, but got {node.default_value.type_annotation}: `{node}`!"
+                )()
+        elif node.present_value.type_annotation != VOID_TYPE:
+            emit_error(
+                f"Missing default case for optional unpacking, present case returns a value so an alternative value is required: `{node}`!"
+            )
         node.type_annotation = node.present_value.type_annotation
+
+    def visit_if_expr(self, node):
+        super().visit_if_expr(node)
+        expected_type = None
+        for cond, value in node.checks:
+            if not cond.type_annotation.matches(BOOL_TYPE):
+                emit_error(
+                    f"Incompatible condition type {cond.type_annotation} for if expression: `{node}`!"
+                )()
+            if expected_type is None:
+                expected_type = value.type_annotation
+            elif expected_type != value.type_annotation:
+                emit_error(
+                    f"Non-matching types in branches of if expression {expected_type} and {value.type_annotation}: `{node}`!"
+                )()
+        if node.otherwise.type_annotation != expected_type:
+            emit_error(
+                f"Type for else branch of if expression {node.otherwise.type_annotation} doesn't match expected type {expected_type}"
+            )()
+        node.type_annotation = expected_type
 
     def visit_assign_expr(self, node):
         super().visit_assign_expr(node)

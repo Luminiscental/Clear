@@ -41,10 +41,17 @@ class ExprVisitor(TypeVisitor):
         node.left.accept(self)
         node.right.accept(self)
 
+    def visit_if_expr(self, node):
+        for cond, value in node.checks:
+            cond.accept(self)
+            value.accept(self)
+        node.otherwise.accept(self)
+
     def visit_unpack_expr(self, node):
         node.target.accept(self)
         node.present_value.accept(self)
-        node.default_value.accept(self)
+        if node.default_value is not None:
+            node.default_value.accept(self)
 
     def visit_and_expr(self, node):
         node.left.accept(self)
