@@ -35,6 +35,8 @@ class TypeAnnotation:
         return self.kind == other.kind
 
     def matches(self, other):
+        # TODO: Need to make a bi-directional way of dealing with this stuff,
+        # if brances of a conditional expression are one optional one not the order shouldn't matter
         if self == other:
             return True
         if isinstance(other, OptionalTypeAnnotation):

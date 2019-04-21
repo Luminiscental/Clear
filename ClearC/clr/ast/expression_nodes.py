@@ -324,24 +324,32 @@ class UnpackExpr(ExprNode):
 
     @staticmethod
     def parse(left, parser):
+        present_value = None
+        default_value = None
+
         parser.consume(
             TokenType.QUESTION_MARK, parse_error("Expected optional unpacking!", parser)
         )
-        present_value = parse_expr(parser)
-        default_value = None
+        # Skipped present-case
         if parser.match(TokenType.COLON):
             default_value = parse_expr(parser)
+        else:
+            present_value = parse_expr(parser)
+            # Both present
+            if parser.match(TokenType.COLON):
+                default_value = parse_expr(parser)
         return UnpackExpr(left, present_value, default_value)
 
     @pprint
     def __str__(self):
-        return (
-            str(self.target)
-            + "? "
-            + str(self.present_value)
-            + " : "
-            + str(self.default_value)
-        )
+        result = str(self.target) + "?"
+        if self.present_value is not None:
+            result += " " + str(self.present_value)
+        if self.default_value is not None:
+            if self.present_value is not None:
+                result += " "
+            result += ": " + str(self.default_value)
+        return result
 
     def accept(self, expr_visitor):
         expr_visitor.visit_unpack_expr(self)

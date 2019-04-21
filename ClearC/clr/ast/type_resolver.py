@@ -35,7 +35,9 @@ class TypeResolver(StructTrackingDeclVisitor):
         self.current_structs = []
 
     def _declare_name(self, name, type_annotation, assignable=False):
-        self.scopes[self.level][name] = TypeInfo(type_annotation, assignable)
+        if name.lexeme in self.scopes[self.level]:
+            emit_error(f"Redeclaration of name {token_info(name)}!")()
+        self.scopes[self.level][name.lexeme] = TypeInfo(type_annotation, assignable)
 
     def _lookup_name(self, name):
         result = TypeInfo()
@@ -143,7 +145,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_access_expr(node)
         if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
             emit_error(
-                f"Non-struct type {node.left.type_annotation} does not have a property to access at {token_info(node.operator)}: `{node}`!"
+                f"Non-struct type {node.left.type_annotation} does not have a property to access: `{node}`!"
             )()
         if not isinstance(node.right, IdentExpr):
             emit_error(f"Accessor {node.right} is not an identifier! `{node}`")()
@@ -204,41 +206,36 @@ class TypeResolver(StructTrackingDeclVisitor):
             node.type_annotation = BOOL_TYPE
 
     def visit_unpack_expr(self, node):
-        # No super as we handle the optional becoming non-optional in the present case
-        node.target.accept(self)
-        if node.target.type_annotation.kind != TypeAnnotationType.OPTIONAL:
-            emit_error(
-                f"Invalid type {node.target.type_annotation} for optional unpacking: `{node}`!"
-            )()
-
-        if not isinstance(node.target, IdentExpr):
-            emit_error(
-                f"Cannot unpack unnamed optional value `{node.target}`: `{node}`!"
-            )()
-        original_info = self._lookup_name(node.target.name)
-        # Re-declare the optional value as non-optional over the present case
-        self._declare_name(
-            node.target.name.lexeme,
-            node.target.type_annotation.target,
-            original_info.assignable,
-        )
-        node.present_value.accept(self)
-        # Revert the re-declaration
-        self._declare_name(
-            node.target.name.lexeme, original_info.annotation, original_info.assignable
-        )
-        if node.default_value is not None:
-            node.default_value.accept(self)
-
+        super().visit_unpack_expr(node)
+        if node.target.type_annotation.kind == TypeAnnotationType.VOID:
+            emit_error(f"Cannot unpack result of void function: `{node}`!")()
+        # Both cases are present
+        if node.present_value is not None and node.default_value is not None:
             if node.present_value.type_annotation != node.default_value.type_annotation:
                 emit_error(
-                    f"Expected type {node.present_value.type_annotation} as result of default case, but got {node.default_value.type_annotation}: `{node}`!"
+                    f"Incompatible types for branches of optional unpacking: {node.present_value.type_annotation} and {node.default_value.type_annotation}: `{node}`!"
                 )()
-        elif node.present_value.type_annotation != VOID_TYPE:
-            emit_error(
-                f"Missing default case for optional unpacking, present case returns a value so an alternative value is required: `{node}`!"
-            )
-        node.type_annotation = node.present_value.type_annotation
+            node.type_annotation = node.present_value.type_annotation
+        # Present-case only
+        elif node.present_value is not None:
+            if node.present_value.type_annotation != VOID_TYPE:
+                emit_error(
+                    f"Missing default case for optional unpacking! Present case returns a value of type {node.present_value.type_annotation}: `{node}`"
+                )
+            node.type_annotation = node.present_value.type_annotation
+        # Default-case only
+        elif node.default_value is not None:
+            target_type = node.target.type_annotation
+            if target_type.kind == TypeAnnotationType.OPTIONAL:
+                target_type = target_type.target
+            if node.default_value.type_annotation == VOID_TYPE:
+                node.type_annotation = VOID_TYPE
+            elif node.default_value.type_annotation != target_type:
+                emit_error(
+                    f"Incompatible types for optional unpacking: {target_type} expected from implicit present case but the default case is of type {node.default_value.type_annotation}: `{node}`!"
+                )()
+            else:
+                node.type_annotation = node.default_value.type_annotation
 
     def visit_if_expr(self, node):
         super().visit_if_expr(node)
@@ -436,6 +433,9 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.return_annotation = ReturnAnnotation(kind, return_type)
 
     def visit_func_decl(self, node):
+        self.resolve_function(node)
+
+    def resolve_function(self, node, is_method=False):
         # No super because we handle the params
         # Iterate over the parameters and resolve to types
         arg_types = []
@@ -460,12 +460,14 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Cannot create function {token_info(node.name)} with same name as struct {token_info(struct.name)}!"
             )()
-        self._declare_name(node.name.lexeme, node.type_annotation)
+        # If it's not a method declare the function
+        if not is_method:
+            self._declare_name(node.name, node.type_annotation)
         # Start the function scope
         self.start_scope()
         # Iterate over the parameters and declare them
         for param_type, param_name in node.params:
-            self._declare_name(param_name.lexeme, param_type.as_annotation)
+            self._declare_name(param_name, param_type.as_annotation)
         # Expect return statements for the return type
         self.expected_returns.append(return_type)
         # Define the function by its block
@@ -495,7 +497,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             prefixed_block.append(implicit_decl)
         prefixed_block.extend(node.block.declarations)
         node.block = BlockStmt(prefixed_block)
-        super().visit_method_decl(node)
+        self.resolve_function(node, is_method=True)
 
     def visit_struct_decl(self, node):
         # Check before super() because super() adds it to self.structs
@@ -533,6 +535,4 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(
                 f"Cannot create variable {token_info(node.name)} with same name as struct {token_info(struct.name)}!"
             )()
-        self._declare_name(
-            node.name.lexeme, node.type_annotation, assignable=node.mutable
-        )
+        self._declare_name(node.name, node.type_annotation, assignable=node.mutable)

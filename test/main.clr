@@ -1,6 +1,9 @@
 
 // TODO: Actual tests !!!
 
+// var maybe_int int? = 3i;
+// maybe_int = nil;
+
 // -----------------------------------------------
 // Recursive and Higher Order Functions:
 
@@ -30,7 +33,11 @@ struct LinkedListInt {
     LinkedListInt? next,
 
     func to_str() str {
-        return str(value) + next? ", " + next.to_str() : "";
+        val dummy_list = LinkedListInt { value=0i, next=nil };
+        val next_if_present = next?: dummy_list;
+
+        // TODO: Handle unpacking of optional target in non-implicit present-case
+        return str(value) + next? ", " + next_if_present.to_str() : "";
     }
 
     func push(int value) LinkedListInt {
@@ -41,8 +48,11 @@ struct LinkedListInt {
     }
 
     func for_each(func(int) void consume) void {
+        val dummy_list = LinkedListInt { value=0i, next=nil };
+        val next_if_present = next?: dummy_list;
+
         consume(value);
-        next? next.for_each(consume);
+        next? next_if_present.for_each(consume);
     }
 }
 
@@ -131,7 +141,7 @@ func startBlock(str name) Timer {
     };
 }
 
-val timer = startBlock("Event struct declaration");
+var timer = startBlock("Event struct declaration");
 
 struct Event {
     int type,
@@ -143,7 +153,7 @@ timer.endBlock();
 val EVENT_TYPE_KEY = 0i;
 val EVENT_TYPE_MOUSE = 1i;
 
-val timer = startBlock("Make simple first callback");
+timer = startBlock("Make simple first callback");
 
 func firstCallback(Event event) void {
     print "first!";
@@ -171,7 +181,7 @@ func mouseHandler(Event event) void {
     print "Mouse Event: [" + str(event.value) + "]";
 }
 
-val timer = startBlock("EventDispatcher struct declaration");
+timer = startBlock("EventDispatcher struct declaration");
 
 struct EventDispatcher {
     func(Event) void dispatch,
@@ -190,7 +200,7 @@ struct EventDispatcher {
 
 timer.endBlock();
 
-val timer = startBlock("Make EventDispatcher with 4 subscribers");
+timer = startBlock("Make EventDispatcher with 4 subscribers");
 
 val dispatcher = EventDispatcher { dispatch=firstCallback }
     .subscribe(secondCallback)
@@ -201,7 +211,7 @@ timer.endBlock();
 
 val testEvent = Event { type=EVENT_TYPE_KEY, value=7i };
 
-val timer = startBlock("Dispatch test event");
+timer = startBlock("Dispatch test event");
 
 dispatcher.dispatch(testEvent);
 

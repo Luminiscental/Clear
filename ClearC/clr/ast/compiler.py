@@ -63,7 +63,7 @@ class Program:
                 print(f"Loading upvalue {upvalue}")
             self.load_name(upvalue)
 
-    def begin_jump(self, conditional=False, leave_value=False):
+    def begin_jump(self, conditional=False):
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
         index = len(self.code_list)
         if DEBUG:
@@ -71,21 +71,16 @@ class Program:
         # Insert temporary offset to later be patched
         temp_offset = ClrUint(0)
         self.code_list.append(temp_offset)
-        # If there was a condition and we aren't told to leave it pop it from the stack
-        if conditional and not leave_value:
-            self.code_list.append(OpCode.POP)
-        return index, conditional
+        return index
 
-    def end_jump(self, jump_ref, leave_value=False):
-        index, conditional = jump_ref
+    def end_jump(self, jump_ref):
+        index = jump_ref
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         if DEBUG:
             print(f"Jump from {index} set with offset {offset}")
         # Patch the previously inserted offset
         self.code_list[index] = ClrUint(offset)
-        if conditional and not leave_value:
-            self.code_list.append(OpCode.POP)
 
     def begin_loop(self):
         index = len(self.code_list)
@@ -200,11 +195,16 @@ class Compiler(DeclVisitor):
             cond.accept(self)
             # If the condition is false jump to the next block
             jump = self.program.begin_jump(conditional=True)
+            # Otherwise pop the condition as we don't need it
+            self.program.simple_op(OpCode.POP)
+            # And run the block
             block.accept(self)
-            # Otherwise jump to the end after the block completes
+            # Then jump to the end after the block completes
             final_jumps.append(self.program.begin_jump())
             # The jump to the next block goes after the jump to the end to avoid it
             self.program.end_jump(jump)
+            # Also pop the condition if the block was skipped
+            self.program.simple_op(OpCode.POP)
         if node.otherwise is not None:
             # If we haven't jumped to the end then all the previous blocks didn't execute so run the
             # else block
@@ -220,11 +220,15 @@ class Compiler(DeclVisitor):
             node.condition.accept(self)
             # If there is a condition jump to the end if it's false
             skip_jump = self.program.begin_jump(conditional=True)
+            # Otherwise pop the condition as we don't need it
+            self.program.simple_op(OpCode.POP)
         node.block.accept(self)
         # Go back to before the condition to check it again
         self.program.loop_back(loop)
         if node.condition is not None:
             self.program.end_jump(skip_jump)
+            # If we broke out the condition is still there so pop it
+            self.program.simple_op(OpCode.POP)
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
@@ -291,22 +295,45 @@ class Compiler(DeclVisitor):
     def visit_unpack_expr(self, node):
         # No super as we need the jumps in the right place
         node.target.accept(self)
-        # If the target isn't present jump to the default case
-        jump_to_default = self.program.begin_jump(conditional=True)
-        # Otherwise load the present value
-        node.present_value.accept(self)
-        # If there is a default value deal with skipping it
-        if node.default_value is not None:
-            # Then skip past the default block, leaving the present value on the stack
-            jump_past_default = self.program.begin_jump(conditional=False)
-            # Start the default block
-            self.program.end_jump(jump_to_default, leave_value=False)
+        # Both cases present `a? b : c` - if a is present evaluates to b otherwise c
+        if node.present_value is not None and node.default_value is not None:
+            # If the target isn't present skip the present-case
+            jump_past_present = self.program.begin_jump(conditional=True)
+            # Otherwise pop the condition and load the present-case
+            self.program.simple_op(OpCode.POP)
+            node.present_value.accept(self)
+            # Then skip past the default-case
+            jump_to_end = self.program.begin_jump()
+            self.program.end_jump(jump_past_present)
+            # If the present-case was skipped pop the condition and load the default-case
+            self.program.simple_op(OpCode.POP)
             node.default_value.accept(self)
-            # End the default block, keeping the value of the present case when the default is skipped
-            self.program.end_jump(jump_past_default, leave_value=True)
-        else:
-            # If there is no default just end the jump that skips the present case
-            self.program.end_jump(jump_to_default, leave_value=False)
+            self.program.end_jump(jump_to_end)
+        # Present-case only `a? b` - b is a void expression that is only evaluated if a is present
+        elif node.present_value is not None:
+            # If the target isn't present skip the present-case
+            skip = self.program.begin_jump(conditional=True)
+            # Otherwise load the present-case
+            node.present_value.accept(self)
+            self.program.end_jump(skip)
+            # Pop the condition
+            self.program.simple_op(OpCode.POP)
+        # Default-case only: `a?: b` - if a is present evaluates to a if non-void, otherwise b
+        elif node.default_value is not None:
+            # If the target isn't present skip the present-case
+            jump_past_present = self.program.begin_jump(conditional=True)
+            # Otherwise pop the condition
+            self.program.simple_op(OpCode.POP)
+            if node.default_value.type_annotation != VOID_TYPE:
+                # Load the target in the present-case if it's a non-void expression
+                node.target.accept(self)
+            # Then skip past the default-case
+            jump_to_end = self.program.begin_jump()
+            self.program.end_jump(jump_past_present)
+            # If the present-case was skipped pop the condition and load the default-case
+            self.program.simple_op(OpCode.POP)
+            node.default_value.accept(self)
+            self.program.end_jump(jump_to_end)
 
     def visit_if_expr(self, node):
         # No super because we need the jumps in the right place
