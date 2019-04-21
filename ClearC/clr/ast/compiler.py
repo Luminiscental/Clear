@@ -276,21 +276,21 @@ class Compiler(DeclVisitor):
 
     def visit_binary_expr(self, node):
         super().visit_binary_expr(node)
-        {
-            TokenType.PLUS: lambda: self.program.simple_op(OpCode.ADD),
-            TokenType.MINUS: lambda: self.program.simple_op(OpCode.SUBTRACT),
-            TokenType.STAR: lambda: self.program.simple_op(OpCode.MULTIPLY),
-            TokenType.SLASH: lambda: self.program.simple_op(OpCode.DIVIDE),
-            TokenType.EQUAL_EQUAL: lambda: self.program.simple_op(OpCode.EQUAL),
-            TokenType.BANG_EQUAL: lambda: self.program.simple_op(OpCode.NEQUAL),
-            TokenType.LESS: lambda: self.program.simple_op(OpCode.LESS),
-            TokenType.GREATER_EQUAL: lambda: self.program.simple_op(OpCode.NLESS),
-            TokenType.GREATER: lambda: self.program.simple_op(OpCode.GREATER),
-            TokenType.LESS_EQUAL: lambda: self.program.simple_op(OpCode.NGREATER),
-        }.get(
-            node.operator.token_type,
-            emit_error(f"Unknown binary operator! {token_info(node.operator)}"),
-        )()
+        binary_codes = {
+            TokenType.PLUS: OpCode.ADD,
+            TokenType.MINUS: OpCode.SUBTRACT,
+            TokenType.STAR: OpCode.MULTIPLY,
+            TokenType.SLASH: OpCode.DIVIDE,
+            TokenType.EQUAL_EQUAL: OpCode.EQUAL,
+            TokenType.BANG_EQUAL: OpCode.NEQUAL,
+            TokenType.LESS: OpCode.LESS,
+            TokenType.GREATER_EQUAL: OpCode.NLESS,
+            TokenType.GREATER: OpCode.GREATER,
+            TokenType.LESS_EQUAL: OpCode.NGREATER,
+        }
+        if node.operator.token_type not in binary_codes:
+            emit_error(f"Unknown binary operator! {token_info(node.operator)}")()
+        self.program.simple_op(binary_codes[node.operator.token_type])
 
     def visit_unpack_expr(self, node):
         # No super as we need the jumps in the right place

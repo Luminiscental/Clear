@@ -13,12 +13,18 @@ from clr.ast.type_annotations import (
     BOOL_TYPE,
     NIL_TYPE,
     VOID_TYPE,
-    ANY_TYPE,
     IdentifierTypeAnnotation,
     FunctionTypeAnnotation,
 )
 from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType
-from clr.ast.expression_nodes import AccessExpr, KeywordExpr, IdentExpr
+from clr.ast.expression_nodes import (
+    AccessExpr,
+    KeywordExpr,
+    IdentExpr,
+    ARITHMETIC_OPS,
+    EQUALITY_OPS,
+    COMPARISON_OPS,
+)
 from clr.ast.statement_nodes import StmtNode, BlockStmt, ValDecl
 
 TypeInfo = namedtuple(
@@ -165,45 +171,31 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_binary_expr(node)
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type != right_type:
-            emit_error(
-                f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}: `{node}`!"
-            )()
-        if (
-            left_type
-            not in {
-                TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
-                TokenType.MINUS: [NUM_TYPE, INT_TYPE],
-                TokenType.STAR: [NUM_TYPE, INT_TYPE],
-                TokenType.SLASH: [NUM_TYPE],
-                TokenType.EQUAL_EQUAL: ANY_TYPE,
-                TokenType.BANG_EQUAL: ANY_TYPE,
-                TokenType.LESS: [NUM_TYPE, INT_TYPE],
-                TokenType.GREATER_EQUAL: [NUM_TYPE, INT_TYPE],
-                TokenType.GREATER: [NUM_TYPE, INT_TYPE],
-                TokenType.LESS_EQUAL: [NUM_TYPE, INT_TYPE],
-            }[node.operator.token_type]
-        ):
-            emit_error(
-                f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}: `{node}`!"
-            )()
-        if node.operator.token_type in {
-            TokenType.PLUS,
-            TokenType.MINUS,
-            TokenType.STAR,
-            TokenType.SLASH,
-            TokenType.BANG,
-        }:
+        unequal_err = emit_error(
+            f"Incompatible operand types {left_type} and {right_type} for binary operator {token_info(node.operator)}: `{node}`!"
+        )
+        if node.operator.token_type in ARITHMETIC_OPS:
+            if left_type != right_type:
+                unequal_err()
+            if left_type not in ARITHMETIC_OPS[node.operator.token_type]:
+                emit_error(
+                    f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}: `{node}`!"
+                )()
             node.type_annotation = left_type
-        elif node.operator.token_type in {
-            TokenType.EQUAL_EQUAL,
-            TokenType.BANG_EQUAL,
-            TokenType.GREATER,
-            TokenType.GREATER_EQUAL,
-            TokenType.LESS,
-            TokenType.LESS_EQUAL,
-        }:
+        elif node.operator.token_type in COMPARISON_OPS:
+            if left_type != right_type:
+                unequal_err()
+            if left_type not in [NUM_TYPE, INT_TYPE]:
+                emit_error(
+                    f"Incompatible operand type {left_type} for binary operator {token_info(node.operator)}: `{node}`!"
+                )()
             node.type_annotation = BOOL_TYPE
+        elif node.operator.token_type in EQUALITY_OPS:
+            node.type_annotation = BOOL_TYPE
+        else:
+            emit_error(
+                f"Unknown binary operator {token_info(node.operator)}: `{node}`!"
+            )()
 
     def visit_unpack_expr(self, node):
         super().visit_unpack_expr(node)

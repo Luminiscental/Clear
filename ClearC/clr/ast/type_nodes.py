@@ -35,7 +35,7 @@ class SimpleType:
 def parse_simple_type(parser):
     err = parse_error("Expected type!", parser)
     parser.consume(TokenType.IDENTIFIER, err)
-    token = parser.get_prev()
+    token = parser[-1]
     if token.lexeme not in SIMPLE_TYPES:
         if token.token_type == TokenType.IDENTIFIER:
             as_annotation = IdentifierTypeAnnotation(token.lexeme)

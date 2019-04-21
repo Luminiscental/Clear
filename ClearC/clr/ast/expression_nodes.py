@@ -4,7 +4,7 @@ from clr.errors import parse_error
 from clr.tokens import TokenType
 from clr.constants import ClrStr, ClrInt, ClrNum
 from clr.ast.index_annotations import IndexAnnotation
-from clr.ast.type_annotations import TypeAnnotation
+from clr.ast.type_annotations import TypeAnnotation, NUM_TYPE, INT_TYPE, STR_TYPE
 
 
 class Precedence(Enum):
@@ -60,11 +60,11 @@ def get_rule(token):
 
 def parse_expr(parser, precedence=Precedence.ASSIGNMENT):
     # Consume an initial prefix expression bound by the passed precedence
-    first_rule = get_rule(parser.get_current())
+    first_rule = get_rule(parser[0])
     value = first_rule.prefix(parser)
     # Consume any following infix expression still bound by the passed precedence
-    while get_rule(parser.get_current()).precedence >= precedence:
-        rule = get_rule(parser.get_current())
+    while get_rule(parser[0]).precedence >= precedence:
+        rule = get_rule(parser[0])
         # Update the value, pushing the old value as the left node of the infix expression
         value = rule.infix(value, parser)
     return value
@@ -151,7 +151,7 @@ class ConstructExpr(ExprNode):
             parser.consume(
                 TokenType.IDENTIFIER, parse_error("Expected field argument!", parser)
             )
-            field_token = parser.get_prev()
+            field_token = parser[-1]
             if field_token.lexeme in args:
                 parse_error("Repeated field argument!", parser)()
             parser.consume(
@@ -190,7 +190,7 @@ class UnaryExpr(ExprNode):
     @staticmethod
     def parse(parser):
         parser.consume_one(UNARY_OPS, parse_error("Expected unary operator!", parser))
-        operator = parser.get_prev()
+        operator = parser[-1]
         target = parse_expr(parser, precedence=Precedence.UNARY)
         return UnaryExpr(operator, target)
 
@@ -212,7 +212,7 @@ class AssignExpr(ExprNode):
     @staticmethod
     def parse(left, parser):
         parser.consume(TokenType.EQUAL, parse_error("Expected assignment!", parser))
-        operator = parser.get_prev()
+        operator = parser[-1]
         right = parse_expr(parser, Precedence.ASSIGNMENT)
         return AssignExpr(left, right, operator)
 
@@ -255,8 +255,13 @@ class BinaryExpr(ExprNode):
 
     @staticmethod
     def parse(left, parser):
-        parser.consume_one(BINARY_OPS, parse_error("Expected binary operator!", parser))
-        operator = parser.get_prev()
+        possibilities = set.union(
+            set(ARITHMETIC_OPS), set(EQUALITY_OPS), set(COMPARISON_OPS)
+        )
+        parser.consume_one(
+            possibilities, parse_error("Expected binary operator!", parser)
+        )
+        operator = parser[-1]
         precedence = get_rule(operator).precedence.next()
         right = parse_expr(parser, precedence)
         return BinaryExpr(left, right, operator)
@@ -365,7 +370,7 @@ class AndExpr(ExprNode):
     @staticmethod
     def parse(left, parser):
         parser.consume(TokenType.AND, parse_error("Expected and operator!", parser))
-        operator = parser.get_prev()
+        operator = parser[-1]
         # and acts like a normal right-associative binary operator when parsing
         right = parse_expr(parser, precedence=Precedence.AND)
         return AndExpr(left, right, operator)
@@ -388,7 +393,7 @@ class OrExpr(ExprNode):
     @staticmethod
     def parse(left, parser):
         parser.consume(TokenType.OR, parse_error("Expected or operator!", parser))
-        operator = parser.get_prev()
+        operator = parser[-1]
         # or acts like a normal right-associative binary operator when parsing
         right = parse_expr(parser, precedence=Precedence.OR)
         return OrExpr(left, right, operator)
@@ -411,7 +416,7 @@ class KeywordExpr(ExprNode):
         parser.consume_one(
             KEYWORD_EXPRESSIONS, parse_error("Expected keyword expression!", parser)
         )
-        token = parser.get_prev()
+        token = parser[-1]
         return KeywordExpr(token)
 
     @pprint
@@ -432,7 +437,7 @@ class IdentExpr(ExprNode):
     @staticmethod
     def parse(parser):
         parser.consume(TokenType.IDENTIFIER, parse_error("Expected variable!", parser))
-        name = parser.get_prev()
+        name = parser[-1]
         return IdentExpr(name)
 
     @pprint
@@ -451,11 +456,11 @@ class StringExpr(ExprNode):
     @staticmethod
     def parse(parser):
         parser.consume(TokenType.STRING, parse_error("Expected string!", parser))
-        total = [parser.get_prev()]
+        total = [parser[-1]]
         # Adjacent string literals are combined and joined by " to allow effective escaping,
         # don't judge me
         while parser.match(TokenType.STRING):
-            total.append(parser.get_prev())
+            total.append(parser[-1])
         joined = '"'.join(map(lambda t: t.lexeme[1:-1], total))
         value = ClrStr(joined)
         return StringExpr(value)
@@ -478,7 +483,7 @@ class NumberExpr(ExprNode):
     @staticmethod
     def parse(parser):
         parser.consume(TokenType.NUMBER, parse_error("Expected number!", parser))
-        lexeme = parser.get_prev().lexeme
+        lexeme = parser[-1].lexeme
         if parser.match(TokenType.INTEGER_SUFFIX):
             try:
                 value = ClrInt(lexeme)
@@ -510,12 +515,12 @@ class BooleanExpr(ExprNode):
     @staticmethod
     def parse(parser):
         parser.consume_one(BOOLEANS, parse_error("Expected boolean literal!", parser))
-        value = parser.get_prev().token_type == TokenType.TRUE
+        value = parser[-1].token_type == TokenType.TRUE
         return BooleanExpr(value)
 
     @pprint
     def __str__(self):
-        return str(self.value)
+        return str(self.value).lower()
 
     def accept(self, expr_visitor):
         expr_visitor.visit_boolean_expr(self)
@@ -527,19 +532,21 @@ BOOLEANS = {TokenType.TRUE, TokenType.FALSE}
 
 UNARY_OPS = {TokenType.MINUS, TokenType.BANG}
 
-BINARY_OPS = {
-    TokenType.PLUS,
-    TokenType.MINUS,
-    TokenType.STAR,
-    TokenType.SLASH,
-    TokenType.EQUAL_EQUAL,
-    TokenType.BANG_EQUAL,
+ARITHMETIC_OPS = {
+    TokenType.PLUS: [NUM_TYPE, INT_TYPE, STR_TYPE],
+    TokenType.MINUS: [NUM_TYPE, INT_TYPE],
+    TokenType.STAR: [NUM_TYPE, INT_TYPE],
+    TokenType.SLASH: [NUM_TYPE],
+}
+
+EQUALITY_OPS = {TokenType.EQUAL_EQUAL, TokenType.BANG_EQUAL}
+
+COMPARISON_OPS = {
     TokenType.LESS,
     TokenType.GREATER_EQUAL,
     TokenType.GREATER,
     TokenType.LESS_EQUAL,
 }
-
 
 PRATT_TABLE = defaultdict(
     ParseRule,

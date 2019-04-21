@@ -90,17 +90,6 @@ class FunctionTypeAnnotation(TypeAnnotation):
         )
 
 
-class AnyType:
-    def __contains__(self, item):
-        return (
-            isinstance(item, TypeAnnotation)
-            and not item.kind == TypeAnnotationType.VOID
-        )
-
-
-ANY_TYPE = AnyType()
-
-
 INT_TYPE = TypeAnnotation(TypeAnnotationType.INT)
 NUM_TYPE = TypeAnnotation(TypeAnnotationType.NUM)
 STR_TYPE = TypeAnnotation(TypeAnnotationType.STR)

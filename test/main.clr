@@ -1,8 +1,26 @@
 
 // TODO: Actual tests !!!
 
-// var maybe_int int? = 3i;
-// maybe_int = nil;
+// -----------------------------------------------
+// Type Annotations and Optional Unpacking:
+
+var maybe_int int? = 3i;
+
+func p() void {
+    print maybe_int?: -1i;
+}
+
+p();
+maybe_int = nil;
+p();
+print;
+
+// TODO: Fix ! i.e. add nil value to vm
+val maybe_false bool? = false;
+print maybe_false? "present" : "not present";
+print "false == nil = " + str(false == nil); 
+print;
+
 
 // -----------------------------------------------
 // Recursive and Higher Order Functions:

@@ -35,7 +35,7 @@ class BlockStmt(StmtNode):
     @staticmethod
     def parse(parser):
         parser.consume(TokenType.LEFT_BRACE, parse_error("Expected block!", parser))
-        opener = parser.get_prev()
+        opener = parser[-1]
         declarations = []
         while not parser.match(TokenType.RIGHT_BRACE):
             if parser.match(TokenType.EOF):
@@ -79,7 +79,7 @@ class RetStmt(StmtNode):
         parser.consume(
             TokenType.RETURN, parse_error("Expected return statement!", parser)
         )
-        return_token = parser.get_prev()
+        return_token = parser[-1]
         if not parser.match(TokenType.SEMICOLON):
             value = parse_expr(parser)
             parser.consume(
@@ -180,9 +180,8 @@ def parse_decl(parser):
             return StructDecl.parse(parser)
         return parse_stmt(parser)
     except ClrCompileError as error:
-        if not parser.match(TokenType.EOF):
-            parser.errors.append(str(error))
-            parser.advance()
+        parser.errors.append(str(error))
+        parser.advance()
 
 
 class DeclNode(StmtNode):  # pylint: disable=too-few-public-methods
@@ -204,12 +203,12 @@ class ValDecl(DeclNode):
         parser.consume_one(
             VAL_TOKENS, parse_error("Expected value declaration!", parser)
         )
-        mutable = parser.get_prev().token_type == TokenType.VAR
+        mutable = parser[-1].token_type == TokenType.VAR
         # Consume the variable name
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected value name!", parser)
         )
-        name = parser.get_prev()
+        name = parser[-1]
         if name.lexeme in BUILTINS:
             emit_error(
                 f"Invalid identifier name {name.lexeme}! This is reserved for the built-in function {name.lexeme}(). {token_info(name)}"
@@ -251,7 +250,7 @@ class FuncDecl(DeclNode):
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected function name!", parser)
         )
-        name = parser.get_prev()
+        name = parser[-1]
         if name.lexeme in BUILTINS:
             emit_error(
                 f"Invalid identifier name {name.lexeme}! This is reserved for the built-in function {name.lexeme}(). {token_info(name)}"
@@ -269,7 +268,7 @@ class FuncDecl(DeclNode):
             parser.consume(
                 TokenType.IDENTIFIER, parse_error("Expected parameter name!", parser)
             )
-            param_name = parser.get_prev()
+            param_name = parser[-1]
             # Append the parameters as (type, name) tuples
             pair = (param_type, param_name)
             params.append(pair)
@@ -308,7 +307,7 @@ class StructDecl(DeclNode):
         parser.consume(
             TokenType.IDENTIFIER, parse_error("Expected struct name!", parser)
         )
-        name = parser.get_prev()
+        name = parser[-1]
         if name.lexeme in BUILTINS:
             emit_error(
                 f"Invalid struct name {token_info(name)}, this is reserved for the built-in function {name.lexeme}()"
@@ -338,7 +337,7 @@ class StructDecl(DeclNode):
                 parser.consume(
                     TokenType.IDENTIFIER, parse_error("Expected field name!", parser)
                 )
-                field_name = parser.get_prev()
+                field_name = parser[-1]
                 # If we haven't hit the end there must be a comma before the next field
                 if not parser.check(TokenType.RIGHT_BRACE):
                     parser.consume(
