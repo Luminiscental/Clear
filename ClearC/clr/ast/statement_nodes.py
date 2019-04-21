@@ -192,10 +192,11 @@ class DeclNode(StmtNode):  # pylint: disable=too-few-public-methods
 
 
 class ValDecl(DeclNode):
-    def __init__(self, mutable, name, initializer):
+    def __init__(self, mutable, name, type_description, initializer):
         super().__init__()
         self.mutable = mutable
         self.name = name
+        self.type_description = type_description
         self.initializer = initializer
 
     @staticmethod
@@ -213,6 +214,9 @@ class ValDecl(DeclNode):
             emit_error(
                 f"Invalid identifier name {name.lexeme}! This is reserved for the built-in function {name.lexeme}(). {token_info(name)}"
             )()
+        type_description = None
+        if not parser.check(TokenType.EQUAL):
+            type_description = parse_type(parser)
         parser.consume(
             TokenType.EQUAL, parse_error("Expected '=' for value initializer!", parser)
         )
@@ -222,7 +226,7 @@ class ValDecl(DeclNode):
             TokenType.SEMICOLON,
             parse_error("Expected semicolon after value declaration!", parser),
         )
-        return ValDecl(mutable, name, initializer)
+        return ValDecl(mutable, name, type_description, initializer)
 
     @sync_errors
     def accept(self, decl_visitor):

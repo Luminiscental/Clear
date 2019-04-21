@@ -493,7 +493,7 @@ class TypeResolver(StructTrackingDeclVisitor):
                 token_type=TokenType.IDENTIFIER, lexeme=field_name.lexeme, line=-1
             )
             field_value = AccessExpr(KeywordExpr(this_token), IdentExpr(name_token))
-            implicit_decl = ValDecl(False, name_token, field_value)
+            implicit_decl = ValDecl(False, name_token, None, field_value)
             prefixed_block.append(implicit_decl)
         prefixed_block.extend(node.block.declarations)
         node.block = BlockStmt(prefixed_block)
@@ -525,7 +525,14 @@ class TypeResolver(StructTrackingDeclVisitor):
 
     def visit_val_decl(self, node):
         super().visit_val_decl(node)
-        node.type_annotation = node.initializer.type_annotation
+        if node.type_description is not None:
+            node.type_annotation = node.type_description.as_annotation
+            if not node.initializer.type_annotation.matches(node.type_annotation):
+                emit_error(
+                    f"Incompatible initializing type `{node.initializer.type_annotation}` for variable {token_info(node.name)} declared as `{node.type_annotation}`!"
+                )()
+        else:
+            node.type_annotation = node.initializer.type_annotation
         if node.type_annotation == VOID_TYPE:
             emit_error(
                 f"Cannot create variable {token_info(node.name)} from calling void function `{node.initializer}`!"

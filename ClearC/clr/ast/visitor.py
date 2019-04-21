@@ -128,6 +128,8 @@ class DeclVisitor(StmtVisitor):
         self.end_scope()
 
     def visit_val_decl(self, node):
+        if node.type_description is not None:
+            node.type_description.accept(self)
         node.initializer.accept(self)
 
     def visit_func_decl(self, node):
