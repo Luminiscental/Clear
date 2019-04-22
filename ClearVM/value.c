@@ -8,6 +8,15 @@
 #include "memory.h"
 #include "obj.h"
 
+Value makeNil() {
+
+    Value result = {};
+
+    result.type = VAL_NIL;
+
+    return result;
+}
+
 Value makeInteger(int32_t integer) {
 
     Value result = {};
@@ -49,6 +58,12 @@ bool valuesEqual(Value a, Value b) {
         return false;
 
     switch (a.type) {
+
+        case VAL_NIL: {
+
+            return true; // all nil values are equal
+
+        } break;
 
         case VAL_INTEGER: {
 
@@ -115,6 +130,12 @@ void freeValueArray(ValueArray *array) {
 void printValue(Value value, bool endLine) {
 
     switch (value.type) {
+
+        case VAL_NIL: {
+
+            printf("nil");
+
+        } break;
 
         case VAL_INTEGER: {
 

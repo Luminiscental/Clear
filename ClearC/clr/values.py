@@ -23,57 +23,58 @@ class OpCode(Enum):
     LOAD_CONST = 4
     TRUE = 5
     FALSE = 6
+    NIL = 7
     # Variables
-    DEFINE_GLOBAL = 7
-    LOAD_GLOBAL = 8
-    DEFINE_LOCAL = 9
-    LOAD_LOCAL = 10
+    DEFINE_GLOBAL = 8
+    LOAD_GLOBAL = 9
+    DEFINE_LOCAL = 10
+    LOAD_LOCAL = 11
     # Built-ins
-    INT = 11
-    BOOL = 12
-    NUM = 13
-    STR = 14
-    CLOCK = 15
+    INT = 12
+    BOOL = 13
+    NUM = 14
+    STR = 15
+    CLOCK = 16
     # Statements
-    PRINT = 16
-    PRINT_BLANK = 17
-    RETURN = 18
-    RETURN_VOID = 19
-    POP = 20
+    PRINT = 17
+    PRINT_BLANK = 18
+    RETURN = 19
+    RETURN_VOID = 20
+    POP = 21
     # Arithmetic operators
-    NEGATE = 21
-    ADD = 22
-    SUBTRACT = 23
-    MULTIPLY = 24
-    DIVIDE = 25
+    NEGATE = 22
+    ADD = 23
+    SUBTRACT = 24
+    MULTIPLY = 25
+    DIVIDE = 26
     # Comparison operators
-    LESS = 26
-    NLESS = 27
-    GREATER = 28
-    NGREATER = 29
-    EQUAL = 30
-    NEQUAL = 31
+    LESS = 27
+    NLESS = 28
+    GREATER = 29
+    NGREATER = 30
+    EQUAL = 31
+    NEQUAL = 32
     # Boolean operators
-    NOT = 32
+    NOT = 33
     # Scoping
-    PUSH_SCOPE = 33
-    POP_SCOPE = 34
+    PUSH_SCOPE = 34
+    POP_SCOPE = 35
     # Control flow
-    JUMP = 35
-    JUMP_IF_NOT = 36
-    LOOP = 37
+    JUMP = 36
+    JUMP_IF_NOT = 37
+    LOOP = 38
     # Functions
-    LOAD_PARAM = 38
-    START_FUNCTION = 39
-    CALL = 40
+    LOAD_PARAM = 39
+    START_FUNCTION = 40
+    CALL = 41
     # Closures
-    CLOSURE = 41
-    LOAD_UPVALUE = 42
-    SET_UPVALUE = 43
+    CLOSURE = 42
+    LOAD_UPVALUE = 43
+    SET_UPVALUE = 44
     # Structs
-    STRUCT = 44
-    GET_FIELD = 45
-    SET_FIELD = 46
+    STRUCT = 45
+    GET_FIELD = 46
+    SET_FIELD = 47
 
     def __str__(self):
         return "OP_" + self.name

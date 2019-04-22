@@ -294,7 +294,11 @@ class Compiler(DeclVisitor):
 
     def visit_unpack_expr(self, node):
         # No super as we need the jumps in the right place
+        # Load the target value
         node.target.accept(self)
+        # Compare check if it isn't nil
+        self.program.simple_op(OpCode.NIL)
+        self.program.simple_op(OpCode.NEQUAL)
         # Both cases present `a? b : c` - if a is present evaluates to b otherwise c
         if node.present_value is not None and node.default_value is not None:
             # If the target isn't present skip the present-case
@@ -396,7 +400,7 @@ class Compiler(DeclVisitor):
         if node.token.token_type == TokenType.THIS:
             self.program.load_name(node.index_annotation)
         elif node.token.token_type == TokenType.NIL:
-            self.program.simple_op(OpCode.FALSE)
+            self.program.simple_op(OpCode.NIL)
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)

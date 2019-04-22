@@ -556,6 +556,18 @@ InterpretResult run(VM *vm) {
 
             } break;
 
+            case OP_NIL: {
+
+                Value val = makeNil();
+
+                if (push(frame, val) != INTERPRET_OK) {
+
+                    printf("|| Could not push nil value!\n");
+                    return INTERPRET_OK;
+                }
+
+            } break;
+
             case OP_DEFINE_GLOBAL: {
 
                 uint8_t index;

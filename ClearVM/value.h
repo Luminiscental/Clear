@@ -17,7 +17,8 @@ typedef enum {
     VAL_NUMBER,
     VAL_INTEGER,
     VAL_BOOL,
-    VAL_OBJ
+    VAL_OBJ,
+    VAL_NIL
 
 } ValueType;
 
@@ -38,6 +39,7 @@ typedef struct {
 
 } Value;
 
+Value makeNil();
 Value makeInteger(int32_t integer);
 Value makeBoolean(bool boolean);
 Value makeNumber(double number);

@@ -15,7 +15,6 @@ maybe_int = nil;
 p();
 print;
 
-// TODO: Fix ! i.e. add nil value to vm
 val maybe_false bool? = false;
 print maybe_false? "present" : "not present";
 print "false == nil = " + str(false == nil); 
