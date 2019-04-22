@@ -299,13 +299,31 @@ class Compiler(DeclVisitor):
         # Compare check if it isn't nil
         self.program.simple_op(OpCode.NIL)
         self.program.simple_op(OpCode.NEQUAL)
+
+        def load_present_value():
+            # Create the present value function
+            implicit_function = self.program.begin_function()
+            # Evaluate the present-value
+            node.present_value.accept(self)
+            # Return from the evaluating function
+            if node.present_value.type_annotation != VOID_TYPE:
+                self.program.simple_op(OpCode.RETURN)
+            else:
+                self.program.simple_op(OpCode.RETURN_VOID)
+            self.program.end_function(implicit_function)
+            self.program.make_closure(node.upvalues)
+            # Call the function with the target value as a single argument
+            node.target.accept(self)
+            self.program.simple_op(OpCode.CALL)
+            self.program.simple_op(1)
+
         # Both cases present `a? b : c` - if a is present evaluates to b otherwise c
         if node.present_value is not None and node.default_value is not None:
             # If the target isn't present skip the present-case
             jump_past_present = self.program.begin_jump(conditional=True)
             # Otherwise pop the condition and load the present-case
             self.program.simple_op(OpCode.POP)
-            node.present_value.accept(self)
+            load_present_value()
             # Then skip past the default-case
             jump_to_end = self.program.begin_jump()
             self.program.end_jump(jump_past_present)
@@ -318,7 +336,7 @@ class Compiler(DeclVisitor):
             # If the target isn't present skip the present-case
             skip = self.program.begin_jump(conditional=True)
             # Otherwise load the present-case
-            node.present_value.accept(self)
+            load_present_value()
             self.program.end_jump(skip)
             # Pop the condition
             self.program.simple_op(OpCode.POP)

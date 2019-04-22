@@ -326,6 +326,8 @@ class UnpackExpr(ExprNode):
         self.target = target
         self.present_value = present_value
         self.default_value = default_value
+        # Upvalues for the present-case implicit function
+        self.upvalues = []
 
     @staticmethod
     def parse(left, parser):

@@ -115,6 +115,18 @@ class NameIndexer(StructTrackingDeclVisitor):
             sorted(node.args.items(), key=lambda arg: field_names[arg[0]])
         )
 
+    def visit_unpack_expr(self, node):
+        node.target.accept(self)
+        if node.present_value is not None:
+            # Present case is actually a function over the target value
+            implicit_function = FunctionNameIndexer(self)
+            # Take the target value as a parameter, any other references become upvalues
+            implicit_function.add_param(node.target.name.lexeme)
+            node.present_value.accept(implicit_function)
+            node.upvalues.extend(implicit_function.upvalues)
+        if node.default_value is not None:
+            node.default_value.accept(self)
+
     def visit_keyword_expr(self, node):
         super().visit_keyword_expr(node)
         if node.token.token_type == TokenType.THIS:

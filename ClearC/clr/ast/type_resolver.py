@@ -40,8 +40,8 @@ class TypeResolver(StructTrackingDeclVisitor):
         self.level = 0
         self.current_structs = []
 
-    def _declare_name(self, name, type_annotation, assignable=False):
-        if name.lexeme in self.scopes[self.level]:
+    def _declare_name(self, name, type_annotation, assignable=False, internal=False):
+        if not internal and name.lexeme in self.scopes[self.level]:
             emit_error(f"Redeclaration of name {token_info(name)}!")()
         self.scopes[self.level][name.lexeme] = TypeInfo(type_annotation, assignable)
 
@@ -198,7 +198,24 @@ class TypeResolver(StructTrackingDeclVisitor):
             )()
 
     def visit_unpack_expr(self, node):
-        super().visit_unpack_expr(node)
+        node.target.accept(self)
+        if node.present_value is not None:
+            orig_info = self._lookup_name(node.target.name.lexeme)
+            self._declare_name(
+                node.target.name,
+                orig_info.annotation.target,
+                orig_info.assignable,
+                internal=True,
+            )
+            node.present_value.accept(self)
+            self._declare_name(
+                node.target.name,
+                orig_info.annotation,
+                orig_info.assignable,
+                internal=True,
+            )
+        if node.default_value is not None:
+            node.default_value.accept(self)
         if node.target.type_annotation.kind == TypeAnnotationType.VOID:
             emit_error(f"Cannot unpack result of void function: `{node}`!")()
         # Both cases are present

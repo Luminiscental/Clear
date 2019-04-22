@@ -50,11 +50,7 @@ struct LinkedListInt {
     LinkedListInt? next,
 
     func to_str() str {
-        val dummy_list = LinkedListInt { value=0i, next=nil };
-        val next_if_present = next?: dummy_list;
-
-        // TODO: Handle unpacking of optional target in non-implicit present-case
-        return str(value) + next? ", " + next_if_present.to_str() : "";
+        return str(value) + next? ", " + next.to_str() : "";
     }
 
     func push(int value) LinkedListInt {
@@ -65,11 +61,8 @@ struct LinkedListInt {
     }
 
     func for_each(func(int) void consume) void {
-        val dummy_list = LinkedListInt { value=0i, next=nil };
-        val next_if_present = next?: dummy_list;
-
         consume(value);
-        next? next_if_present.for_each(consume);
+        next? next.for_each(consume);
     }
 }
 
