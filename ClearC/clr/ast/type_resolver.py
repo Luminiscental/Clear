@@ -227,11 +227,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             node.type_annotation = node.present_value.type_annotation
         # Present-case only
         elif node.present_value is not None:
-            if node.present_value.type_annotation != VOID_TYPE:
-                emit_error(
-                    f"Missing default case for optional unpacking! Present case returns a value of type {node.present_value.type_annotation}: `{node}`"
-                )
-            node.type_annotation = node.present_value.type_annotation
+            node.type_annotation = VOID_TYPE
         # Default-case only
         elif node.default_value is not None:
             target_type = node.target.type_annotation

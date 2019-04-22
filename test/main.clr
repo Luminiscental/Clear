@@ -18,8 +18,15 @@ print;
 val maybe_false bool? = false;
 print maybe_false? "present" : "not present";
 print "false == nil = " + str(false == nil); 
-print;
 
+func side_effect() int {
+    val result = 2i;
+    print result;
+    return result;
+}
+
+maybe_false? side_effect();
+print;
 
 // -----------------------------------------------
 // Recursive and Higher Order Functions:
@@ -50,7 +57,13 @@ struct LinkedListInt {
     LinkedListInt? next,
 
     func to_str() str {
-        return str(value) + next? ", " + next.to_str() : "";
+        val rest = next? ", " + next.to_str() : "";
+        return str(value) + rest;
+    }
+
+    func for_each(func(int) void consume) void {
+        consume(value);
+        next? next.for_each(consume);
     }
 
     func push(int value) LinkedListInt {
@@ -58,11 +71,6 @@ struct LinkedListInt {
             value=value,
             next=this
         };
-    }
-
-    func for_each(func(int) void consume) void {
-        consume(value);
-        next? next.for_each(consume);
     }
 }
 

@@ -337,6 +337,9 @@ class Compiler(DeclVisitor):
             skip = self.program.begin_jump(conditional=True)
             # Otherwise load the present-case
             load_present_value()
+            # If it's a discarded expression pop it as the unpack counts as void after
+            if node.present_value.type_annotation != VOID_TYPE:
+                self.program.simple_op(OpCode.POP)
             self.program.end_jump(skip)
             # Pop the condition
             self.program.simple_op(OpCode.POP)
