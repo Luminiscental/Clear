@@ -5,7 +5,7 @@
 #include "table.h"
 #include "value.h"
 
-#define FRAMES_MAX 64
+#define FRAMES_MAX 256
 // TODO: Multiple-byte indices
 #define STACK_MAX 256
 

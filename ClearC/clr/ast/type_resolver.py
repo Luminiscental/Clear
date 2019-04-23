@@ -149,13 +149,13 @@ class TypeResolver(StructTrackingDeclVisitor):
 
     def visit_access_expr(self, node):
         super().visit_access_expr(node)
-        if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
-            emit_error(
-                f"Non-struct type {node.left.type_annotation} does not have a property to access: `{node}`!"
-            )()
         if not isinstance(node.right, IdentExpr):
             emit_error(f"Accessor {node.right} is not an identifier! `{node}`")()
         property_token = node.right.name
+        if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
+            emit_error(
+                f"Non-struct type {node.left.type_annotation} does not have a property {token_info(property_token)} to access: `{node}`!"
+            )()
         struct = self.structs[node.left.type_annotation.identifier]
         fields = {
             field_name.lexeme: field_type for (field_type, field_name) in struct.fields

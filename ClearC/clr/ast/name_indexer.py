@@ -48,7 +48,7 @@ class NameIndexer(StructTrackingDeclVisitor):
         # If no resolved name was found the returned index is unresolved
         return IndexAnnotation()
 
-    def _declare_new(self):
+    def _new_index(self):
         if self.level > 0:
             idx = self.local_index
             self.local_index += 1
@@ -62,16 +62,10 @@ class NameIndexer(StructTrackingDeclVisitor):
         return result
 
     def _declare_name(self, name):
-        prev = self.lookup_name(name)
-        if prev.kind == IndexAnnotationType.UNRESOLVED:
-            # If the name already was not found as already declared make it a new index
-            result = self._declare_new()
-        else:
-            # If it was already declared use the old value directly
-            result = IndexAnnotation(prev.kind, prev.value)
+        result = self._new_index()
+        self.scopes[self.level][name] = result
         if DEBUG:
             print(f"Declared {name} as {result}")
-        self.scopes[self.level][name] = result
         return result
 
     def start_scope(self):
@@ -181,7 +175,7 @@ class NameIndexer(StructTrackingDeclVisitor):
     def visit_struct_decl(self, node):
         # Declare the methods before the constructor as they are created before it when compiling
         for method in node.methods.values():
-            method.index_annotation = self._declare_new()
+            method.index_annotation = self._new_index()
         # Declare the constructor before calling super() so that it can be referenced in methods
         node.index_annotation = self._declare_name(node.name.lexeme)
         # Call super(), visiting all the methods/fields

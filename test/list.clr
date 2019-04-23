@@ -58,30 +58,28 @@ struct List {
     }
 }
 
-func list(int value) List {
-    return List { value=value, next=nil };
-}
+val count = 100i;
 
-val test_list = list(3i).push(2i).push(1i).push(7i).push(-1i);
-print "test_list = " + test_list.to_str();
-print "test_list.push_all(test_list) = " + test_list.push_all(test_list).to_str();
-print "sorted = " + test_list.sort().to_str();
-print;
+var i = 0i;
+val start = clock();
+while (i < count) {
+    i = i + 1i;
+}
+val end = clock();
+
+val adjustment = end - start;
 
 func time_function(func() void f, str msg) void {
+    var i = 0i;
     val start = clock();
-    f();
-    f();
-    f();
-    f();
-    f();
-    f();
-    f();
-    f();
-    f();
-    f();
-    val elapsed = clock() - start;
-    val per_call = elapsed / 10;
+    while (i < count) {
+        f();
+        i = i + 1i;
+    }
+    val end = clock();
+
+    val elapsed = end - start - adjustment;
+    val per_call = elapsed / num(count);
     print "(" + msg + ", " + str(per_call) + ")";
 }
 
@@ -89,8 +87,8 @@ func make_sorter(int n) func() void {
     var list = List { value=-1i, next=nil };
     var value = 21i;
 
-    var i = n;
-    while (i >= 0i) {
+    var i = 1i;
+    while (i < n) {
 
         list = list.push(value);
         if (value > 5i) {
@@ -101,10 +99,9 @@ func make_sorter(int n) func() void {
             value = value * 2i;
         }
 
-        i = i - 1i;
+        i = i + 1i;
     }
 
-    print "n=" + str(n) + ": list=" + list.to_str();
     func sorter() void {
         list.sort();
     }
@@ -117,12 +114,23 @@ func time_nth(int n) void {
     time_function(nth, str(n));
 }
 
-print "sort times:";
+func main() void {
+    val test_list = List { value=3i, next=nil }.push(2i).push(1i).push(7i).push(-1i);
+    print "
+test_list = " + test_list.to_str() + "
+test_list.push_all(test_list) = " + test_list.push_all(test_list).to_str() + "
+sorted = " + test_list.sort().to_str() + "
+";
 
-var i = 1i;
-while (i <= 27i) {
+    print "sort times:";
 
-    time_nth(i);
+    var i = 1i;
+    while (i <= 100i) {
+        time_nth(i);
+        i = i + 1i;
+    }
 
-    i = i + 1i;
+    print;
 }
+
+main();
