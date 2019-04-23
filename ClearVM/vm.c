@@ -96,6 +96,7 @@ InterpretResult getGlobal(GlobalState *state, size_t index, Value *out) {
         if (out != NULL) {
 
             *out = state->values[index];
+            out->references = NULL; // Copies don't track upvalue references
         }
 
         return INTERPRET_OK;
@@ -663,7 +664,14 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
+                if (index >= frame->localState.localIndex) {
+
+                    printf("|| Local index out of range!\n");
+                    return INTERPRET_ERR;
+                }
+
                 Value val = frame->stack[index];
+                val.references = NULL; // Copies don't track upvalues
 
                 if (push(frame, val) != INTERPRET_OK) {
 
@@ -720,8 +728,11 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                if (push(frame, *frame->closure->upvalues[index]->value) !=
-                    INTERPRET_OK) {
+                Value target = *frame->closure->upvalues[index]->value;
+                target.references =
+                    NULL; // Copies don't track upvalue references
+
+                if (push(frame, target) != INTERPRET_OK) {
 
                     printf("|| Could not push upvalue!\n");
                     return INTERPRET_ERR;

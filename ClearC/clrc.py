@@ -27,6 +27,7 @@ def main():
     except ClrCompileError as compile_error:
         print("Could not compile:")
         print(compile_error)
+        exit(1)
     else:
         print("Compiled successfully")
         with open(dest_file_name, "wb") as dest_file:

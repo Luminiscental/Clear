@@ -1,9 +1,11 @@
 #!/bin/sh
 
+set -e
+
 echo ""
 echo "-- Compiling test source --"
 
-python ClearC/clrc.py test/main
+python ClearC/clrc.py test/$1
 
 echo ""
 echo "-- Compiling VM --"
@@ -19,7 +21,7 @@ make
 echo ""
 echo "-- Running bytecode --"
 
-./clr ../../test/main
+./clr ../../test/$1
 
 echo ""
 echo ""

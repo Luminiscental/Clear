@@ -1,0 +1,123 @@
+
+struct List {
+    int value,
+    List? next,
+
+    func push(int value) List {
+        return List {
+            value=value,
+            next=this
+        };
+    }
+
+    func push_all(List list) List {
+        val list_next = list.next;
+        return list_next? push_all(list_next).push(list.value) : push(list.value);
+    }
+
+    func to_str() str {
+        return str(value) + next? ", " + next.to_str() : "";
+    }
+
+    func for_each(func(int) void consumer) void {
+        consumer(value);
+        next? next.for_each(consumer);
+    }
+
+    func sort() List {
+        if (next == nil) {
+            return this;
+        }
+
+        var less List? = nil;
+        var more List? = nil;
+
+        val dummy_list = List { value=0i, next=nil };
+        val present_next = next?: dummy_list;
+
+        func add_to_sides(int value) void {
+            if (value <= this.value) {
+                less = less? less.push(value) : List { value=value, next=nil };
+            } else {
+                more = more? more.push(value) : List { value=value, next=nil };
+            }
+        }
+
+        present_next.for_each(add_to_sides);
+
+        val nil_list List? = nil;
+        func make_optional(List list) List? {
+            return list;
+        }
+
+        less = less? make_optional(less.sort()) : nil_list;
+        more = more? make_optional(more.sort()) : nil_list;
+
+        val tail = more? more.push(value) : List { value=value, next=nil };
+        return less? tail.push_all(less) : tail;
+    }
+}
+
+func list(int value) List {
+    return List { value=value, next=nil };
+}
+
+val test_list = list(3i).push(2i).push(1i).push(7i).push(-1i);
+print "test_list = " + test_list.to_str();
+print "test_list.push_all(test_list) = " + test_list.push_all(test_list).to_str();
+print "sorted = " + test_list.sort().to_str();
+print;
+
+func time_function(func() void f, str msg) void {
+    val start = clock();
+    f();
+    f();
+    f();
+    f();
+    f();
+    f();
+    f();
+    f();
+    f();
+    f();
+    val elapsed = clock() - start;
+    val per_call = elapsed / 10;
+    print "(" + msg + ", " + str(per_call) + ")";
+}
+
+func make_sorter(int n) func() void {
+    var list = List { value=-1i, next=nil };
+    var value = 21i;
+
+    var i = n;
+    while (i >= 0i) {
+
+        list = list.push(value);
+        value = value + 1i;
+
+        i = i - 1i;
+    }
+
+    // TODO: Why seg-fault from this?
+    // print "n=" + str(n) + ": list=" + list.to_str();
+    func sorter() void {
+        list.sort();
+    }
+
+    return sorter;
+}
+
+func time_nth(int n) void {
+    val nth = make_sorter(n);
+    time_function(nth, str(n));
+}
+
+print "sort times:";
+
+var i = 1i;
+while (i <= 25i) {
+
+    time_nth(i);
+
+    i = i + 1i;
+}

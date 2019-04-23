@@ -432,22 +432,23 @@ class Compiler(DeclVisitor):
     def visit_and_expr(self, node):
         # No super because we need to put the jumps in the right place
         node.left.accept(self)
+        # If the first value is false don't bother checking the second
         short_circuit = self.program.begin_jump(conditional=True)
-        # If the first is false jump past the second, if we don't jump pop the value to replace
-        # with the second one
+        # Otherwise pop the false value and load the second
+        self.program.simple_op(OpCode.POP)
         node.right.accept(self)
-        # If we jumped here because the first was false leave that false value on the stack
-        self.program.end_jump(short_circuit, leave_value=True)
+        self.program.end_jump(short_circuit)
 
     def visit_or_expr(self, node):
         # No super because we need to put the jumps in the right place
         node.left.accept(self)
         # If the first value is false jump past the shortcircuit
-        long_circuit = self.program.begin_jump(conditional=True, leave_value=True)
+        long_circuit = self.program.begin_jump(conditional=True)
         # If we haven't skipped the shortcircuit jump to the end
         short_circuit = self.program.begin_jump()
         # If we skipped the shortcircuit pop the first value to replace with the second one
         self.program.end_jump(long_circuit)
+        self.program.simple_op(OpCode.POP)
         node.right.accept(self)
         # If we short circuited leave the true value on the stack
-        self.program.end_jump(short_circuit, leave_value=True)
+        self.program.end_jump(short_circuit)

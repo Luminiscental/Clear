@@ -334,6 +334,9 @@ class UnpackExpr(ExprNode):
         present_value = None
         default_value = None
 
+        if not isinstance(left, IdentExpr):
+            parse_error(f"Cannot unpack non-identifier expression `{left}`!", parser)()
+
         parser.consume(
             TokenType.QUESTION_MARK, parse_error("Expected optional unpacking!", parser)
         )

@@ -16,10 +16,25 @@ class NameIndexer(StructTrackingDeclVisitor):
     def __init__(self):
         super().__init__()
         self.scopes = [defaultdict(IndexAnnotation)]
+        self.scope_indices = [[]]
         self.level = 0
         self.local_index = 0
         self.global_index = 0
         self.is_function = False
+
+    def increase_level(self):
+        if DEBUG:
+            print("Increasing scope level")
+        self.scopes.append(defaultdict(IndexAnnotation))
+        self.scope_indices.append([])
+        self.level += 1
+
+    def decrease_level(self):
+        if DEBUG:
+            print("Decreasing scope level")
+        del self.scopes[self.level]
+        del self.scope_indices[self.level]
+        self.level -= 1
 
     def lookup_name(self, name):
         lookback = 0
@@ -29,8 +44,7 @@ class NameIndexer(StructTrackingDeclVisitor):
             lookback += 1
             # If the scope contains a resolved index for the name we're done
             if name in scope:
-                result = scope[name]
-                return result
+                return scope[name]
         # If no resolved name was found the returned index is unresolved
         return IndexAnnotation()
 
@@ -43,7 +57,9 @@ class NameIndexer(StructTrackingDeclVisitor):
             idx = self.global_index
             self.global_index += 1
             kind = IndexAnnotationType.GLOBAL
-        return IndexAnnotation(kind, idx)
+        result = IndexAnnotation(kind, idx)
+        self.scope_indices[self.level].append(result)
+        return result
 
     def _declare_name(self, name):
         prev = self.lookup_name(name)
@@ -60,29 +76,21 @@ class NameIndexer(StructTrackingDeclVisitor):
 
     def start_scope(self):
         super().start_scope()
-        self.scopes.append(defaultdict(IndexAnnotation))
-        self.level += 1
+        self.increase_level()
 
     def end_scope(self):
         super().end_scope()
         if self.level == 0:
             emit_error("Cannot end the global scope!")()
         else:
-            popped = self.scopes[self.level]
-            popped_indices = [
-                index
-                for index in popped.values()
-                if index.kind != IndexAnnotationType.UNRESOLVED
-            ]
+            popped_indices = self.scope_indices[self.level]
             # If there are resolved indices that went out of scope, reset back so that they can be
             # re-used
             if popped_indices:
                 self.local_index = min(map(lambda index: index.value, popped_indices))
                 if DEBUG:
                     print(f"After popping local index is {self.local_index}")
-        # Remove the popped scope
-        del self.scopes[self.level]
-        self.level -= 1
+        self.decrease_level()
 
     def visit_access_expr(self, node):
         super().visit_access_expr(node)
@@ -200,9 +208,8 @@ class FunctionNameIndexer(NameIndexer):
         # Inherit structs from parent as a copy
         self.structs = parent.structs.copy()
         self.parent = parent
-        self.scopes.append(defaultdict(IndexAnnotation))
         # Default scope is not the global scope in a function
-        self.level += 1
+        self.increase_level()
         self.params = []
         self.upvalues = []
         self.is_function = True
