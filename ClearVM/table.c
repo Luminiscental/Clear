@@ -48,7 +48,7 @@ static Entry *findEntry(Entry *entries, size_t capacity, Value key) {
 
 static void adjustCapacity(Table *table, size_t capacity) {
 
-    Entry *entries = ALLOCATE(Entry, capacity);
+    Entry *entries = ALLOCATE_ARRAY(Entry, capacity);
 
     for (size_t i = 0; i < capacity; i++) {
 

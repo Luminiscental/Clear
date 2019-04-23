@@ -20,7 +20,7 @@ FileBuffer readFile(const char *name) {
     size_t nameLength = strlen(name);
     size_t fileNameLength = nameLength + 6;
 
-    char *fileName = ALLOCATE(char, fileNameLength + 1);
+    char *fileName = ALLOCATE_ARRAY(char, fileNameLength + 1);
     fileName[fileNameLength] = '\0';
     strcpy(fileName, name);
     strcat(fileName, ".clr.b");
@@ -62,7 +62,7 @@ FileBuffer readFile(const char *name) {
         return result;
     }
 
-    char *buffer = ALLOCATE(char, fileLength);
+    char *buffer = ALLOCATE_ARRAY(char, fileLength);
 
     fread(buffer, 1, fileLength, inFile);
 

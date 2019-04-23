@@ -90,7 +90,7 @@ Value makeStringFromLiteral(VM *vm, const char *string) {
 
     Value result = {};
 
-    char *copyStr = ALLOCATE(char, length + 1);
+    char *copyStr = ALLOCATE_ARRAY(char, length + 1);
     strcpy(copyStr, string);
 
     ObjString *stringObj = allocateString(vm, length, copyStr);
@@ -128,7 +128,7 @@ Value makeStringFromInteger(VM *vm, int32_t integer) {
     size_t digits = countDigits(integer);
     size_t length = minusSignLength + digits;
 
-    char *buffer = ALLOCATE(char, length + 1);
+    char *buffer = ALLOCATE_ARRAY(char, length + 1);
     buffer[length] = '\0';
 
     snprintf(buffer, length + 1, "%d", integer);
@@ -144,7 +144,7 @@ char *makeRawStringFromNumber(double number, size_t *lengthOut) {
     size_t preDecimalDigits = size < 1.0 ? 1 : 1 + (size_t)log10(size);
     size_t length = minusSignLength + preDecimalDigits + 1 + NUMBER_PLACES;
 
-    char *buffer = ALLOCATE(char, length + 1);
+    char *buffer = ALLOCATE_ARRAY(char, length + 1);
     buffer[length] = '\0';
 
     snprintf(buffer, length + 1, "%.*f", NUMBER_PLACES, number);
@@ -196,7 +196,7 @@ Value concatStrings(VM *vm, ObjString *first, ObjString *second) {
 
     size_t newLength = first->length + second->length;
 
-    char *result = ALLOCATE(char, newLength + 1);
+    char *result = ALLOCATE_ARRAY(char, newLength + 1);
     result[newLength] = '\0';
 
     memcpy(result, first->chars, first->length);
@@ -257,7 +257,7 @@ Value makeClosure(VM *vm, ObjFunction *function, size_t upvalueCount) {
 
     closure->function = function;
     closure->upvalueCount = upvalueCount;
-    closure->upvalues = ALLOCATE(ObjUpvalue *, upvalueCount);
+    closure->upvalues = ALLOCATE_ARRAY(ObjUpvalue *, upvalueCount);
 
     for (size_t i = 0; i < upvalueCount; i++) {
 

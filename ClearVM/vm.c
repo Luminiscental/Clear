@@ -13,7 +13,7 @@
 
 Scope *makeScope(Scope *parent) {
 
-    Scope *result = (Scope *)malloc(sizeof(Scope));
+    Scope *result = ALLOCATE(Scope);
 
     result->parent = parent;
     result->variables = 0;
@@ -26,7 +26,7 @@ void freeScope(Scope *scope) {
     while (scope != NULL) {
 
         Scope *parent = scope->parent;
-        free(scope);
+        FREE(Scope, scope);
         scope = parent;
     }
 }
@@ -58,12 +58,17 @@ InterpretResult popScope(LocalState *state, size_t *out) {
         printf("|| Cannot pop global scope!\n");
         return INTERPRET_ERR;
     }
+
     state->currentScope = popped->parent;
     state->localIndex -= popped->variables;
+
     if (out != NULL) {
 
         *out = popped->variables;
     }
+
+    FREE(Scope, popped);
+
     return INTERPRET_OK;
 }
 
@@ -981,7 +986,7 @@ InterpretResult run(VM *vm) {
                     return INTERPRET_ERR;
                 }
 
-                Value *fields = ALLOCATE(Value, fieldCount);
+                Value *fields = ALLOCATE_ARRAY(Value, fieldCount);
 
                 for (size_t i = 0; i < fieldCount; i++) {
 
