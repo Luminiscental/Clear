@@ -3,6 +3,7 @@ project(clr C)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_definitions("-Wextra -Werror -Wswitch")
+set(CMAKE_BUILD_TYPE Debug)
 # add_compile_definitions(DEBUG_FILE)
 # add_compile_definitions(DEBUG_DIS)
 # add_compile_definitions(DEBUG_TRACE)

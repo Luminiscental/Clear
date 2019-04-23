@@ -133,7 +133,7 @@ Value makeStringFromInteger(VM *vm, int32_t integer) {
 
     snprintf(buffer, length + 1, "%d", integer);
 
-    return makeString(vm, digits, buffer);
+    return makeString(vm, length, buffer);
 }
 
 char *makeRawStringFromNumber(double number, size_t *lengthOut) {
@@ -199,8 +199,8 @@ Value concatStrings(VM *vm, ObjString *first, ObjString *second) {
     char *result = ALLOCATE(char, newLength + 1);
     result[newLength] = '\0';
 
-    strcpy(result, first->chars);
-    strcat(result, second->chars);
+    memcpy(result, first->chars, first->length);
+    memcpy(result + first->length, second->chars, second->length);
 
     return makeString(vm, newLength, result);
 }

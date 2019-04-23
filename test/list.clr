@@ -93,13 +93,18 @@ func make_sorter(int n) func() void {
     while (i >= 0i) {
 
         list = list.push(value);
-        value = value + 1i;
+        if (value > 5i) {
+            value = value - 17i;
+        } else if (value < -10i) {
+            value = value + 13i;
+        } else {
+            value = value * 2i;
+        }
 
         i = i - 1i;
     }
 
-    // TODO: Why seg-fault from this?
-    // print "n=" + str(n) + ": list=" + list.to_str();
+    print "n=" + str(n) + ": list=" + list.to_str();
     func sorter() void {
         list.sort();
     }
@@ -115,7 +120,7 @@ func time_nth(int n) void {
 print "sort times:";
 
 var i = 1i;
-while (i <= 25i) {
+while (i <= 27i) {
 
     time_nth(i);
 
