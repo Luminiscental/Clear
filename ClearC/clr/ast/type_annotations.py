@@ -35,13 +35,26 @@ class TypeAnnotation:
         return self.kind == other.kind
 
     def matches(self, other):
-        # TODO: Need to make a bi-directional way of dealing with this stuff,
-        # if brances of a conditional expression are one optional one not the order shouldn't matter
-        if self == other:
-            return True
-        if isinstance(other, OptionalTypeAnnotation):
-            return self.matches(other.target) or self.matches(NIL_TYPE)
-        return False
+        return union_type(self, other) == other
+
+
+def union_type(a, b):
+    # equal types match
+    if a == b:
+        return a
+    # optional types match nil
+    if isinstance(a, OptionalTypeAnnotation):
+        if b in [a.target, NIL_TYPE]:
+            return a
+    if isinstance(b, OptionalTypeAnnotation):
+        if a in [b.target, NIL_TYPE]:
+            return b
+    # nil makes things optional
+    if a == NIL_TYPE and b != VOID_TYPE:
+        return OptionalTypeAnnotation(b)
+    if b == NIL_TYPE and a != VOID_TYPE:
+        return OptionalTypeAnnotation(a)
+    return None
 
 
 class IdentifierTypeAnnotation(TypeAnnotation):

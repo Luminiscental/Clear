@@ -15,6 +15,7 @@ from clr.ast.type_annotations import (
     VOID_TYPE,
     IdentifierTypeAnnotation,
     FunctionTypeAnnotation,
+    union_type,
 )
 from clr.ast.return_annotations import ReturnAnnotation, ReturnAnnotationType
 from clr.ast.expression_nodes import (
@@ -199,6 +200,8 @@ class TypeResolver(StructTrackingDeclVisitor):
 
     def visit_unpack_expr(self, node):
         node.target.accept(self)
+        if node.target.type_annotation.kind != TypeAnnotationType.OPTIONAL:
+            emit_error(f"Cannot unpack non-optional value: `{node}`!")()
         if node.present_value is not None:
             orig_info = self._lookup_name(node.target.name.lexeme)
             self._declare_name(
@@ -216,23 +219,22 @@ class TypeResolver(StructTrackingDeclVisitor):
             )
         if node.default_value is not None:
             node.default_value.accept(self)
-        if node.target.type_annotation.kind == TypeAnnotationType.VOID:
-            emit_error(f"Cannot unpack result of void function: `{node}`!")()
         # Both cases are present
         if node.present_value is not None and node.default_value is not None:
-            if node.present_value.type_annotation != node.default_value.type_annotation:
+            union = union_type(
+                node.present_value.type_annotation, node.default_value.type_annotation
+            )
+            if union is None:
                 emit_error(
-                    f"Incompatible types for branches of optional unpacking: {node.present_value.type_annotation} and {node.default_value.type_annotation}: `{node}`!"
+                    f"Incompatible types for branches of optional unpacking {node.present_value.type_annotation} and {node.default_value.type_annotation}: `{node}`!"
                 )()
-            node.type_annotation = node.present_value.type_annotation
+            node.type_annotation = union
         # Present-case only
         elif node.present_value is not None:
             node.type_annotation = VOID_TYPE
         # Default-case only
         elif node.default_value is not None:
-            target_type = node.target.type_annotation
-            if target_type.kind == TypeAnnotationType.OPTIONAL:
-                target_type = target_type.target
+            target_type = node.target.type_annotation.target
             if node.default_value.type_annotation == VOID_TYPE:
                 node.type_annotation = VOID_TYPE
             elif node.default_value.type_annotation != target_type:
@@ -252,15 +254,19 @@ class TypeResolver(StructTrackingDeclVisitor):
                 )()
             if expected_type is None:
                 expected_type = value.type_annotation
-            elif expected_type != value.type_annotation:
-                emit_error(
-                    f"Non-matching types in branches of if expression {expected_type} and {value.type_annotation}: `{node}`!"
-                )()
-        if node.otherwise.type_annotation != expected_type:
+            else:
+                union = union_type(expected_type, value.type_annotation)
+                if union is None:
+                    emit_error(
+                        f"Non-matching types in branches of if expression, expected {expected_type} but got {value.type_annotation}: `{node}`!"
+                    )()
+                expected_type = union
+        union = union_type(expected_type, node.otherwise.type_annotation)
+        if union is None:
             emit_error(
                 f"Type for else branch of if expression {node.otherwise.type_annotation} doesn't match expected type {expected_type}"
             )()
-        node.type_annotation = expected_type
+        node.type_annotation = union
 
     def visit_assign_expr(self, node):
         super().visit_assign_expr(node)

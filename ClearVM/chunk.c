@@ -113,7 +113,7 @@ static uint32_t storeConstant(VM *vm, Chunk *chunk, uint32_t offset) {
                 return chunk->count;
             }
 
-            char *string = ALLOCATE(char, size + 1);
+            char *string = ALLOCATE_ARRAY(char, size + 1);
             string[size] = '\0';
             memcpy(string, chunk->code + result + 1, size);
 

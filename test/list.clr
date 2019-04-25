@@ -45,20 +45,15 @@ struct List {
 
         present_next.for_each(add_to_sides);
 
-        val nil_list List? = nil;
-        func make_optional(List list) List? {
-            return list;
-        }
-
-        less = less? make_optional(less.sort()) : nil_list;
-        more = more? make_optional(more.sort()) : nil_list;
+        less = less? less.sort() : nil;
+        more = more? more.sort() : nil;
 
         val tail = more? more.push(value) : List { value=value, next=nil };
         return less? tail.push_all(less) : tail;
     }
 }
 
-val count = 100i;
+val count = 50i;
 
 var i = 0i;
 val start = clock();
@@ -125,7 +120,7 @@ sorted = " + test_list.sort().to_str() + "
     print "sort times:";
 
     var i = 1i;
-    while (i <= 100i) {
+    while (i <= 32i) {
         time_nth(i);
         i = i + 1i;
     }
