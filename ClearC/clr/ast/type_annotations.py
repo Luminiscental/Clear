@@ -37,24 +37,32 @@ class TypeAnnotation:
     def matches(self, other):
         return union_type(self, other) == other
 
+def symmetric(func):
+    def wrapper(first, second):
+        return func(first, second) or func(second, first)
+    return wrapper
 
-def union_type(a, b):
-    # equal types match
-    if a == b:
-        return a
-    # optional types match nil
-    if isinstance(a, OptionalTypeAnnotation):
-        if b in [a.target, NIL_TYPE]:
-            return a
-    if isinstance(b, OptionalTypeAnnotation):
-        if a in [b.target, NIL_TYPE]:
-            return b
-    # nil makes things optional
-    if a == NIL_TYPE and b != VOID_TYPE:
-        return OptionalTypeAnnotation(b)
-    if b == NIL_TYPE and a != VOID_TYPE:
-        return OptionalTypeAnnotation(a)
-    return None
+def union_type(first_type, second_type):
+    @symmetric
+    def get_equal_union(first_type, second_type):
+        if first_type == second_type:
+            return first_type
+        return None
+
+    @symmetric
+    def coerce_from_nil(first_type, second_type):
+        if isinstance(first_type, OptionalTypeAnnotation):
+            if second_type in [first_type.target, NIL_TYPE]:
+                return first_type
+        return None
+
+    @symmetric
+    def coerce_to_optional(first_type, second_type):
+        if first_type == NIL_TYPE:
+            return OptionalTypeAnnotation(second_type)
+        return None
+
+    return get_equal_union(first_type, second_type) or coerce_from_nil(first_type, second_type) or coerce_to_optional(first_type, second_type)
 
 
 class IdentifierTypeAnnotation(TypeAnnotation):
