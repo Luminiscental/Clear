@@ -4,7 +4,7 @@ syn keyword clrKeywords val var print if else and or return func while struct vo
 hi link clrKeywords Type
 
 syn keyword clrBuiltins str num int bool clock
-hi link clrBuiltins Function
+hi link clrBuiltins PreProc
 
 syn match clrDecorator '@'
 hi link clrDecorator Define
@@ -30,3 +30,8 @@ hi link clrComment Comment
 syn match clrSymbol '[?\.,<>{}()!+=\*\-;:/]\(/\)\@!'
 hi link clrSymbol Normal
 
+syn match clrFunction '\(func\_s\+\)\@<=\([a-zA-Z_][a-zA-Z0-9_]*\)'
+hi link clrFunction Function
+
+syn match clrStruct '\(struct\_s\+\)\@<=\([a-zA-Z_][a-zA-Z0-9_]*\)'
+hi link clrStruct Identifier
