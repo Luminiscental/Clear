@@ -1,31 +1,38 @@
 #!/bin/sh
 
-set -e
+if [ $# -lt 1 ]; then
+    echo "Too few arguments!"
+    echo "Usage: $0 <module name>"
+elif [ $# -gt 1 ]; then
+    echo "Too many arguments!"
+    echo "Usage: $0 <module name>"
+else
+    set -e
 
-echo ""
-echo "-- Compiling test source --"
+    echo ""
+    echo "-- Compiling test source --"
 
-python ClearC/clrc.py test/$1
+    python ClearC/clrc.py test/$1
 
-echo ""
-echo "-- Compiling VM --"
+    echo ""
+    echo "-- Compiling VM --"
 
-pushd ClearVM
-mkdir -p build
-pushd build
+    pushd ClearVM
+    mkdir -p build
+    pushd build
 
-rm -f CMakeCache.txt
-cmake ..
-make
+    rm -f CMakeCache.txt
+    cmake ..
+    make
 
-echo ""
-echo "-- Running bytecode --"
+    echo ""
+    echo "-- Running bytecode --"
 
-./clr ../../test/$1
+    ./clr ../../test/$1
 
-echo ""
-echo ""
+    echo ""
+    echo ""
 
-popd
-popd
-
+    popd
+    popd
+fi
