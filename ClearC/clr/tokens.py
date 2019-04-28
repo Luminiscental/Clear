@@ -17,6 +17,7 @@ class TokenType(Enum):
     DOT = "."
     MINUS = "-"
     PLUS = "+"
+    AT = "@"
     SEMICOLON = ";"
     COLON = ":"
     SLASH = "/"
@@ -92,6 +93,7 @@ SIMPLE_TOKENS = {
     "-": TokenType.MINUS,
     "*": TokenType.STAR,
     "/": TokenType.SLASH,
+    "@": TokenType.AT,
     ";": TokenType.SEMICOLON,
     ":": TokenType.COLON,
     ",": TokenType.COMMA,

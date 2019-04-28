@@ -133,6 +133,8 @@ class DeclVisitor(StmtVisitor):
         node.initializer.accept(self)
 
     def visit_func_decl(self, node):
+        if node.decorator:
+            node.decorator.accept(self)
         for param_type, _ in node.params:
             param_type.accept(self)
         node.return_type.accept(self)

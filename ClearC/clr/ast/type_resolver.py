@@ -465,6 +465,27 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.type_annotation = FunctionTypeAnnotation(
             return_type=return_type, signature=arg_types
         )
+        if node.decorator:
+            node.decorator.accept(self)
+            decorator_type = node.decorator.type_annotation
+            if decorator_type.kind != TypeAnnotationType.FUNCTION:
+                emit_error(
+                    f"Decorator must be a function, found {decorator_type} instead decorating {token_info(node.name)}!"
+                )()
+            if decorator_type.return_type.kind != TypeAnnotationType.FUNCTION:
+                emit_error(
+                    f"Decorator must produce a function, found {decorator_type.return_type} instead decorating {token_info(node.name)}!"
+                )()
+            pretty_sig = "(" + ", ".join(map(str, decorator_type.signature)) + ")"
+            if len(decorator_type.signature) != 1:
+                emit_error(
+                    f"Decorator must have one parameter for the decorated function only, but actual signature is {pretty_sig} found decorating {token_info(node.name)}!"
+                )()
+            if decorator_type.signature[0] != node.type_annotation:
+                emit_error(
+                    f"Decorator expects function type {decorator_type.signature[0]} but the function {token_info(node.name)} has type {node.type_annotation}!"
+                )()
+            node.type_annotation = decorator_type.return_type
         # Declare the function
         if node.name.lexeme in self.structs:
             struct = self.structs[node.name.lexeme]

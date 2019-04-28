@@ -1,0 +1,80 @@
+
+func square(func(int) int original) func(int) int {
+    func wrapped(int n) int {
+        val prev = original(n);
+        return prev * prev;
+    }
+    return wrapped;
+}
+
+struct Wrapper {
+    @square
+    func inc(int n) int {
+        return n + 1i;
+    }
+}
+
+print "(3 + 1)^2 = " + str(Wrapper{}.inc(3i));
+print;
+
+func time(str name) func(func() void) func() void {
+    func decorator(func() void function) func() void {
+        func wrapped() void {
+            val start = clock();
+            function();
+            val end = clock();
+            print "[" + name + "] took: " + str(end - start) + "s";
+        }
+        return wrapped;
+    }
+    return decorator;
+}
+
+val count = 500i;
+
+@time("loop triangle")
+func loop_triangle() void {
+    var result = 0i;
+
+    var i = 1i;
+    while (i <= count) {
+        result = result + i;
+        i = i + 1i;
+    }
+
+    print str(count) + ": " + str(result);
+}
+
+@time("formula triangle")
+func formula_triangle() void {
+    val result = int(num((count + 1i) * count) / 2);
+    print str(count) + ": " + str(result);
+}
+
+loop_triangle();
+formula_triangle();
+print;
+
+func unwrap(int value) func(func() int?) func() int {
+    func decorator(func() int? original) func() int {
+        func wrapped() int {
+            val result = original();
+            return result?: value;
+        }
+        return wrapped;
+    }
+    return decorator;
+}
+
+@unwrap(2i)
+func maybe_three() int? {
+    return 3i;
+}
+
+@unwrap(2i)
+func maybe_four() int? {
+    return nil;
+}
+
+print maybe_three();
+print maybe_four();

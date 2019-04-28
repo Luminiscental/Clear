@@ -147,6 +147,8 @@ class NameIndexer(StructTrackingDeclVisitor):
         node.index_annotation = self._declare_name(node.name.lexeme)
 
     def _index_function(self, node, is_method=False):
+        if node.decorator:
+            node.decorator.accept(self)
         # If it's a method we don't associate it with a name so that it doesn't override anything
         # and isn't accessible as its own object
         if not is_method:
@@ -176,6 +178,8 @@ class NameIndexer(StructTrackingDeclVisitor):
         # Declare the methods before the constructor as they are created before it when compiling
         for method in node.methods.values():
             method.index_annotation = self._new_index()
+            if method.decorator:
+                method.decorator_index_annotation = self._new_index()
         # Declare the constructor before calling super() so that it can be referenced in methods
         node.index_annotation = self._declare_name(node.name.lexeme)
         # Call super(), visiting all the methods/fields
@@ -192,6 +196,10 @@ class NameIndexer(StructTrackingDeclVisitor):
             method.constructor_index_annotation = constructor.lookup_index(
                 method.index_annotation
             )
+            if method.decorator:
+                method.decorator_constructor_index_annotation = constructor.lookup_index(
+                    method.decorator_index_annotation
+                )
         node.upvalues.extend(constructor.upvalues)
         self.errors.extend(constructor.errors)
 

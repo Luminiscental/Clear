@@ -11,8 +11,8 @@ class TypeAnnotationType(Enum):
     FUNCTION = "<function>"
     OPTIONAL = "<optional>"
     IDENTIFIER = "<identifier>"
-    VOID = "<void>"
-    NIL = "<nil>"
+    VOID = "void"
+    NIL = "nil"
     UNRESOLVED = "<unresolved>"
 
     def __repr__(self):
@@ -37,10 +37,13 @@ class TypeAnnotation:
     def matches(self, other):
         return union_type(self, other) == other
 
+
 def symmetric(func):
     def wrapper(first, second):
         return func(first, second) or func(second, first)
+
     return wrapper
+
 
 def union_type(first_type, second_type):
     @symmetric
@@ -62,7 +65,11 @@ def union_type(first_type, second_type):
             return OptionalTypeAnnotation(second_type)
         return None
 
-    return get_equal_union(first_type, second_type) or coerce_from_nil(first_type, second_type) or coerce_to_optional(first_type, second_type)
+    return (
+        get_equal_union(first_type, second_type)
+        or coerce_from_nil(first_type, second_type)
+        or coerce_to_optional(first_type, second_type)
+    )
 
 
 class IdentifierTypeAnnotation(TypeAnnotation):

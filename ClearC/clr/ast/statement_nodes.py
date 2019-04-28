@@ -174,7 +174,7 @@ def parse_decl(parser):
     try:
         if parser.check_one(VAL_TOKENS):
             return ValDecl.parse(parser)
-        if parser.check(TokenType.FUNC):
+        if parser.check(TokenType.FUNC) or parser.check(TokenType.AT):
             return FuncDecl.parse(parser)
         if parser.check(TokenType.STRUCT):
             return StructDecl.parse(parser)
@@ -233,16 +233,21 @@ class ValDecl(DeclNode):
 
 
 class FuncDecl(DeclNode):
-    def __init__(self, name, params, return_type, block):
+    def __init__(self, name, params, return_type, block, decorator=None):
         super().__init__()
         self.name = name
         self.params = params
         self.return_type = return_type
         self.block = block
         self.upvalues = []
+        self.decorator = decorator
 
     @staticmethod
     def parse(parser):
+        # TODO: Multiple/chained decorators
+        decorator = None
+        if parser.match(TokenType.AT):
+            decorator = parse_expr(parser)
         parser.consume(
             TokenType.FUNC, parse_error("Expected function declaration!", parser)
         )
@@ -282,7 +287,7 @@ class FuncDecl(DeclNode):
         return_type = parse_type(parser)
         # Consume the definition block
         block = BlockStmt.parse(parser)
-        return FuncDecl(name, params, return_type, block)
+        return FuncDecl(name, params, return_type, block, decorator)
 
     @sync_errors
     def accept(self, decl_visitor):
@@ -320,7 +325,11 @@ class StructDecl(DeclNode):
         # Consume the fields until we hit the closing brace
         while not parser.match(TokenType.RIGHT_BRACE):
             # Check if it's a method
-            if parser.check(TokenType.FUNC) and parser.check_then(TokenType.IDENTIFIER):
+            if (
+                parser.check(TokenType.AT)
+                or parser.check(TokenType.FUNC)
+                and parser.check_then(TokenType.IDENTIFIER)
+            ):
                 # Parse the function
                 func_decl = FuncDecl.parse(parser)
                 # Put the declaration for the method in self.methods as the value for this field's index

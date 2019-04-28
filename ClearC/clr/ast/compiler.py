@@ -129,10 +129,17 @@ class Compiler(DeclVisitor):
         self._make_function(node)
         # Store the function object as a local to close over
         self.program.define_name(node.index_annotation)
+        # Load the decorator if it exists
+        if node.decorator:
+            node.decorator.accept(self)
         # Close the function
         self.program.load_name(node.index_annotation)
         self.program.make_closure(node.upvalues)
-        # Define the function as the closure value
+        # Decorate the function
+        if node.decorator:
+            self.program.simple_op(OpCode.CALL)
+            self.program.simple_op(1)
+        # Define the function as the final value
         self.program.define_name(node.index_annotation)
 
     def visit_struct_decl(self, node):
@@ -141,6 +148,9 @@ class Compiler(DeclVisitor):
         for method in node.methods.values():
             self._make_function(method)
             self.program.define_name(method.index_annotation)
+            if method.decorator:
+                method.decorator.accept(self)
+                self.program.define_name(method.decorator_index_annotation)
         # Create the constructor
         function = self.program.begin_function()
         field_count = len(node.fields)
@@ -166,9 +176,19 @@ class Compiler(DeclVisitor):
                 method = node.methods[i]
                 # Load the instance for the later SET_FIELD op
                 self.program.load_name(INDEX_OF_THIS)
-                # Close the method
+                # Load the decorator to call if it exists
+                if method.decorator:
+                    self.program.load_name(
+                        method.decorator_constructor_index_annotation
+                    )
+                # Load the method
                 self.program.load_name(method.constructor_index_annotation)
+                # Close it
                 self.program.make_closure(method.upvalues)
+                # Decorate it
+                if method.decorator:
+                    self.program.simple_op(OpCode.CALL)
+                    self.program.simple_op(1)
                 # Put it in the field
                 self.program.simple_op(OpCode.SET_FIELD)
                 self.program.simple_op(i)
