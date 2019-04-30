@@ -380,6 +380,14 @@ class Compiler(DeclVisitor):
             node.default_value.accept(self)
             self.program.end_jump(jump_to_end)
 
+    def visit_lambda_expr(self, node):
+        # No super as we handle params / scoping
+        function = self.program.begin_function()
+        node.result.accept(self)
+        self.program.simple_op(OpCode.RETURN)
+        self.program.end_function(function)
+        self.program.make_closure(node.upvalues)
+
     def visit_if_expr(self, node):
         # No super because we need the jumps in the right place
         # Create a list of jumps that skip to the end once a block completes

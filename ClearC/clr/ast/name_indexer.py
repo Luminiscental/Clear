@@ -129,6 +129,15 @@ class NameIndexer(StructTrackingDeclVisitor):
         if node.default_value is not None:
             node.default_value.accept(self)
 
+    def visit_lambda_expr(self, node):
+        # No super as we handle the params / scoping
+        function = FunctionNameIndexer(self, False)
+        for _, name in node.params:
+            function.add_param(name.lexeme)
+        node.result.accept(function)
+        node.upvalues.extend(function.upvalues)
+        self.errors.extend(function.errors)
+
     def visit_keyword_expr(self, node):
         super().visit_keyword_expr(node)
         if node.token.token_type == TokenType.THIS:

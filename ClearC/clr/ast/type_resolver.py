@@ -37,6 +37,7 @@ class TypeResolver(StructTrackingDeclVisitor):
     def __init__(self):
         super().__init__()
         self.scopes = [defaultdict(TypeInfo)]
+        # TODO: Return type inference
         self.expected_returns = []
         self.level = 0
         self.current_structs = []
@@ -244,6 +245,34 @@ class TypeResolver(StructTrackingDeclVisitor):
             else:
                 node.type_annotation = node.default_value.type_annotation
 
+    def visit_lambda_expr(self, node):
+        # No super as we handle parameter scoping
+        node.return_type.accept(self)
+        if node.return_type.as_annotation == VOID_TYPE:
+            emit_error(f"Lambda expression cannot return void: `{node}`!")()
+        self.start_scope()
+        param_types = []
+        for param_type, param_name in node.params:
+            param_type.accept(self)
+            resolved_type = param_type.as_annotation
+            if resolved_type.kind == TypeAnnotationType.UNRESOLVED:
+                emit_error(
+                    f"Invalid parameter type {param_type} for function lambda: `{node}`!"
+                )()
+            self._declare_name(param_name, resolved_type)
+            param_types.append(resolved_type)
+        node.type_annotation = FunctionTypeAnnotation(
+            return_type=node.return_type.as_annotation, signature=param_types
+        )
+        self.expected_returns.append(node.return_type.as_annotation)
+        node.result.accept(self)
+        self.end_scope()
+        del self.expected_returns[-1]
+        if not node.result.type_annotation.matches(node.return_type.as_annotation):
+            emit_error(
+                f"Unexpected type {node.result.type_annotation} for lambda expression returning {node.return_type.as_annotation}: `{node}`!"
+            )()
+
     def visit_if_expr(self, node):
         super().visit_if_expr(node)
         expected_type = None
@@ -444,26 +473,26 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.return_annotation = ReturnAnnotation(kind, return_type)
 
     def visit_func_decl(self, node):
+        # No super because we handle the params
         self.resolve_function(node)
 
     def resolve_function(self, node, is_method=False):
-        # No super because we handle the params
         # Iterate over the parameters and resolve to types
-        arg_types = []
-        for param_type, param_name in node.params:
+        param_types = []
+        for param_type, _ in node.params:
             param_type.accept(self)
             resolved_type = param_type.as_annotation
             if resolved_type.kind == TypeAnnotationType.UNRESOLVED:
                 emit_error(
                     f"Invalid parameter type {param_type} for function {token_info(node.name)}!"
                 )()
-            arg_types.append(resolved_type)
+            param_types.append(resolved_type)
         # Resolve the return type
         node.return_type.accept(self)
         return_type = node.return_type.as_annotation
         # Create an annotation for the function signature
         node.type_annotation = FunctionTypeAnnotation(
-            return_type=return_type, signature=arg_types
+            return_type=return_type, signature=param_types
         )
         if node.decorator:
             node.decorator.accept(self)

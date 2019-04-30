@@ -54,6 +54,11 @@ class ExprVisitor(TypeVisitor):
         if node.default_value is not None:
             node.default_value.accept(self)
 
+    def visit_lambda_expr(self, node):
+        for param_type, _ in node.params:
+            param_type.accept(self)
+        node.result.accept(self)
+
     def visit_and_expr(self, node):
         node.left.accept(self)
         node.right.accept(self)

@@ -1,0 +1,18 @@
+
+func decorate(func() int original) func() int {
+    func squared() int {
+        val result =  original();
+        return result * result;
+    }
+    return squared;
+}
+
+@decorate
+func decorated() int {
+    return 3i;
+}
+
+val lambda = decorate(func() int 3i);
+
+print "lambda() = " + str(lambda());
+print "decorated() = " + str(decorated());

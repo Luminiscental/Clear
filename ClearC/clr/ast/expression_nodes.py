@@ -5,6 +5,7 @@ from clr.tokens import TokenType
 from clr.constants import ClrStr, ClrInt, ClrNum
 from clr.ast.index_annotations import IndexAnnotation
 from clr.ast.type_annotations import TypeAnnotation, NUM_TYPE, INT_TYPE, STR_TYPE
+from clr.ast.type_nodes import parse_type
 
 
 class Precedence(Enum):
@@ -365,6 +366,46 @@ class UnpackExpr(ExprNode):
         expr_visitor.visit_unpack_expr(self)
 
 
+class LambdaExpr(ExprNode):
+    def __init__(self, params, return_type, result):
+        super().__init__()
+        self.params = params
+        self.return_type = return_type
+        self.result = result
+        self.upvalues = []
+
+    @staticmethod
+    def parse(parser):
+        parser.consume(TokenType.FUNC, parse_error("Expected lambda!", parser))
+        parser.consume(
+            TokenType.LEFT_PAREN, parse_error("Expected '(' for parameters!", parser)
+        )
+        params = []
+        while not parser.match(TokenType.RIGHT_PAREN):
+            param_type = parse_type(parser)
+            param_name = IdentExpr.parse(parser)
+            pair = (param_type, param_name.name)
+            params.append(pair)
+        return_type = parse_type(parser)
+        result = parse_expr(parser)
+        return LambdaExpr(params, return_type, result)
+
+    @pprint
+    def __str__(self):
+        result = "func("
+        result += ", ".join(
+            map(
+                lambda param_type, param_name: str(param_type) + " " + str(param_name),
+                self.params,
+            )
+        )
+        result += ") " + str(self.result)
+        return result
+
+    def accept(self, expr_visitor):
+        expr_visitor.visit_lambda_expr(self)
+
+
 class AndExpr(ExprNode):
     def __init__(self, left, right, operator):
         super().__init__()
@@ -606,5 +647,6 @@ PRATT_TABLE = defaultdict(
         TokenType.THIS: ParseRule(prefix=KeywordExpr.parse),
         TokenType.NIL: ParseRule(prefix=KeywordExpr.parse),
         TokenType.IF: ParseRule(prefix=IfExpr.parse),
+        TokenType.FUNC: ParseRule(prefix=LambdaExpr.parse),
     },
 )
