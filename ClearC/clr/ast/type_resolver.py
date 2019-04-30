@@ -264,10 +264,8 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.type_annotation = FunctionTypeAnnotation(
             return_type=node.return_type.as_annotation, signature=param_types
         )
-        self.expected_returns.append(node.return_type.as_annotation)
         node.result.accept(self)
         self.end_scope()
-        del self.expected_returns[-1]
         if not node.result.type_annotation.matches(node.return_type.as_annotation):
             emit_error(
                 f"Unexpected type {node.result.type_annotation} for lambda expression returning {node.return_type.as_annotation}: `{node}`!"
