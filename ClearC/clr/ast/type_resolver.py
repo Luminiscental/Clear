@@ -247,9 +247,6 @@ class TypeResolver(StructTrackingDeclVisitor):
 
     def visit_lambda_expr(self, node):
         # No super as we handle parameter scoping
-        node.return_type.accept(self)
-        if node.return_type.as_annotation == VOID_TYPE:
-            emit_error(f"Lambda expression cannot return void: `{node}`!")()
         self.start_scope()
         param_types = []
         for param_type, param_name in node.params:
@@ -261,15 +258,11 @@ class TypeResolver(StructTrackingDeclVisitor):
                 )()
             self._declare_name(param_name, resolved_type)
             param_types.append(resolved_type)
-        node.type_annotation = FunctionTypeAnnotation(
-            return_type=node.return_type.as_annotation, signature=param_types
-        )
         node.result.accept(self)
         self.end_scope()
-        if not node.result.type_annotation.matches(node.return_type.as_annotation):
-            emit_error(
-                f"Unexpected type {node.result.type_annotation} for lambda expression returning {node.return_type.as_annotation}: `{node}`!"
-            )()
+        node.type_annotation = FunctionTypeAnnotation(
+            return_type=node.result.type_annotation, signature=param_types
+        )
 
     def visit_if_expr(self, node):
         super().visit_if_expr(node)

@@ -367,10 +367,9 @@ class UnpackExpr(ExprNode):
 
 
 class LambdaExpr(ExprNode):
-    def __init__(self, params, return_type, result):
+    def __init__(self, params, result):
         super().__init__()
         self.params = params
-        self.return_type = return_type
         self.result = result
         self.upvalues = []
 
@@ -386,16 +385,15 @@ class LambdaExpr(ExprNode):
             param_name = IdentExpr.parse(parser)
             pair = (param_type, param_name.name)
             params.append(pair)
-        return_type = parse_type(parser)
         result = parse_expr(parser)
-        return LambdaExpr(params, return_type, result)
+        return LambdaExpr(params, result)
 
     @pprint
     def __str__(self):
         result = "func("
         result += ", ".join(
             map(
-                lambda param_type, param_name: str(param_type) + " " + str(param_name),
+                lambda param_pair: str(param_pair[0]) + " " + str(param_pair[1]),
                 self.params,
             )
         )

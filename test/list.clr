@@ -10,6 +10,10 @@ struct List {
         };
     }
 
+    func contains(int value) bool {
+        return this.value == value or next? next.contains(value) : false;
+    }
+
     func push_all(List list) List {
         val list_next = list.next;
         return list_next? push_all(list_next).push(list.value) : push(list.value);
@@ -22,6 +26,22 @@ struct List {
     func for_each(func(int) void consumer) void {
         consumer(value);
         next? next.for_each(consumer);
+    }
+
+    func map(func(int) int f) List {
+        return List {
+            value=f(value),
+            next=next? next.map(f) : nil
+        };
+    }
+
+    func filter(func(int) bool pred) List? {
+        val rest = next? next.filter(pred) : nil;
+        return if (pred(value)) {
+            List { value=value, next=rest }
+        } else {
+            rest
+        };
     }
 
     func sort() List {
@@ -53,79 +73,75 @@ struct List {
     }
 }
 
-val count = 50i;
+struct Set {
+    List _list,
 
-var i = 0i;
-val start = clock();
-while (i < count) {
-    i = i + 1i;
-}
-val end = clock();
-
-val adjustment = end - start;
-
-func time_function(func() void f, str msg) void {
-    var i = 0i;
-    val start = clock();
-    while (i < count) {
-        f();
-        i = i + 1i;
-    }
-    val end = clock();
-
-    val elapsed = end - start - adjustment;
-    val per_call = elapsed / num(count);
-    print "(" + msg + ", " + str(per_call) + ")";
-}
-
-func make_sorter(int n) func() void {
-    var list = List { value=-1i, next=nil };
-    var value = 21i;
-
-    var i = 1i;
-    while (i < n) {
-
-        list = list.push(value);
-        if (value > 5i) {
-            value = value - 17i;
-        } else if (value < -10i) {
-            value = value + 13i;
-        } else {
-            value = value * 2i;
+    func add(int value) Set? {
+        if (_list.contains(value)) {
+            return nil;
         }
-
-        i = i + 1i;
+        return Set {
+            _list=_list.push(value)
+        };
     }
 
-    func sorter() void {
-        list.sort();
+    func add_unchecked(int value) Set {
+        val result = add(value);
+        return result?: this;
     }
 
-    return sorter;
-}
+    func contains(int value) bool {
+        return _list.contains(value);
+    }
 
-func time_nth(int n) void {
-    val nth = make_sorter(n);
-    time_function(nth, str(n));
+    func map(func(int) int f) Set {
+        val unchecked = _list.map(f);
+        var result Set? = nil;
+        func add_to_result(int value) void {
+            result = result? result.add_unchecked(value) : Set { _list=List { value=value, next=nil } };
+        }
+        unchecked.for_each(add_to_result);
+        return result?: this;
+    }
 }
 
 func main() void {
-    val test_list = List { value=3i, next=nil }.push(2i).push(1i).push(7i).push(-1i);
+    val test_list = List { value=3i, next=nil }
+        .push(2i)
+        .push(1i)
+        .push(7i)
+        .push(-1i)
+        .push(-4i)
+        .push(5i)
+        .push(11i)
+        .push(0i)
+        .push(-3i)
+        .push(6i)
+        .push(-8i);
+    val repeated = test_list.push_all(test_list);
+    val squared = test_list.map(func(int x) x * x);
+    val filtered = test_list.filter(func(int x) x >= 0i);
+    val sorted = test_list.sort();
     print "
 test_list = " + test_list.to_str() + "
-test_list.push_all(test_list) = " + test_list.push_all(test_list).to_str() + "
-sorted = " + test_list.sort().to_str() + "
+test_list all squared = " + squared.to_str() + "
+test_list all positive = " + (filtered? filtered.to_str() : "nil") + "
+test_list.push_all(test_list) = " + repeated.to_str() + "
+sorted = " + sorted.to_str() + "
 ";
 
-    print "sort times:";
-
     var i = 1i;
-    while (i <= 32i) {
-        time_nth(i);
+    var rangeSet = Set { _list=List { value=i, next=nil } };
+    while (i < 15i) {
         i = i + 1i;
+        rangeSet = rangeSet.add_unchecked(i);
     }
+    val squareSet = rangeSet.map(func(int x) x * x);
 
-    print;
+    print "7 square? " + str(squareSet.contains(7i));
+    print "225 square? " + str(squareSet.contains(225i));
+
+    print "squares: " + squareSet._list.to_str();
 }
 
 main();
