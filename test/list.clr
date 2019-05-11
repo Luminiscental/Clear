@@ -45,48 +45,45 @@ struct List {
     }
 
     func sort() List {
-        if (next == nil) {
-            return this;
-        }
+        func sort_with(List rest) List {
+            var less List? = nil;
+            var more List? = nil;
 
-        var less List? = nil;
-        var more List? = nil;
-
-        val dummy_list = List { value=0i, next=nil };
-        val present_next = next?: dummy_list;
-
-        func add_to_sides(int value) void {
-            if (value <= this.value) {
-                less = less? less.push(value) : List { value=value, next=nil };
-            } else {
-                more = more? more.push(value) : List { value=value, next=nil };
+            func add_to_sides(int value) void {
+                if (value <= this.value) {
+                    less = less? less.push(value) : List { value=value, next=nil };
+                } else {
+                    more = more? more.push(value) : List { value=value, next=nil };
+                }
             }
+
+            rest.for_each(add_to_sides);
+
+            less = less? less.sort() : nil;
+            more = more? more.sort() : nil;
+
+            val tail = more? more.push(value) : List { value=value, next=nil };
+            return less? tail.push_all(less) : tail;
         }
-
-        present_next.for_each(add_to_sides);
-
-        less = less? less.sort() : nil;
-        more = more? more.sort() : nil;
-
-        val tail = more? more.push(value) : List { value=value, next=nil };
-        return less? tail.push_all(less) : tail;
+        return next? sort_with(next) : this;
     }
 }
 
 struct Set {
     List _list,
 
-    func add(int value) Set? {
-        if (_list.contains(value)) {
-            return nil;
-        }
-        return Set {
-            _list=_list.push(value)
+    func maybe_add(int value) Set? {
+        return if (_list.contains(value)) {
+            nil
+        } else {
+            Set {
+                _list=_list.push(value)
+            }
         };
     }
 
-    func add_unchecked(int value) Set {
-        val result = add(value);
+    func add(int value) Set {
+        val result = maybe_add(value);
         return result?: this;
     }
 
@@ -98,7 +95,7 @@ struct Set {
         val unchecked = _list.map(f);
         var result Set? = nil;
         func add_to_result(int value) void {
-            result = result? result.add_unchecked(value) : Set { _list=List { value=value, next=nil } };
+            result = result? result.add(value) : Set { _list=List { value=value, next=nil } };
         }
         unchecked.for_each(add_to_result);
         return result?: this;
@@ -134,7 +131,7 @@ sorted = " + sorted.to_str() + "
     var rangeSet = Set { _list=List { value=i, next=nil } };
     while (i < 15i) {
         i = i + 1i;
-        rangeSet = rangeSet.add_unchecked(i);
+        rangeSet = rangeSet.add(i);
     }
     val squareSet = rangeSet.map(func(int x) x * x);
 
