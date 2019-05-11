@@ -1,4 +1,8 @@
 
+// TODO: Really need generics
+
+// TODO: import semantics, standard lib
+
 // sequence core:
 
 struct IntSeq {
