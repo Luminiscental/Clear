@@ -384,7 +384,12 @@ class Compiler(DeclVisitor):
         # No super as we handle params / scoping
         function = self.program.begin_function()
         node.result.accept(self)
-        self.program.simple_op(OpCode.RETURN)
+        return_op = (
+            OpCode.RETURN_VOID
+            if node.type_annotation.return_type == VOID_TYPE
+            else OpCode.RETURN
+        )
+        self.program.simple_op(return_op)
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)
 
