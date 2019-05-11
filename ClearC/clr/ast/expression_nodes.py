@@ -385,6 +385,11 @@ class LambdaExpr(ExprNode):
             param_name = IdentExpr.parse(parser)
             pair = (param_type, param_name.name)
             params.append(pair)
+            if not parser.check(TokenType.RIGHT_PAREN):
+                parser.consume(
+                    TokenType.COMMA,
+                    parse_error("Expected comma delimited parameters!", parser),
+                )
         result = parse_expr(parser)
         return LambdaExpr(params, result)
 
