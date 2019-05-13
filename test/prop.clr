@@ -1,0 +1,22 @@
+
+prop C {
+    func() void do_stuff,
+    func three() void
+}
+
+prop B {
+    func one() void,
+    func() void do_stuff
+}
+
+struct A with B as { one=two }, C {
+    func() void do_stuff,
+
+    func two() void {
+        print "two";
+    }
+
+    func three() void {
+        print "three";
+    }
+}

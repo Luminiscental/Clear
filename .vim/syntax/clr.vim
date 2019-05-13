@@ -1,4 +1,4 @@
-syn keyword clrKeywords val var print if else and or return func while struct void this nil
+syn keyword clrKeywords val var print if else and or return func while struct void this nil with as prop
 hi link clrKeywords Type
 
 syn keyword clrBuiltins str num int bool clock
@@ -15,6 +15,9 @@ hi link clrFunction Function
 
 syn match clrStruct '\(struct\_s\+\)\@<=\([a-zA-Z_][a-zA-Z0-9_]*\)'
 hi link clrStruct Identifier
+
+syn match clrProp '\(prop\_s\+\)\@<=\([a-zA-Z_][a-zA-Z0-9_]*\)'
+hi link clrProp Identifier
 
 syn match clrDecorator '@'
 hi link clrDecorator Define

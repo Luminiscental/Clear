@@ -294,12 +294,26 @@ class FuncDecl(DeclNode):
         decl_visitor.visit_func_decl(self)
 
 
-class StructDecl(DeclNode):
+class PropDecl(DeclNode):
     def __init__(self, name, fields, methods):
         super().__init__()
         self.name = name
         self.fields = fields
         self.methods = methods
+
+    @staticmethod
+    def parse(parser):
+        # TODO
+        pass
+
+
+class StructDecl(DeclNode):
+    def __init__(self, name, fields, methods, props):
+        super().__init__()
+        self.name = name
+        self.fields = fields
+        self.methods = methods
+        self.props = props
         # Upvalues for the constructor
         self.upvalues = []
 
@@ -317,6 +331,52 @@ class StructDecl(DeclNode):
             emit_error(
                 f"Invalid struct name {token_info(name)}, this is reserved for the built-in function {name.lexeme}()"
             )()
+        props = {}
+        if parser.match(TokenType.WITH):
+            while not parser.check(TokenType.LEFT_BRACE):
+                parser.consume(
+                    TokenType.IDENTIFIER, parse_error("Expected property name!", parser)
+                )
+                prop = parser[-1]
+                if prop.lexeme in props:
+                    emit_error(f"Duplicate property description {token_info(prop)}!")()
+                field_map = {}
+                if parser.match(TokenType.AS):
+                    parser.consume(
+                        TokenType.LEFT_BRACE,
+                        parse_error("Expected field mapping block!", parser),
+                    )
+                    while not parser.match(TokenType.RIGHT_BRACE):
+                        parser.consume(
+                            TokenType.IDENTIFIER,
+                            parse_error("Expected property field name!", parser),
+                        )
+                        param = parser[-1]
+                        parser.consume(
+                            TokenType.EQUAL,
+                            parse_error("Expected '=' for field value", parser),
+                        )
+                        parser.consume(
+                            TokenType.IDENTIFIER,
+                            parse_error("Expected field name!", parser),
+                        )
+                        arg = parser[-1]
+                        if param.lexeme in field_map:
+                            emit_error(
+                                f"Duplicate property field mapping {token_info(param)}"
+                            )()
+                        field_map[param.lexeme] = arg.lexeme
+                        if not parser.check(TokenType.RIGHT_BRACE):
+                            parser.consume(
+                                TokenType.COMMA,
+                                parse_error("Expected delimiting comma!", parser),
+                            )
+                props[prop.lexeme] = field_map
+                if not parser.check(TokenType.LEFT_BRACE):
+                    parser.consume(
+                        TokenType.COMMA,
+                        parse_error("Expected delimiting comma!", parser),
+                    )
         fields = []
         methods = {}
         parser.consume(
@@ -356,7 +416,7 @@ class StructDecl(DeclNode):
                 # Append the fields as (type, name) tuples
                 pair = (field_type, field_name)
                 fields.append(pair)
-        return StructDecl(name, fields, methods)
+        return StructDecl(name, fields, methods, props)
 
     @sync_errors
     def accept(self, decl_visitor):

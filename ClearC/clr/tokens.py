@@ -42,13 +42,14 @@ class TokenType(Enum):
     STRUCT = "struct"
     ELSE = "else"
     FALSE = "false"
-    FOR = "for"
     FUNC = "func"
     IF = "if"
     OR = "or"
     PRINT = "print"
     RETURN = "return"
     THIS = "this"
+    WITH = "with"
+    AS = "as"
     TRUE = "true"
     VAL = "val"
     VAR = "var"
@@ -69,24 +70,27 @@ class Token(namedtuple("Token", "token_type lexeme line")):
 
 
 KEYWORD_TYPES = {
-    "and": TokenType.AND,
-    "struct": TokenType.STRUCT,
-    "else": TokenType.ELSE,
-    "false": TokenType.FALSE,
-    "for": TokenType.FOR,
-    "func": TokenType.FUNC,
-    "if": TokenType.IF,
-    "or": TokenType.OR,
-    "print": TokenType.PRINT,
-    "return": TokenType.RETURN,
-    "this": TokenType.THIS,
-    "true": TokenType.TRUE,
-    "val": TokenType.VAL,
-    "var": TokenType.VAR,
-    "while": TokenType.WHILE,
-    "void": TokenType.VOID,
-    "nil": TokenType.NIL,
+    TokenType.AND,
+    TokenType.STRUCT,
+    TokenType.ELSE,
+    TokenType.FALSE,
+    TokenType.FUNC,
+    TokenType.IF,
+    TokenType.OR,
+    TokenType.PRINT,
+    TokenType.RETURN,
+    TokenType.THIS,
+    TokenType.TRUE,
+    TokenType.WITH,
+    TokenType.AS,
+    TokenType.VAL,
+    TokenType.VAR,
+    TokenType.WHILE,
+    TokenType.VOID,
+    TokenType.NIL,
 }
+
+KEYWORD_TYPES = {token_type.value: token_type for token_type in KEYWORD_TYPES}
 
 SIMPLE_TOKENS = {
     "+": TokenType.PLUS,

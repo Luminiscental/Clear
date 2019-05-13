@@ -7,11 +7,13 @@
 
 struct IntSeq {
     func() int? next,
+
     func for_seq(func(int) void consume) void {
         val current = next();
         current? consume(current);
         current? for_seq(consume);
     }
+
     func map_seq(func(int) int mapping) IntSeq {
         func iterator() int? {
             val current = next();
@@ -19,11 +21,13 @@ struct IntSeq {
         }
         return IntSeq { next=iterator };
     }
+
     func fold_seq(func(int, int) int folder, int init) int {
         val current = next();
         return current? fold_seq(folder, folder(init, current))
                       : init;
     }
+
     func take_seq(int limit) IntSeq {
         var index = 0i;
         func iterator() int? {
@@ -46,6 +50,7 @@ struct IntSeq {
 
 func range(int min, int max) IntSeq {
     var counter = min;
+
     func iterator() int? {
         if (counter < max) {
             val old = counter;
@@ -55,16 +60,19 @@ func range(int min, int max) IntSeq {
             return nil;
         }
     }
+
     return IntSeq { next=iterator };
 }
 
 func arithmetic(int start, int difference) IntSeq {
     var current = start;
+
     func iterator() int? {
         val old = current;
         current = current + difference;
         return old;
     }
+
     return IntSeq { next=iterator };
 }
 
