@@ -552,6 +552,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         self.resolve_function(node, is_method=True)
 
     def visit_struct_decl(self, node):
+        # TODO: Property resolution
         # Check before super() because super() adds it to self.structs
         name = node.name.lexeme
         if name in self.structs:

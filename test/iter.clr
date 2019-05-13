@@ -32,6 +32,7 @@ struct IntSeq {
         var index = 0i;
         func iterator() int? {
             val current = next();
+            index = index + 1i;
 
             val result = if (index <= limit) {
                 current
@@ -39,7 +40,6 @@ struct IntSeq {
                 nil
             };
 
-            index = index + 1i;
             return result;
         }
         return IntSeq { next=iterator };
@@ -76,6 +76,18 @@ func arithmetic(int start, int difference) IntSeq {
     return IntSeq { next=iterator };
 }
 
+func repeat(int value) IntSeq {
+    func iterator() int? {
+        return value;
+    }
+
+    return IntSeq { next=iterator };
+}
+
+func repeatn(int value, int times) IntSeq {
+    return repeat(value).take_seq(times);
+}
+
 func print_int(int x) void {
     print x;
 }
@@ -90,6 +102,10 @@ val sum = range(-3i, 6i)
     .fold_seq(func(int a, int b) a + b, 0i);
 
 print "sum n^2 for n in [-3...6] = " + str(sum);
+print;
+
+val prod = repeatn(5i, 6i).fold_seq(func(int a, int b) a + b, 0i);
+print "5 * 6 = " + str(prod);
 print;
 
 print "[3,6...] = ";
