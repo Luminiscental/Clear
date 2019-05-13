@@ -154,6 +154,14 @@ class DeclVisitor(StmtVisitor):
         for method in node.methods.values():
             self.visit_method_decl(method)
 
+    def visit_prop_decl(self, node):
+        for field_type, _ in node.fields:
+            field_type.accept(self)
+        for param_types, return_type in node.methods.values():
+            for param_type in param_types:
+                param_type.accept(self)
+            return_type.accept(self)
+
 
 class StructTrackingDeclVisitor(DeclVisitor):
     def __init__(self):
