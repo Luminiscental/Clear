@@ -40,6 +40,7 @@ class TokenType(Enum):
     AND = "and"
     VOID = "void"
     STRUCT = "struct"
+    PROP = "prop"
     ELSE = "else"
     FALSE = "false"
     FUNC = "func"
@@ -72,6 +73,7 @@ class Token(namedtuple("Token", "token_type lexeme line")):
 KEYWORD_TYPES = {
     TokenType.AND,
     TokenType.STRUCT,
+    TokenType.PROP,
     TokenType.ELSE,
     TokenType.FALSE,
     TokenType.FUNC,

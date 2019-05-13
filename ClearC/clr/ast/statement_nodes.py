@@ -178,6 +178,8 @@ def parse_decl(parser):
             return FuncDecl.parse(parser)
         if parser.check(TokenType.STRUCT):
             return StructDecl.parse(parser)
+        if parser.check(TokenType.PROP):
+            return PropDecl.parse(parser)
         return parse_stmt(parser)
     except ClrCompileError as error:
         parser.errors.append(str(error))
@@ -232,6 +234,33 @@ class ValDecl(DeclNode):
         decl_visitor.visit_val_decl(self)
 
 
+def parse_params(parser):
+    parser.consume(
+        TokenType.LEFT_PAREN,
+        parse_error("Expected '(' to start function parameters!", parser),
+    )
+    params = []
+    # Consume parameters until we hit the closing paren
+    while not parser.match(TokenType.RIGHT_PAREN):
+        # Consume a type for the parameter
+        param_type = parse_type(parser)
+        # And then a name for the parameter
+        parser.consume(
+            TokenType.IDENTIFIER, parse_error("Expected parameter name!", parser)
+        )
+        param_name = parser[-1]
+        # Append the parameters as (type, name) tuples
+        pair = (param_type, param_name)
+        params.append(pair)
+        # If we haven't hit the end there must be a comma before the next parameter
+        if not parser.check(TokenType.RIGHT_PAREN):
+            parser.consume(
+                TokenType.COMMA,
+                parse_error("Expected comma to delimit parameters!", parser),
+            )
+    return params
+
+
 class FuncDecl(DeclNode):
     def __init__(self, name, params, return_type, block, decorator=None):
         super().__init__()
@@ -260,29 +289,7 @@ class FuncDecl(DeclNode):
             emit_error(
                 f"Invalid identifier name {name.lexeme}! This is reserved for the built-in function {name.lexeme}(). {token_info(name)}"
             )()
-        parser.consume(
-            TokenType.LEFT_PAREN,
-            parse_error("Expected '(' to start function parameters!", parser),
-        )
-        params = []
-        # Consume parameters until we hit the closing paren
-        while not parser.match(TokenType.RIGHT_PAREN):
-            # Consume a type for the parameter
-            param_type = parse_type(parser)
-            # And then a name for the parameter
-            parser.consume(
-                TokenType.IDENTIFIER, parse_error("Expected parameter name!", parser)
-            )
-            param_name = parser[-1]
-            # Append the parameters as (type, name) tuples
-            pair = (param_type, param_name)
-            params.append(pair)
-            # If we haven't hit the end there must be a comma before the next parameter
-            if not parser.check(TokenType.RIGHT_PAREN):
-                parser.consume(
-                    TokenType.COMMA,
-                    parse_error("Expected comma to delimit parameters!", parser),
-                )
+        params = parse_params(parser)
         # Consume the return type
         return_type = parse_type(parser)
         # Consume the definition block
@@ -303,8 +310,61 @@ class PropDecl(DeclNode):
 
     @staticmethod
     def parse(parser):
-        # TODO
-        pass
+        parser.consume(
+            TokenType.PROP, parse_error("Expected property declaration!", parser)
+        )
+        parser.consume(
+            TokenType.IDENTIFIER, parse_error("Expected property name!", parser)
+        )
+        name = parser[-1]
+        if name.lexeme in BUILTINS:
+            emit_error(
+                f"Invalid property name {token_info(name)}, this is reserved for the built-in function {name.lexeme}()"
+            )()
+        parser.consume(
+            TokenType.LEFT_BRACE, parse_error("Expected property body!", parser)
+        )
+        methods = {}
+        fields = []
+        while not parser.match(TokenType.RIGHT_BRACE):
+            if (
+                parser.check(TokenType.AT)
+                or parser.check(TokenType.FUNC)
+                and parser.check_then(TokenType.IDENTIFIER)
+            ):
+                # It's a method
+                parser.consume(
+                    TokenType.FUNC, parse_error("Expected method declaration!", parser)
+                )
+                parser.consume(
+                    TokenType.IDENTIFIER, parse_error("Expected method name!", parser)
+                )
+                name = parser[-1]
+                params = parse_params(parser)
+                return_type = parse_type(parser)
+                methods[len(fields)] = (params, return_type)
+                param_types = [param_type for (param_type, _) in params]
+                func_type = FunctionType(param_types, return_type)
+                pair = (func_type, name)
+                fields.append(pair)
+            else:
+                field_type = parse_type(parser)
+                parser.consume(
+                    TokenType.IDENTIFIER, parse_error("Expected field name!", parser)
+                )
+                field_name = parser[-1]
+                pair = (field_type, field_name)
+                fields.append(pair)
+            if not parser.check(TokenType.RIGHT_BRACE):
+                parser.consume(
+                    TokenType.COMMA,
+                    parse_error("Expected comma to delimit members!", parser),
+                )
+        return PropDecl(name, fields, methods)
+
+    @sync_errors
+    def accept(self, decl_visitor):
+        decl_visitor.visit_prop_decl(self)
 
 
 class StructDecl(DeclNode):
@@ -411,7 +471,7 @@ class StructDecl(DeclNode):
                 if not parser.check(TokenType.RIGHT_BRACE):
                     parser.consume(
                         TokenType.COMMA,
-                        parse_error("Expected comma to delimit parameters!", parser),
+                        parse_error("Expected comma to delimit members!", parser),
                     )
                 # Append the fields as (type, name) tuples
                 pair = (field_type, field_name)
