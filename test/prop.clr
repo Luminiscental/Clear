@@ -3,6 +3,10 @@ prop Countable {
     int n
 }
 
+struct Uh {
+    int a
+}
+
 struct A with Countable as { n=sheep } {
     int sheep
 }

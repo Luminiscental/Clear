@@ -33,6 +33,15 @@ TypeInfo = namedtuple(
 )
 
 
+def check_name_collisions(fields):
+    field_names = {}
+    for _, field_name in fields:
+        if field_name.lexeme in field_names:
+            return field_name, field_names[field_name.lexeme]
+        field_names[field_name.lexeme] = field_name
+    return None
+
+
 class TypeResolver(StructTrackingDeclVisitor):
     def __init__(self):
         super().__init__()
@@ -589,6 +598,16 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.block = BlockStmt(prefixed_block)
         self.resolve_function(node, is_method=True)
 
+    def visit_prop_decl(self, node):
+        super().visit_prop_decl(node)
+        collision = check_name_collisions(node.fields)
+        if collision is not None:
+            duplicate, original = collision
+            emit_error(
+                f"Duplicate field {token_info(duplicate)} in property {token_info(node.name)}: "
+                f"ambiguous with {token_info(original)}!"
+            )()
+
     def visit_struct_decl(self, node):
         # Check before super() because super() adds it to self.structs
         name = node.name.lexeme
@@ -598,14 +617,13 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Redefinition of struct {node.name}! Struct shadowing is not allowed."
             )()
         # Check for name collisions
-        field_names = {}
-        for _, field_name in node.fields:
-            if field_name.lexeme in field_names:
-                emit_error(
-                    f"Duplicate field {token_info(field_name)} in struct {token_info(node.name)}: "
-                    f"ambiguous with {token_info(field_names[field_name.lexeme])}!"
-                )()
-            field_names[field_name.lexeme] = field_name
+        collision = check_name_collisions(node.fields)
+        if collision is not None:
+            duplicate, original = collision
+            emit_error(
+                f"Duplicate field {token_info(duplicate)} in struct {token_info(node.name)}: "
+                f"ambiguous with {token_info(original)}!"
+            )()
         field_dict = {
             name_token.lexeme: type_node.as_annotation
             for type_node, name_token in node.fields
