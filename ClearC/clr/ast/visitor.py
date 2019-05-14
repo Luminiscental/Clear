@@ -167,7 +167,12 @@ class StructTrackingDeclVisitor(DeclVisitor):
     def __init__(self):
         super().__init__()
         self.structs = {}
+        self.props = {}
 
     def visit_struct_decl(self, node):
         self.structs[node.name.lexeme] = node
         super().visit_struct_decl(node)
+
+    def visit_prop_decl(self, node):
+        self.props[node.name.lexeme] = node
+        super().visit_prop_decl(node)

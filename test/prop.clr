@@ -1,22 +1,15 @@
 
-prop C {
-    func() void do_stuff,
-    func three() void
+prop Countable {
+    int n
 }
 
-prop B {
-    func one() void,
-    func() void do_stuff
+struct A with Countable as { n=sheep } {
+    int sheep
 }
 
-struct A with B as { one=two }, C {
-    func() void do_stuff,
-
-    func two() void {
-        print "two";
-    }
-
-    func three() void {
-        print "three";
-    }
-}
+//struct B with Countable {
+//}
+//
+//struct C with Countable {
+//    num size
+//}

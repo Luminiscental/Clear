@@ -339,13 +339,13 @@ class PropDecl(DeclNode):
                 parser.consume(
                     TokenType.IDENTIFIER, parse_error("Expected method name!", parser)
                 )
-                name = parser[-1]
+                method_name = parser[-1]
                 params = parse_params(parser)
                 return_type = parse_type(parser)
                 methods[len(fields)] = (params, return_type)
                 param_types = [param_type for (param_type, _) in params]
                 func_type = FunctionType(param_types, return_type)
-                pair = (func_type, name)
+                pair = (func_type, method_name)
                 fields.append(pair)
             else:
                 field_type = parse_type(parser)
