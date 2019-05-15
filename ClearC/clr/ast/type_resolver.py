@@ -630,7 +630,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             field_name.lexeme: field_type.as_annotation
             for field_type, field_name in struct.fields
         }
-        for type_node, name_token in prop.fields:
+        for i, (type_node, name_token) in enumerate(prop.fields):
             required_name = name_token.lexeme
             required_type = type_node.as_annotation
             if required_name in property_mappings:
@@ -640,11 +640,21 @@ class TypeResolver(StructTrackingDeclVisitor):
                     f'Missing member "{required_name}" expected for property "{prop_name}" on struct {token_info(struct.name)}!'
                 )()
             idx = struct_fields.index(required_name)
+            if i in prop.methods and idx not in struct.methods:
+                emit_error(
+                    f'Incompatible member "{required_name}" for property "{prop_name}" '
+                    f'on struct {token_info(struct.name)}; a method is required, not a function!"'
+                )()
+            elif i not in prop.methods and idx in struct.methods:
+                emit_error(
+                    f'Incompatible member "{required_name}" for property "{prop_name}" '
+                    f'on struct {token_info(struct.name)}; a function is required, not a method!"'
+                )()
             polymorph.append(idx)
             if not struct_dict[required_name].matches(required_type):
                 emit_error(
                     f"Incompatible type {struct_dict[required_name]} for property member "
-                    f'{token_info(name_token)} to satisfy "{prop_name}" on {token_info(struct.name)}; '
+                    f'"{required_name}" to satisfy "{prop_name}" on {token_info(struct.name)}; '
                     f"expected {required_type}!"
                 )()
         struct.props[prop_name] = polymorph
