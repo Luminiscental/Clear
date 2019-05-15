@@ -88,7 +88,11 @@ class NameIndexer(StructTrackingDeclVisitor):
 
     def visit_access_expr(self, node):
         super().visit_access_expr(node)
-        struct = self.structs[node.left.type_annotation.identifier]
+        typename = node.left.type_annotation.identifier
+        if typename in self.structs:
+            struct = self.structs[typename]
+        elif typename in self.props:
+            struct = self.props[typename]
         field_names = [field_name.lexeme for (_, field_name) in struct.fields]
         index = field_names.index(node.right.name.lexeme)
         node.right.index_annotation = IndexAnnotation(
@@ -218,6 +222,7 @@ class FunctionNameIndexer(NameIndexer):
         super().__init__()
         # Inherit structs from parent as a copy
         self.structs = parent.structs.copy()
+        self.props = parent.props.copy()
         self.parent = parent
         # Default scope is not the global scope in a function
         self.increase_level()

@@ -3,17 +3,23 @@ prop Countable {
     int n
 }
 
-struct Uh {
-    int a
+prop Sizeable {
+    int size
 }
 
-struct A with Countable as { n=sheep } {
+struct A with Countable as { n=sheep }, Sizeable as { size=sheep } {
+    num x,
     int sheep
 }
 
-//struct B with Countable {
-//}
-//
-//struct C with Countable {
-//    num size
-//}
+func count(Countable c) void {
+    print "Count is " + str(c.n);
+}
+
+func size(Sizeable s) void {
+    print "Size is " + str(s.size);
+}
+
+val a = A { x=3.14, sheep=2i };
+count(a);
+size(a);

@@ -74,7 +74,8 @@ class OpCode(Enum):
     # Structs
     STRUCT = 45
     GET_FIELD = 46
-    SET_FIELD = 47
+    GET_FIELDS = 47
+    SET_FIELD = 48
 
     def __str__(self):
         return "OP_" + self.name

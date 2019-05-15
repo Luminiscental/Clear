@@ -66,6 +66,22 @@ class TypeResolver(StructTrackingDeclVisitor):
                 break
         return result
 
+    def _match_type(self, expression, expected_type):
+        expr_type = expression.type_annotation
+        if expr_type.matches(expected_type):
+            return True
+        if (
+            isinstance(expected_type, IdentifierTypeAnnotation)
+            and isinstance(expr_type, IdentifierTypeAnnotation)
+            and expected_type.identifier in self.props
+            and expr_type.identifier in self.structs
+        ):
+            struct = self.structs[expr_type.identifier]
+            if expected_type.identifier in struct.props:
+                expression.polymorphed_fields = struct.props[expected_type.identifier]
+                return True
+        return False
+
     def start_scope(self):
         super().start_scope()
         self.scopes.append(defaultdict(TypeInfo))
@@ -104,9 +120,7 @@ class TypeResolver(StructTrackingDeclVisitor):
                     f"Invalid field assignment to {field_name} in struct constructor, "
                     f"`{node.name}` is not a field: `{node}`!"
                 )()
-            if not field_value.type_annotation.matches(
-                field_names[field_name].as_annotation
-            ):
+            if not self._match_type(field_value, field_names[field_name].as_annotation):
                 emit_error(
                     f"Incompatible type {field_value.type_annotation} for field {field_name} "
                     f"whose type is {field_names[field_name]}: `{node}`!"
@@ -143,7 +157,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             for i, (arg, param_type) in enumerate(
                 zip(node.arguments, function_type.signature)
             ):
-                if not arg.type_annotation.matches(param_type):
+                if not self._match_type(arg, param_type):
                     emit_error(
                         f"Incompatible type {arg.type_annotation} passed as argument {i+1}; "
                         f"expected {param_type}! `{node}`"
@@ -172,14 +186,16 @@ class TypeResolver(StructTrackingDeclVisitor):
         property_token = node.right.name
         if node.left.type_annotation.kind != TypeAnnotationType.IDENTIFIER:
             emit_error(
-                f"Non-struct type {node.left.type_annotation} does not have a property "
+                f"Type {node.left.type_annotation} does not have a property "
                 f"{token_info(property_token)} to access: `{node}`!"
             )()
         typename = node.left.type_annotation.identifier
         if typename in self.structs:
             struct = self.structs[typename]
-        else:
+        elif typename in self.props:
             struct = self.props[typename]
+        else:
+            emit_error(f'Use of undefined type "{typename}": `{node}`!')()
         fields = {
             field_name.lexeme: field_type for (field_type, field_name) in struct.fields
         }
@@ -296,7 +312,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_if_expr(node)
         expected_type = None
         for cond, value in node.checks:
-            if not cond.type_annotation.matches(BOOL_TYPE):
+            if not self._match_type(cond, BOOL_TYPE):
                 emit_error(
                     f"Incompatible condition type {cond.type_annotation} for if expression: `{node}`!"
                 )()
@@ -324,7 +340,7 @@ class TypeResolver(StructTrackingDeclVisitor):
             emit_error(f"Unassignable expression `{node.left}`: `{node}`!")()
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if not right_type.matches(left_type):
+        if not self._match_type(node.right, left_type):
             emit_error(
                 f"`{node.left}` is of type {left_type}, so cannot assign `{node.right}` "
                 f"of type {right_type} to it: `{node}`!"
@@ -351,25 +367,17 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_or_expr(node)
         left_type = node.left.type_annotation
         right_type = node.right.type_annotation
-        if left_type.kind == TypeAnnotationType.OPTIONAL:
-            if not right_type.matches(left_type):
-                emit_error(
-                    f"Incompatible type {right_type} for optional unpacking of {left_type} "
-                    f"in {token_info(node.operator)} expression: `{node}`!"
-                )()
-            node.type_annotation = left_type.target
-        else:
-            if not left_type.matches(BOOL_TYPE):
-                emit_error(
-                    f"Incompatible type {left_type} for left operand to logic operator "
-                    f"{token_info(node.operator)}: `{node}`!"
-                )()
-            if not right_type.matches(BOOL_TYPE):
-                emit_error(
-                    f"Incompatible type {right_type} for right operand to logic operator "
-                    f"{token_info(node.operator)}: `{node}`!"
-                )()
-            node.type_annotation = BOOL_TYPE
+        if not self._match_type(node.left, BOOL_TYPE):
+            emit_error(
+                f"Incompatible type {left_type} for left operand to logic operator "
+                f"{token_info(node.operator)}: `{node}`!"
+            )()
+        if not self._match_type(node.right, BOOL_TYPE):
+            emit_error(
+                f"Incompatible type {right_type} for right operand to logic operator "
+                f"{token_info(node.operator)}: `{node}`!"
+            )()
+        node.type_annotation = BOOL_TYPE
 
     def visit_keyword_expr(self, node):
         super().visit_keyword_expr(node)
@@ -449,7 +457,7 @@ class TypeResolver(StructTrackingDeclVisitor):
                 emit_error(
                     f"Return statement found in void function {token_info(node.return_token)}!"
                 )()
-            if not node.value.type_annotation.matches(expected):
+            if not self._match_type(node.value, expected):
                 emit_error(
                     f"Incompatible return type! Expected {expected} but was given "
                     f"{node.value.type_annotation} at {token_info(node.return_token)}!"
@@ -465,7 +473,7 @@ class TypeResolver(StructTrackingDeclVisitor):
     def visit_if_stmt(self, node):
         super().visit_if_stmt(node)
         for cond, _ in node.checks:
-            if not cond.type_annotation.matches(BOOL_TYPE):
+            if not self._match_type(cond, BOOL_TYPE):
                 emit_error(
                     f"Expected boolean condition for if-block but got {cond.type_annotation} instead: `{cond}`!"
                 )()
@@ -608,6 +616,39 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"ambiguous with {token_info(original)}!"
             )()
 
+    def resolve_property(self, prop_name, struct):
+        # TODO: Distinguish fields and methods!!!
+        if prop_name not in self.props:
+            emit_error(
+                f'Undefined property "{prop_name}" referenced for struct {token_info(struct.name)}!'
+            )
+        prop = self.props[prop_name]
+        polymorph = []
+        property_mappings = struct.props[prop_name]
+        struct_fields = [field_name.lexeme for _, field_name in struct.fields]
+        struct_dict = {
+            field_name.lexeme: field_type.as_annotation
+            for field_type, field_name in struct.fields
+        }
+        for type_node, name_token in prop.fields:
+            required_name = name_token.lexeme
+            required_type = type_node.as_annotation
+            if required_name in property_mappings:
+                required_name = property_mappings[required_name]
+            if required_name not in struct_fields:
+                emit_error(
+                    f'Missing member "{required_name}" expected for property "{prop_name}" on struct {token_info(struct.name)}!'
+                )()
+            idx = struct_fields.index(required_name)
+            polymorph.append(idx)
+            if not struct_dict[required_name].matches(required_type):
+                emit_error(
+                    f"Incompatible type {struct_dict[required_name]} for property member "
+                    f'{token_info(name_token)} to satisfy "{prop_name}" on {token_info(struct.name)}; '
+                    f"expected {required_type}!"
+                )()
+        struct.props[prop_name] = polymorph
+
     def visit_struct_decl(self, node):
         # Check before super() because super() adds it to self.structs
         name = node.name.lexeme
@@ -624,45 +665,8 @@ class TypeResolver(StructTrackingDeclVisitor):
                 f"Duplicate field {token_info(duplicate)} in struct {token_info(node.name)}: "
                 f"ambiguous with {token_info(original)}!"
             )()
-        field_dict = {
-            name_token.lexeme: type_node.as_annotation
-            for type_node, name_token in node.fields
-        }
         for prop_name in node.props:
-            if prop_name not in self.props:
-                emit_error(
-                    f'Undefined property "{prop_name}" referenced for struct {token_info(node.name)}!'
-                )
-            prop = self.props[prop_name]
-            field_map = node.props[prop_name]
-            for type_node, name_token in prop.fields:
-                field_name = name_token.lexeme
-                field_type = type_node.as_annotation
-                if field_name in field_map:
-                    mapped_name = field_map[field_name]
-                    if mapped_name not in field_dict:
-                        emit_error(
-                            f'Struct "{token_info(node.name)}" does not satisfy the property "{prop_name}", '
-                            f'missing field "{field_name}={mapped_name}"; "{mapped_name}" not found!'
-                        )()
-                    found_type = field_dict[mapped_name]
-                    if not found_type.matches(field_type):
-                        emit_error(
-                            f'Incompatible type {found_type} for property field "{field_name}={mapped_name}" '
-                            f'of property "{prop_name}" in struct {token_info(node.name)}, expected {field_type}!'
-                        )()
-                else:
-                    if field_name not in field_dict:
-                        emit_error(
-                            f'Struct "{token_info(node.name)}" does not satisfy the property "{prop_name}"; '
-                            f'"{field_name}" not found!'
-                        )()
-                    found_type = field_dict[field_name]
-                    if not found_type.matches(field_type):
-                        emit_error(
-                            f'Incompatible type {found_type} for property field "{field_name}" '
-                            f'of property "{prop_name}" in struct {token_info(node.name)}, expected {field_type}!'
-                        )()
+            self.resolve_property(prop_name, node)
         # Push the struct name onto self.current_structs
         self.current_structs.append(node)
         super().visit_struct_decl(node)
@@ -674,7 +678,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         super().visit_val_decl(node)
         if node.type_description is not None:
             node.type_annotation = node.type_description.as_annotation
-            if not node.initializer.type_annotation.matches(node.type_annotation):
+            if not self._match_type(node.initializer, node.type_annotation):
                 emit_error(
                     f"Incompatible initializing type `{node.initializer.type_annotation}` "
                     f"for variable {token_info(node.name)} declared as `{node.type_annotation}`!"

@@ -116,6 +116,15 @@ class Compiler(DeclVisitor):
         super().visit_val_decl(node)
         self.program.define_name(node.index_annotation)
 
+    def _end_expression(self, node):
+        if node.polymorphed_fields is not None:
+            self.program.simple_op(OpCode.GET_FIELDS)
+            self.program.simple_op(len(node.polymorphed_fields))
+            for field in node.polymorphed_fields:
+                self.program.simple_op(field)
+            self.program.simple_op(OpCode.STRUCT)
+            self.program.simple_op(len(node.polymorphed_fields))
+
     def _make_function(self, node):
         function = self.program.begin_function()
         for decl in node.block.declarations:
@@ -279,6 +288,7 @@ class Compiler(DeclVisitor):
             node.operator.token_type,
             emit_error(f"Unknown unary operator! {token_info(node.operator)}"),
         )()
+        self._end_expression(node)
 
     def visit_assign_expr(self, node):
         # Don't call super as we don't want to evaluate the left hand side
@@ -288,11 +298,13 @@ class Compiler(DeclVisitor):
             print(f"Loading name for {node.left}")
         # Assignment is an expression so we load the assigned value as well
         self.program.load_name(node.left.index_annotation)
+        self._end_expression(node)
 
     def visit_access_expr(self, node):
         super().visit_access_expr(node)
         self.program.simple_op(OpCode.GET_FIELD)
         self.program.simple_op(node.right.index_annotation.value)
+        self._end_expression(node)
 
     def visit_binary_expr(self, node):
         super().visit_binary_expr(node)
@@ -311,6 +323,7 @@ class Compiler(DeclVisitor):
         if node.operator.token_type not in binary_codes:
             emit_error(f"Unknown binary operator! {token_info(node.operator)}")()
         self.program.simple_op(binary_codes[node.operator.token_type])
+        self._end_expression(node)
 
     def visit_unpack_expr(self, node):
         # No super as we need the jumps in the right place
@@ -379,6 +392,7 @@ class Compiler(DeclVisitor):
             self.program.simple_op(OpCode.POP)
             node.default_value.accept(self)
             self.program.end_jump(jump_to_end)
+        self._end_expression(node)
 
     def visit_lambda_expr(self, node):
         # No super as we handle params / scoping
@@ -392,6 +406,7 @@ class Compiler(DeclVisitor):
         self.program.simple_op(return_op)
         self.program.end_function(function)
         self.program.make_closure(node.upvalues)
+        self._end_expression(node)
 
     def visit_if_expr(self, node):
         # No super because we need the jumps in the right place
@@ -412,6 +427,7 @@ class Compiler(DeclVisitor):
         for final_jump in final_jumps:
             # All the final jumps end here after everything
             self.program.end_jump(final_jump)
+        self._end_expression(node)
 
     def visit_call_expr(self, node):
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
@@ -424,6 +440,7 @@ class Compiler(DeclVisitor):
             super().visit_call_expr(node)
             self.program.simple_op(OpCode.CALL)
             self.program.simple_op(len(node.arguments))
+        self._end_expression(node)
 
     def visit_construct_expr(self, node):
         # Load the constructor before calling super() as callable comes before arguments
@@ -432,22 +449,27 @@ class Compiler(DeclVisitor):
         # Call the constructor
         self.program.simple_op(OpCode.CALL)
         self.program.simple_op(len(node.args))
+        self._end_expression(node)
 
     def _visit_constant_expr(self, node):
         const_index = self.constants.add(node.value)
         self.program.load_constant(const_index)
+        self._end_expression(node)
 
     def visit_number_expr(self, node):
         super().visit_number_expr(node)
         self._visit_constant_expr(node)
+        self._end_expression(node)
 
     def visit_string_expr(self, node):
         super().visit_string_expr(node)
         self._visit_constant_expr(node)
+        self._end_expression(node)
 
     def visit_boolean_expr(self, node):
         super().visit_boolean_expr(node)
         self.program.simple_op(OpCode.TRUE if node.value else OpCode.FALSE)
+        self._end_expression(node)
 
     def visit_keyword_expr(self, node):
         super().visit_keyword_expr(node)
@@ -455,12 +477,14 @@ class Compiler(DeclVisitor):
             self.program.load_name(node.index_annotation)
         elif node.token.token_type == TokenType.NIL:
             self.program.simple_op(OpCode.NIL)
+        self._end_expression(node)
 
     def visit_ident_expr(self, node):
         super().visit_ident_expr(node)
         if DEBUG:
             print(f"Loading name for {node}")
         self.program.load_name(node.index_annotation)
+        self._end_expression(node)
 
     def visit_and_expr(self, node):
         # No super because we need to put the jumps in the right place
@@ -471,6 +495,7 @@ class Compiler(DeclVisitor):
         self.program.simple_op(OpCode.POP)
         node.right.accept(self)
         self.program.end_jump(short_circuit)
+        self._end_expression(node)
 
     def visit_or_expr(self, node):
         # No super because we need to put the jumps in the right place
@@ -485,3 +510,4 @@ class Compiler(DeclVisitor):
         node.right.accept(self)
         # If we short circuited leave the true value on the stack
         self.program.end_jump(short_circuit)
+        self._end_expression(node)

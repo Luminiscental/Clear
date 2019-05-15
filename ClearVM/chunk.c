@@ -223,6 +223,27 @@ static uint32_t indexInstruction(const char *name, Chunk *chunk,
     return offset + 2;
 }
 
+static uint32_t listInstruction(const char *name, Chunk *chunk,
+                                uint32_t offset) {
+
+    if (offset + 2 > chunk->count) {
+
+        printf("|| EOF reached during list instruction!\n");
+        return chunk->count;
+    }
+
+    uint8_t len = chunk->code[offset + 1];
+    printf("%-18s %4d:\n", name, len);
+
+    for (size_t i = 0; i < len; i++) {
+
+        uint8_t value = chunk->code[offset + 2 + i];
+        printf("\t%4d\n", value);
+    }
+
+    return offset + 2 + len;
+}
+
 uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
 
     printf("%04d ", offset);
@@ -486,6 +507,12 @@ uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset) {
         case OP_GET_FIELD: {
 
             return indexInstruction("OP_GET_FIELD", chunk, offset);
+
+        } break;
+
+        case OP_GET_FIELDS: {
+
+            return listInstruction("OP_GET_FIELDS", chunk, offset);
 
         } break;
 

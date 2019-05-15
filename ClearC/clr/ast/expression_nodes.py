@@ -88,6 +88,7 @@ class ExprNode:  # pylint: disable=too-few-public-methods
         self.type_annotation = TypeAnnotation()
         self.assignable = False
         self.grouped = False
+        self.polymorphed_fields = None
 
 
 def pprint(str_func):

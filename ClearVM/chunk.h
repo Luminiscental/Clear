@@ -80,7 +80,8 @@ typedef enum {
     // Structs
     OP_STRUCT = 45,
     OP_GET_FIELD = 46,
-    OP_SET_FIELD = 47
+    OP_GET_FIELDS = 47,
+    OP_SET_FIELD = 48
 
 } OpCode;
 

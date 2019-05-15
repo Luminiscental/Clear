@@ -1045,8 +1045,59 @@ InterpretResult run(VM *vm) {
 
                 if (push(frame, field) != INTERPRET_OK) {
 
-                    printf("|| Could not push field to stack!\n");
+                    printf("|| Could not push field onto the stack!\n");
                     return INTERPRET_ERR;
+                }
+
+            } break;
+
+            case OP_GET_FIELDS: {
+
+                uint8_t fieldCount;
+                if (readByte(vm, frame, &fieldCount) != INTERPRET_OK) {
+
+                    printf("|| Could not read number of fields to extract!\n");
+                    return INTERPRET_ERR;
+                }
+
+                Value structValue;
+                if (pop(frame, &structValue) != INTERPRET_OK) {
+
+                    printf("|| Could not get struct to extract fields from!\n");
+                    return INTERPRET_ERR;
+                }
+
+                if (!isObjType(structValue, OBJ_STRUCT)) {
+
+                    printf("|| Provided value is not a struct!\n");
+                    return INTERPRET_ERR;
+                }
+
+                ObjStruct *objStruct = (ObjStruct *)structValue.as.obj;
+
+                for (size_t i = 0; i < fieldCount; i++) {
+
+                    uint8_t fieldIndex;
+                    if (readByte(vm, frame, &fieldIndex) != INTERPRET_OK) {
+
+                        printf("|| Could not read index for field to extract "
+                               "%zu!\n",
+                               i);
+                        return INTERPRET_ERR;
+                    }
+
+                    Value fieldValue;
+                    if (!getField(objStruct, fieldIndex, &fieldValue)) {
+
+                        printf("|| Could not find field on struct!\n");
+                        return INTERPRET_ERR;
+                    }
+
+                    if (push(frame, fieldValue) != INTERPRET_OK) {
+
+                        printf("|| Could not push field onto the stack!\n");
+                        return INTERPRET_ERR;
+                    }
                 }
 
             } break;
