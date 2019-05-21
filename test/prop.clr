@@ -1,14 +1,24 @@
 
 prop Countable {
-    func count() int
-}
-
-struct Works with Countable {
-    func count() int {
-        return 3i;
+    int n
+} with {
+    func display_count() void {
+        print "Count is " + str(n);
     }
 }
 
-struct Doesnt with Countable {
-    func() int count
+struct Farmer with Countable as { n=sheep } {
+    int sheep
 }
+
+val farmer = Farmer { sheep=3i };
+
+print farmer.n; // no
+farmer.display_count(); // yes
+
+func test(Countable c) void {
+    print c.n; // yes
+    c.display_count(); // yes
+}
+
+test(farmer);

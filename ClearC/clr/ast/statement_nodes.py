@@ -302,11 +302,12 @@ class FuncDecl(DeclNode):
 
 
 class PropDecl(DeclNode):
-    def __init__(self, name, fields, methods):
+    def __init__(self, name, fields, methods, assoc_methods):
         super().__init__()
         self.name = name
         self.fields = fields
         self.methods = methods
+        self.assoc_methods = assoc_methods
 
     @staticmethod
     def parse(parser):
@@ -360,7 +361,14 @@ class PropDecl(DeclNode):
                     TokenType.COMMA,
                     parse_error("Expected comma to delimit members!", parser),
                 )
-        return PropDecl(name, fields, methods)
+        assoc_methods = []
+        if parser.match(TokenType.WITH):
+            parser.consume(
+                TokenType.LEFT_BRACE, parse_error("Expected with block!", parser)
+            )
+            while not parser.match(TokenType.RIGHT_BRACE):
+                assoc_methods.append(FuncDecl.parse(parser))
+        return PropDecl(name, fields, methods, assoc_methods)
 
     @sync_errors
     def accept(self, decl_visitor):
