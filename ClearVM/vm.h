@@ -15,7 +15,8 @@
     } T##Stack##N;                                                             \
                                                                                \
     Result push##T##Stack##N(T##Stack##N *stack, T value);                     \
-    Result pop##T##Stack##N(T##Stack##N *stack, T *popped);
+    Result pop##T##Stack##N(T##Stack##N *stack, T *popped);                    \
+    Result peek##T##Stack##N(T##Stack##N *stack, T *peeked, size_t offset);
 
 DEFN_STACK(Value, 256)
 DEFN_STACK(Value, 64)
@@ -34,7 +35,8 @@ DEFN_STACK(Frame, 64)
 
 typedef struct sVM VM;
 
-typedef Result (*Instruction)(VM *vm, uint8_t **ip, size_t codeLength);
+typedef Result (*Instruction)(VM *vm, uint8_t **ip, uint8_t *code,
+                              size_t codeLength);
 
 typedef struct sVM {
 

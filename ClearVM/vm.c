@@ -36,6 +36,21 @@
         }                                                                      \
                                                                                \
         return RESULT_OK;                                                      \
+    }                                                                          \
+                                                                               \
+    Result peek##T##Stack##N(T##Stack##N *stack, T *peeked, size_t offset) {   \
+                                                                               \
+        if ((size_t)(stack->next - stack->values) <= offset) {                 \
+                                                                               \
+            return RESULT_ERR;                                                 \
+        }                                                                      \
+                                                                               \
+        if (peeked != NULL) {                                                  \
+                                                                               \
+            *peeked = *(stack->next - offset);                                 \
+        }                                                                      \
+                                                                               \
+        return RESULT_OK;                                                      \
     }
 
 IMPL_STACK(Value, 256)
@@ -44,14 +59,76 @@ IMPL_STACK(Frame, 64)
 
 #undef IMPL_STACK
 
-Result errorInstruction(VM *vm, uint8_t **ip, size_t codeLength) {
+#define GET_FRAME                                                              \
+    Frame frame;                                                               \
+    if (peekFrameStack64(&vm->frames, &frame, 0) != RESULT_OK) {               \
+                                                                               \
+        printf("|| Could not get current frame\n");                            \
+        return RESULT_ERR;                                                     \
+    }
+
+static Result errorInstruction(VM *vm, uint8_t **ip, uint8_t *code,
+                               size_t codeLength) {
 
     UNUSED(vm);
     UNUSED(ip);
+    UNUSED(code);
     UNUSED(codeLength);
 
     printf("|| Unimplemented opcode\n");
     return RESULT_ERR;
+}
+
+#define DEFN_READ(name, type)                                                  \
+    static Result read##name(uint8_t **ip, uint8_t *code, size_t codeLength,   \
+                             type *out) {                                      \
+                                                                               \
+        if ((size_t)(1 + *ip - code) > codeLength) {                           \
+                                                                               \
+            printf("|| Ran out of bytes reading instruction\n");               \
+            return RESULT_ERR;                                                 \
+        }                                                                      \
+                                                                               \
+        if (out != NULL) {                                                     \
+                                                                               \
+            *out = *(type *)(*ip);                                             \
+        }                                                                      \
+                                                                               \
+        (*ip)++;                                                               \
+        return RESULT_OK;                                                      \
+    }
+
+DEFN_READ(U8, uint8_t)
+
+#undef DEFN_READ
+
+static Result op_loadConst(VM *vm, uint8_t **ip, uint8_t *code,
+                           size_t codeLength) {
+
+    GET_FRAME
+
+    uint8_t index;
+    if (readU8(ip, code, codeLength, &index) != RESULT_OK) {
+
+        printf("|| Couldn't read constant index\n");
+        return RESULT_ERR;
+    }
+
+    if (index >= vm->constantCount) {
+
+        printf("|| Constant index %d out of range\n", index);
+        return RESULT_ERR;
+    }
+
+    Value value = vm->constants[index];
+
+    if (pushValueStack256(&frame.stack, value) != RESULT_OK) {
+
+        printf("|| Could not push constant value\n");
+        return RESULT_ERR;
+    }
+
+    return RESULT_OK;
 }
 
 void initVM(VM *vm) {
@@ -67,6 +144,8 @@ void initVM(VM *vm) {
 
         vm->instructions[i] = errorInstruction;
     }
+
+    vm->instructions[OP_LOAD_CONST] = op_loadConst;
 }
 
 static Value makeObject(VM *vm, size_t size, ObjectType type) {
@@ -205,7 +284,7 @@ Result executeCode(VM *vm, uint8_t *code, size_t length) {
             return RESULT_ERR;
         }
 
-        if (vm->instructions[opcode](vm, &ip, length) != RESULT_OK) {
+        if (vm->instructions[opcode](vm, &ip, code, length) != RESULT_OK) {
 
             printf("|| Opcode %d failed\n", opcode);
             return RESULT_ERR;
