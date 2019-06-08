@@ -10,5 +10,5 @@ set(CMAKE_BUILD_TYPE Debug)
 # add_compile_definitions(DEBUG_STACK)
 # add_compile_definitions(DEBUG_MEM)
 
-add_executable(clr main.c chunk.c memory.c vm.c value.c obj.c table.c)
+add_executable(clr main.c memory.c vm.c)
 target_link_libraries(clr m)

@@ -1,10 +1,5 @@
-#ifndef clearvm_chunk_h
-#define clearvm_chunk_h
-
-#include "common.h"
-#include "value.h"
-
-typedef struct sVM VM;
+#ifndef clearvm_bytecode_h
+#define clearvm_bytecode_h
 
 typedef enum {
 
@@ -84,24 +79,5 @@ typedef enum {
     OP_SET_FIELD = 48
 
 } OpCode;
-
-typedef struct {
-
-    uint32_t count;
-    uint32_t capacity;
-    uint32_t start;
-    uint8_t *code;
-    ValueArray constants;
-
-} Chunk;
-
-void initChunk(Chunk *chunk);
-void writeChunk(Chunk *chunk, uint8_t byte);
-int addConstant(Chunk *chunk, Value value);
-void freeChunk(Chunk *chunk);
-
-void loadConstants(VM *vm, Chunk *chunk);
-void disassembleChunk(Chunk *chunk, const char *name);
-uint32_t disassembleInstruction(Chunk *chunk, uint32_t offset);
 
 #endif

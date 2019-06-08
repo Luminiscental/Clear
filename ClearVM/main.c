@@ -3,7 +3,6 @@
 #include "stdlib.h"
 #include "string.h"
 
-#include "chunk.h"
 #include "common.h"
 #include "memory.h"
 #include "vm.h"
@@ -93,32 +92,21 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    Chunk chunk;
-    initChunk(&chunk);
-
-    for (size_t i = 0; i < byteCode.length; i++) {
-
-        writeChunk(&chunk, byteCode.buffer[i]);
-    }
-
-    FREE_ARRAY(char, byteCode.buffer, byteCode.length);
-
-    loadConstants(&vm, &chunk);
-
 #ifdef DEBUG_DIS
 
     printf("\nDisassembling:\n```\n");
-    disassembleChunk(&chunk, "main");
+    disassembleCode(byteCode.buffer, byteCode.length, "main");
     printf("```\n");
 
 #endif
 
     printf("\nRunning:\n```\n");
-    interpret(&vm, &chunk);
+    executeCode(&vm, byteCode.buffer, byteCode.length);
     printf("```\n");
 
+    FREE_ARRAY(char, byteCode.buffer, byteCode.length);
+
     freeVM(&vm);
-    freeChunk(&chunk);
 
     return 0;
 }

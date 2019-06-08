@@ -2,7 +2,6 @@
 #define clearvm_memory_h
 
 #include "common.h"
-#include "vm.h"
 
 #define GROW_CAPACITY(capacity) ((capacity) < 8 ? 8 : (capacity)*2)
 
@@ -20,6 +19,5 @@
     (type *)reallocate(NULL, 0, sizeof(type) * (count))
 
 void *reallocate(void *previous, size_t oldSize, size_t newSize);
-void freeObjects(VM *vm);
 
 #endif
