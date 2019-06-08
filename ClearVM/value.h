@@ -16,4 +16,21 @@ typedef union {
 
 } Value;
 
+typedef struct {
+
+    Value *data;
+    size_t count;
+    size_t capacity;
+
+} ValueList;
+
+void initValueList(ValueList *list);
+
+void growValueList(ValueList *list);
+void appendValueList(ValueList *list, Value value);
+Result getValueList(ValueList *list, size_t index, Value *out);
+Result setValueList(ValueList *list, size_t index, Value value);
+
+void freeValueList(ValueList *list);
+
 #endif

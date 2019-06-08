@@ -1,49 +1,53 @@
 
 #include "bytecode.h"
 
+#include "memory.h"
 #include <stdio.h>
+#include <string.h>
 
-static Result disassembleSimple(const char *name, uint8_t *code, size_t length,
-                                size_t *index) {
+static Result disassembleSimple(const char *name, size_t *index) {
 
     printf("%s\n", name);
     *index = *index + 1;
     return RESULT_OK;
 }
 
-#define DIS_UNARY(fName, type)                                                 \
+#define DIS_UNARY(fName, format, type)                                         \
     static Result disassemble##fName(const char *name, uint8_t *code,          \
                                      size_t length, size_t *index) {           \
                                                                                \
         if (*index >= length - sizeof(type)) {                                 \
                                                                                \
+            printf("\n");                                                      \
             return RESULT_ERR;                                                 \
         }                                                                      \
                                                                                \
-        size_t paramIndex = *index + 1;                                        \
-        type *paramPtr = (type *)(code + paramIndex);                          \
+        *index = *index + 1;                                                   \
+        type *paramPtr = (type *)(code + *index);                              \
+        *index = *index + sizeof(type);                                        \
                                                                                \
-        printf("%s\t\t%04d\n", name, *paramPtr);                               \
-        *index = *index + 1 + sizeof(type);                                    \
+        printf("%-18s " format "\n", name, *paramPtr);                         \
                                                                                \
         return RESULT_OK;                                                      \
     }
 
-DIS_UNARY(U8, uint8_t)
-DIS_UNARY(U32, uint32_t)
+DIS_UNARY(U8, "%d", uint8_t)
+DIS_UNARY(U32, "%d", uint32_t)
+DIS_UNARY(S32, "'%d'", int32_t)
+DIS_UNARY(F64, "'%f'", double)
 
 #undef DIS_UNARY
 
 static Result disassembleInstruction(uint8_t *code, size_t length,
                                      size_t *index) {
 
-    printf("%04zu\t\t", *index);
+    printf("%04zu ", *index);
 
     switch (code[*index]) {
 
 #define SIMPLE(name)                                                           \
     case name: {                                                               \
-        return disassembleSimple(#name, code, length, index);                  \
+        return disassembleSimple(#name, index);                                \
     } break;
 #define U8(name)                                                               \
     case name: {                                                               \
@@ -126,6 +130,74 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
 Result disassembleCode(uint8_t *code, size_t length) {
 
     size_t index = 0;
+
+    size_t constantCount = *(uint32_t *)code;
+    index = index + sizeof(uint32_t);
+
+    for (size_t i = 0; i < constantCount; i++) {
+
+        printf("%04zu ", index);
+
+        switch (code[index]) {
+
+            case OP_INTEGER: {
+
+                if (disassembleS32("OP_INTEGER", code, length, &index) !=
+                    RESULT_OK) {
+
+                    return RESULT_ERR;
+                }
+
+            } break;
+
+            case OP_NUMBER: {
+
+                if (disassembleF64("OP_NUMBER", code, length, &index) !=
+                    RESULT_OK) {
+
+                    return RESULT_ERR;
+                }
+
+            } break;
+
+            case OP_STRING: {
+
+                printf("%-18s ", "OP_STRING");
+                index++;
+
+                if (index >= length - sizeof(uint8_t)) {
+
+                    printf("\n");
+                    return RESULT_ERR;
+                }
+
+                uint8_t strLength = *(uint8_t *)(code + index);
+                index += sizeof(uint8_t);
+
+                if (index >= length - strLength) {
+
+                    printf("\n");
+                    return RESULT_ERR;
+                }
+
+                char *str = ALLOCATE_ARRAY(char, strLength + 1);
+                str[strLength] = '\0';
+
+                memcpy(str, code + index, strLength);
+                index += strLength;
+
+                printf("'%s'\n", str);
+
+            } break;
+
+            default: {
+
+                printf("\n|| Unknown constant type %d\n", code[index]);
+                return RESULT_ERR;
+
+            } break;
+        }
+    }
 
     while (index < length) {
 

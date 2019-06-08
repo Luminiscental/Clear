@@ -23,5 +23,5 @@ endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(clr main.c memory.c vm.c bytecode.c)
+add_executable(clr main.c memory.c vm.c bytecode.c value.c)
 target_link_libraries(clr m)

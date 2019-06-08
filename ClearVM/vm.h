@@ -4,33 +4,37 @@
 #include "common.h"
 #include "value.h"
 
-#define STACK_MAX 256
-
-#define DEFN_STACK(T)                                                          \
+#define DEFN_STACK(T, N)                                                       \
                                                                                \
     typedef struct {                                                           \
                                                                                \
-        T values[STACK_MAX];                                                   \
+        T values[N];                                                           \
         T *next;                                                               \
                                                                                \
-    } T##Stack;                                                                \
+    } T##Stack##N;                                                             \
                                                                                \
-    Result push##T##Stack(T##Stack *stack, T value);                           \
-    Result pop##T##Stack(T##Stack *stack, T *popped);
+    Result push##T##Stack##N(T##Stack##N *stack, T value);                     \
+    Result pop##T##Stack##N(T##Stack##N *stack, T *popped);
 
-DEFN_STACK(Value)
+DEFN_STACK(Value, 256)
+DEFN_STACK(Value, 64)
 
 typedef struct {
 
-    ValueStack stack;
+    ValueStack256 stack;
+    ValueStack64 locals;
+    size_t paramCount;
 
 } Frame;
 
-DEFN_STACK(Frame)
+DEFN_STACK(Frame, 64)
+
+#undef DEFN_STACK
 
 typedef struct {
 
-    FrameStack frames;
+    FrameStack64 frames;
+    ValueList globals;
 
 } VM;
 
