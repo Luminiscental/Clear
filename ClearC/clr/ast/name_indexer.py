@@ -187,6 +187,10 @@ class NameIndexer(StructTrackingDeclVisitor):
         # No super as we don't delegate to visit_func_decl
         self._index_function(node, is_method=True)
 
+    def visit_prop_decl(self, node):
+        # TODO
+        pass
+
     def visit_struct_decl(self, node):
         # Declare the methods before the constructor as they are created before it when compiling
         for method in node.methods.values():

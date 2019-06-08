@@ -161,6 +161,8 @@ class DeclVisitor(StmtVisitor):
             for param_type in param_types:
                 param_type.accept(self)
             return_type.accept(self)
+        for method in node.assoc_methods:
+            method.accept(self)
 
 
 class StructTrackingDeclVisitor(DeclVisitor):

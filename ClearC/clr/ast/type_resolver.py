@@ -607,6 +607,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         self.resolve_function(node, is_method=True)
 
     def visit_prop_decl(self, node):
+        # TODO: assoc methods
         super().visit_prop_decl(node)
         collision = check_name_collisions(node.fields)
         if collision is not None:

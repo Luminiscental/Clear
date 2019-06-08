@@ -151,6 +151,10 @@ class Compiler(DeclVisitor):
         # Define the function as the final value
         self.program.define_name(node.index_annotation)
 
+    def visit_prop_decl(self, node):
+        # TODO
+        pass
+
     def visit_struct_decl(self, node):
         # No super as we handle methods
         # Make all method function objects
