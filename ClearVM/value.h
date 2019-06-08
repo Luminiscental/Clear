@@ -3,16 +3,37 @@
 
 #include "common.h"
 
-typedef union {
+typedef enum {
 
-    bool asBool;
-    uint8_t asU8;
-    uint32_t asU32;
-    uint64_t asU64;
-    int8_t asS8;
-    int32_t asS32;
-    int64_t asS64;
-    void *asPtr;
+    OBJ_STRING
+
+} ObjectType;
+
+typedef struct sObjectValue ObjectValue;
+struct sObjectValue {
+
+    ObjectType type;
+    void *ptr;
+    ObjectValue *next;
+};
+
+typedef struct {
+
+    size_t length;
+    char *data;
+
+} StringObject;
+
+typedef struct {
+
+    union {
+
+        bool b;
+        int32_t s32;
+        double f64;
+        ObjectValue *obj;
+
+    } as;
 
 } Value;
 

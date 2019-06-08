@@ -29,3 +29,23 @@ void *reallocate(void *previous,
 
     return realloc(previous, newSize);
 }
+
+void freeObject(ObjectValue *obj) {
+
+    switch (obj->type) {
+
+        case OBJ_STRING: {
+
+            StringObject *strObj = (StringObject *)obj->ptr;
+            FREE_ARRAY(char, strObj->data, strObj->length + 1);
+            FREE(StringObject, strObj);
+
+        } break;
+
+        default: {
+
+            printf("|| Unknown object type %d could not be freed\n", obj->type);
+
+        } break;
+    }
+}

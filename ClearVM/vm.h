@@ -39,7 +39,14 @@ typedef Result (*Instruction)(VM *vm, uint8_t **ip, size_t codeLength);
 typedef struct sVM {
 
     FrameStack64 frames;
+
+    ObjectValue *objects;
+
     ValueList globals;
+
+    Value *constants;
+    size_t constantCount;
+
     Instruction instructions[OP_COUNT];
 
 } VM;

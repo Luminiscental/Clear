@@ -16,13 +16,13 @@ static Result disassembleSimple(const char *name, size_t *index) {
     static Result disassemble##fName(const char *name, uint8_t *code,          \
                                      size_t length, size_t *index) {           \
                                                                                \
-        if (*index >= length - sizeof(type)) {                                 \
+        *index = *index + 1;                                                   \
+        if (*index > length - sizeof(type)) {                                  \
                                                                                \
             printf("\n|| EOF reached while parsing constant " #type "\n");     \
             return RESULT_ERR;                                                 \
         }                                                                      \
                                                                                \
-        *index = *index + 1;                                                   \
         type *paramPtr = (type *)(code + *index);                              \
         *index = *index + sizeof(type);                                        \
                                                                                \
@@ -165,7 +165,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
                 printf("%-18s ", "OP_STRING");
                 index++;
 
-                if (index >= length - sizeof(uint8_t)) {
+                if (index > length - sizeof(uint8_t)) {
 
                     printf(
                         "\n|| EOF reached instead of constant string length\n");
@@ -175,19 +175,14 @@ Result disassembleCode(uint8_t *code, size_t length) {
                 uint8_t strLength = *(uint8_t *)(code + index);
                 index += sizeof(uint8_t);
 
-                if (index >= length - strLength) {
+                if (index > length - strLength) {
 
-                    printf("\n|| Reached EOF while parsing constan string\n");
+                    printf("\n|| Reached EOF while parsing constant string\n");
                     return RESULT_ERR;
                 }
 
-                char *str = ALLOCATE_ARRAY(char, strLength + 1);
-                str[strLength] = '\0';
-
-                memcpy(str, code + index, strLength);
+                printf("'%.*s'\n", strLength, code + index);
                 index += strLength;
-
-                printf("'%s'\n", str);
 
             } break;
 

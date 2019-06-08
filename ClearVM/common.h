@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define UNUSED(x) (void)(x)
+
 typedef enum {
 
     RESULT_OK,
