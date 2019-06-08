@@ -18,7 +18,7 @@ static Result disassembleSimple(const char *name, size_t *index) {
                                                                                \
         if (*index >= length - sizeof(type)) {                                 \
                                                                                \
-            printf("\n");                                                      \
+            printf("\n|| EOF reached while parsing constant " #type "\n");     \
             return RESULT_ERR;                                                 \
         }                                                                      \
                                                                                \
@@ -167,7 +167,8 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
                 if (index >= length - sizeof(uint8_t)) {
 
-                    printf("\n");
+                    printf(
+                        "\n|| EOF reached instead of constant string length\n");
                     return RESULT_ERR;
                 }
 
@@ -176,7 +177,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
                 if (index >= length - strLength) {
 
-                    printf("\n");
+                    printf("\n|| Reached EOF while parsing constan string\n");
                     return RESULT_ERR;
                 }
 
@@ -203,6 +204,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
         if (disassembleInstruction(code, length, &index) != RESULT_OK) {
 
+            printf("|| Instruction at index %zu was invalid\n", index);
             return RESULT_ERR;
         }
     }

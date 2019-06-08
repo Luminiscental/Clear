@@ -1,6 +1,7 @@
 #ifndef clearvm_vm_h
 #define clearvm_vm_h
 
+#include "bytecode.h"
 #include "common.h"
 #include "value.h"
 
@@ -31,10 +32,15 @@ DEFN_STACK(Frame, 64)
 
 #undef DEFN_STACK
 
-typedef struct {
+typedef struct sVM VM;
+
+typedef Result (*Instruction)(VM *vm, uint8_t **ip, size_t codeLength);
+
+typedef struct sVM {
 
     FrameStack64 frames;
     ValueList globals;
+    Instruction instructions[OP_COUNT];
 
 } VM;
 

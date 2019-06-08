@@ -1,7 +1,6 @@
 
 #include "vm.h"
 
-#include "bytecode.h"
 #include <stdio.h>
 
 #define IMPL_STACK(T, N)                                                       \
@@ -42,13 +41,23 @@ IMPL_STACK(Frame, 64)
 
 #undef IMPL_STACK
 
-void initVM(VM *vm) { initValueList(&vm->globals); }
+Result errorInstruction(VM *vm, uint8_t **ip, size_t codeLength) {
 
-typedef Result (*Instruction)(VM *vm, uint8_t **ip, size_t codeLength);
+    printf("|| Unimplemented opcode\n");
+    return RESULT_ERR;
+}
+
+void initVM(VM *vm) {
+
+    initValueList(&vm->globals);
+
+    for (size_t i = 0; i < OP_COUNT; i++) {
+
+        vm->instructions[i] = errorInstruction;
+    }
+}
 
 Result executeCode(VM *vm, uint8_t *code, size_t length) {
-
-    Instruction instructions[] = {};
 
     for (uint8_t *ip = code; (size_t)(ip - code) < length; ip++) {
 
@@ -60,8 +69,9 @@ Result executeCode(VM *vm, uint8_t *code, size_t length) {
             return RESULT_ERR;
         }
 
-        if (instructions[opcode](vm, &ip, length) != RESULT_OK) {
+        if (vm->instructions[opcode](vm, &ip, length) != RESULT_OK) {
 
+            printf("|| Opcode %d failed\n", opcode);
             return RESULT_ERR;
         }
     }
