@@ -1,6 +1,8 @@
 #ifndef clearvm_bytecode_h
 #define clearvm_bytecode_h
 
+#include "common.h"
+
 typedef enum {
 
     // Constant storage
@@ -79,5 +81,7 @@ typedef enum {
     OP_SET_FIELD = 48
 
 } OpCode;
+
+Result disassembleCode(uint8_t *code, size_t length);
 
 #endif

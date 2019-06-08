@@ -3,13 +3,14 @@
 #include "stdlib.h"
 #include "string.h"
 
+#include "bytecode.h"
 #include "common.h"
 #include "memory.h"
 #include "vm.h"
 
 typedef struct {
 
-    char *buffer;
+    uint8_t *buffer;
     size_t length;
 
 } FileBuffer;
@@ -24,7 +25,7 @@ FileBuffer readFile(const char *name) {
     strcpy(fileName, name);
     strcat(fileName, ".clr.b");
 
-#ifdef DEBUG_FILE
+#ifdef DEBUG
 
     printf("File: %s\n", fileName);
 
@@ -49,7 +50,7 @@ FileBuffer readFile(const char *name) {
 
     size_t fileLength = ftell(inFile);
 
-#ifdef DEBUG_FILE
+#ifdef DEBUG
 
     printf("File has length %zu\n\n", fileLength);
 
@@ -61,7 +62,7 @@ FileBuffer readFile(const char *name) {
         return result;
     }
 
-    char *buffer = ALLOCATE_ARRAY(char, fileLength);
+    uint8_t *buffer = ALLOCATE_ARRAY(uint8_t, fileLength);
 
     fread(buffer, 1, fileLength, inFile);
 
@@ -75,38 +76,68 @@ FileBuffer readFile(const char *name) {
 
 int main(int argc, char **argv) {
 
+#define EXIT(code)                                                             \
+    do {                                                                       \
+        return code;                                                           \
+    } while (false)
+
     if (argc < 2) {
 
         printf("Incorrect usage: Please pass a .crl.b file to run\n");
-        return 1;
+        EXIT(1);
     }
 
     VM vm;
     initVM(&vm);
+
+#undef EXIT
+#define EXIT(code)                                                             \
+    do {                                                                       \
+        freeVM(&vm);                                                           \
+        return code;                                                           \
+    } while (false)
 
     FileBuffer byteCode = readFile(argv[1]);
 
     if (byteCode.buffer == NULL) {
 
         printf("Could not read file!\n");
-        return 1;
+        EXIT(1);
     }
 
-#ifdef DEBUG_DIS
+#undef EXIT
+#define EXIT(code)                                                             \
+    do {                                                                       \
+                                                                               \
+        FREE_ARRAY(uint8_t, byteCode.buffer, byteCode.length);                 \
+        freeVM(&vm);                                                           \
+        return code;                                                           \
+                                                                               \
+    } while (false)
+
+#ifdef DEBUG
 
     printf("\nDisassembling:\n```\n");
-    disassembleCode(byteCode.buffer, byteCode.length, "main");
+    Result disResult = disassembleCode(byteCode.buffer, byteCode.length);
     printf("```\n");
+
+    if (disResult != RESULT_OK) {
+
+        printf("Invalid code!\n");
+        EXIT(1);
+    }
 
 #endif
 
     printf("\nRunning:\n```\n");
-    executeCode(&vm, byteCode.buffer, byteCode.length);
+    Result execResult = executeCode(&vm, byteCode.buffer, byteCode.length);
     printf("```\n");
 
-    FREE_ARRAY(char, byteCode.buffer, byteCode.length);
+    if (execResult != RESULT_OK) {
 
-    freeVM(&vm);
+        printf("Error while running!\n");
+        EXIT(1);
+    }
 
-    return 0;
+    EXIT(0);
 }

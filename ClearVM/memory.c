@@ -4,7 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void *reallocate(void *previous, size_t oldSize, size_t newSize) {
+void *reallocate(void *previous,
+#ifdef DEBUG_MEM
+                 size_t oldSize,
+#endif
+                 size_t newSize) {
 
 #ifdef DEBUG_MEM
 
