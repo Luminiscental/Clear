@@ -83,7 +83,7 @@ static Result errorInstruction(VM *vm, uint8_t **ip, uint8_t *code,
     static Result read##name(uint8_t **ip, uint8_t *code, size_t codeLength,   \
                              type *out) {                                      \
                                                                                \
-        if ((size_t)(1 + *ip - code) > codeLength) {                           \
+        if ((size_t)(sizeof(type) + *ip - code) > codeLength) {                \
                                                                                \
             printf("|| Ran out of bytes reading instruction\n");               \
             return RESULT_ERR;                                                 \
@@ -94,7 +94,7 @@ static Result errorInstruction(VM *vm, uint8_t **ip, uint8_t *code,
             *out = *(type *)(*ip);                                             \
         }                                                                      \
                                                                                \
-        (*ip)++;                                                               \
+        *ip += sizeof(type);                                                   \
         return RESULT_OK;                                                      \
     }
 
@@ -131,6 +131,36 @@ static Result op_loadConst(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
+static Result op_true(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    Value truthValue;
+    truthValue.as.b = true;
+
+    return pushValueStack256(&frame.stack, truthValue);
+}
+
+static Result op_false(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    Value falseValue;
+    falseValue.as.b = false;
+
+    return pushValueStack256(&frame.stack, falseValue);
+}
+
+#undef GET_FRAME
+
 void initVM(VM *vm) {
 
     vm->constants = NULL;
@@ -145,7 +175,16 @@ void initVM(VM *vm) {
         vm->instructions[i] = errorInstruction;
     }
 
-    vm->instructions[OP_LOAD_CONST] = op_loadConst;
+#define INSTR(opcode, instr)                                                   \
+    do {                                                                       \
+        vm->instructions[opcode] = instr;                                      \
+    } while (0)
+
+    INSTR(OP_LOAD_CONST, op_loadConst);
+    INSTR(OP_TRUE, op_true);
+    INSTR(OP_FALSE, op_false);
+
+#undef INSTR
 }
 
 static Value makeObject(VM *vm, size_t size, ObjectType type) {
@@ -274,9 +313,11 @@ Result executeCode(VM *vm, uint8_t *code, size_t length) {
         return RESULT_ERR;
     }
 
-    for (uint8_t *ip = code; (size_t)(ip - code) < length; ip++) {
+    uint8_t *ip = code;
 
-        uint8_t opcode = *ip;
+    while ((size_t)(ip - code) < length) {
+
+        uint8_t opcode = *ip++;
 
         if (opcode >= OP_COUNT) {
 
