@@ -14,9 +14,10 @@
                                                                                \
     } T##Stack##N;                                                             \
                                                                                \
+    void init##T##Stack##N(T##Stack##N *stack);                                \
     Result push##T##Stack##N(T##Stack##N *stack, T value);                     \
     Result pop##T##Stack##N(T##Stack##N *stack, T *popped);                    \
-    Result peek##T##Stack##N(T##Stack##N *stack, T *peeked, size_t offset);
+    Result peek##T##Stack##N(T##Stack##N *stack, T **peeked, size_t offset);
 
 DEFN_STACK(Value, 256)
 DEFN_STACK(Value, 64)
@@ -28,6 +29,8 @@ typedef struct {
     size_t paramCount;
 
 } Frame;
+
+void initFrame(Frame *frame);
 
 DEFN_STACK(Frame, 64)
 
@@ -53,7 +56,7 @@ typedef struct sVM {
 
 } VM;
 
-void initVM(VM *vm);
+Result initVM(VM *vm);
 Result executeCode(VM *vm, uint8_t *code, size_t length);
 void freeVM(VM *vm);
 

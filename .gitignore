@@ -215,3 +215,4 @@ test/main.clr.b
 tags
 *.clr.b
 .todo
+vgcore.*

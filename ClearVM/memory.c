@@ -48,4 +48,6 @@ void freeObject(ObjectValue *obj) {
 
         } break;
     }
+
+    FREE(ObjectValue, obj);
 }

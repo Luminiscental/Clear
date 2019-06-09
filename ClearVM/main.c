@@ -88,7 +88,11 @@ int main(int argc, char **argv) {
     }
 
     VM vm;
-    initVM(&vm);
+    if (initVM(&vm) != RESULT_OK) {
+
+        printf("|| Could not initialize vm\n");
+        EXIT(1);
+    }
 
 #undef EXIT
 #define EXIT(code)                                                             \

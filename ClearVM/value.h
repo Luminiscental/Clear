@@ -24,7 +24,17 @@ typedef struct {
 
 } StringObject;
 
+typedef enum {
+
+    VAL_BOOL,
+    VAL_NIL,
+    VAL_OBJ
+
+} ValueType;
+
 typedef struct {
+
+    ValueType type;
 
     union {
 

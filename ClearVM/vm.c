@@ -8,6 +8,11 @@
 
 #define IMPL_STACK(T, N)                                                       \
                                                                                \
+    void init##T##Stack##N(T##Stack##N *stack) {                               \
+                                                                               \
+        stack->next = stack->values;                                           \
+    }                                                                          \
+                                                                               \
     Result push##T##Stack##N(T##Stack##N *stack, T value) {                    \
                                                                                \
         if (stack->next - stack->values == N) {                                \
@@ -38,7 +43,7 @@
         return RESULT_OK;                                                      \
     }                                                                          \
                                                                                \
-    Result peek##T##Stack##N(T##Stack##N *stack, T *peeked, size_t offset) {   \
+    Result peek##T##Stack##N(T##Stack##N *stack, T **peeked, size_t offset) {  \
                                                                                \
         if ((size_t)(stack->next - stack->values) <= offset) {                 \
                                                                                \
@@ -47,7 +52,7 @@
                                                                                \
         if (peeked != NULL) {                                                  \
                                                                                \
-            *peeked = *(stack->next - offset);                                 \
+            *peeked = (stack->next - offset - 1);                              \
         }                                                                      \
                                                                                \
         return RESULT_OK;                                                      \
@@ -59,8 +64,15 @@ IMPL_STACK(Frame, 64)
 
 #undef IMPL_STACK
 
+void initFrame(Frame *frame) {
+
+    frame->paramCount = 0;
+    initValueStack256(&frame->stack);
+    initValueStack64(&frame->locals);
+}
+
 #define GET_FRAME                                                              \
-    Frame frame;                                                               \
+    Frame *frame;                                                              \
     if (peekFrameStack64(&vm->frames, &frame, 0) != RESULT_OK) {               \
                                                                                \
         printf("|| Could not get current frame\n");                            \
@@ -122,7 +134,7 @@ static Result op_loadConst(VM *vm, uint8_t **ip, uint8_t *code,
 
     Value value = vm->constants[index];
 
-    if (pushValueStack256(&frame.stack, value) != RESULT_OK) {
+    if (pushValueStack256(&frame->stack, value) != RESULT_OK) {
 
         printf("|| Could not push constant value\n");
         return RESULT_ERR;
@@ -140,9 +152,10 @@ static Result op_true(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     GET_FRAME
 
     Value truthValue;
+    truthValue.type = VAL_BOOL;
     truthValue.as.b = true;
 
-    return pushValueStack256(&frame.stack, truthValue);
+    return pushValueStack256(&frame->stack, truthValue);
 }
 
 static Result op_false(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
@@ -154,14 +167,82 @@ static Result op_false(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     GET_FRAME
 
     Value falseValue;
+    falseValue.type = VAL_BOOL;
     falseValue.as.b = false;
 
-    return pushValueStack256(&frame.stack, falseValue);
+    return pushValueStack256(&frame->stack, falseValue);
+}
+
+static Result op_nil(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    Value nilValue;
+    nilValue.type = VAL_NIL;
+
+    return pushValueStack256(&frame->stack, nilValue);
+}
+
+static Result op_defineGlobal(VM *vm, uint8_t **ip, uint8_t *code,
+                              size_t codeLength) {
+
+    GET_FRAME
+
+    uint8_t index;
+    if (readU8(ip, code, codeLength, &index) != RESULT_OK) {
+
+        printf("|| Could not read global index\n");
+        return RESULT_ERR;
+    }
+
+    Value value;
+    if (popValueStack256(&frame->stack, &value) != RESULT_OK) {
+
+        printf("|| Could not pop global value\n");
+        return RESULT_ERR;
+    }
+
+    Value nilValue;
+    nilValue.type = VAL_NIL;
+
+    // TODO: This probably shouldn't be a ValueList
+    while (setValueList(&vm->globals, index, value) != RESULT_OK) {
+
+        appendValueList(&vm->globals, nilValue);
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_loadGlobal(VM *vm, uint8_t **ip, uint8_t *code,
+                            size_t codeLength) {
+
+    GET_FRAME
+
+    uint8_t index;
+    if (readU8(ip, code, codeLength, &index) != RESULT_OK) {
+
+        printf("|| Could not read global index\n");
+        return RESULT_ERR;
+    }
+
+    Value global;
+    if (getValueList(&vm->globals, index, &global) != RESULT_OK) {
+
+        printf("|| Undefined global %d\n", index);
+        return RESULT_ERR;
+    }
+
+    return pushValueStack256(&frame->stack, global);
 }
 
 #undef GET_FRAME
 
-void initVM(VM *vm) {
+Result initVM(VM *vm) {
 
     vm->constants = NULL;
     vm->constantCount = 0;
@@ -169,6 +250,24 @@ void initVM(VM *vm) {
     vm->objects = NULL;
 
     initValueList(&vm->globals);
+    initFrameStack64(&vm->frames);
+
+    Frame globalFrame;
+
+    if (pushFrameStack64(&vm->frames, globalFrame) != RESULT_OK) {
+
+        printf("|| Could not push global frame\n");
+        return RESULT_ERR;
+    }
+
+    Frame *globalPtr;
+    if (peekFrameStack64(&vm->frames, &globalPtr, 0) != RESULT_OK) {
+
+        printf("|| Could not peek global frame\n");
+        return RESULT_ERR;
+    }
+
+    initFrame(globalPtr);
 
     for (size_t i = 0; i < OP_COUNT; i++) {
 
@@ -183,8 +282,14 @@ void initVM(VM *vm) {
     INSTR(OP_LOAD_CONST, op_loadConst);
     INSTR(OP_TRUE, op_true);
     INSTR(OP_FALSE, op_false);
+    INSTR(OP_NIL, op_nil);
+
+    INSTR(OP_DEFINE_GLOBAL, op_defineGlobal);
+    INSTR(OP_LOAD_GLOBAL, op_loadGlobal);
 
 #undef INSTR
+
+    return RESULT_OK;
 }
 
 static Value makeObject(VM *vm, size_t size, ObjectType type) {
@@ -199,6 +304,7 @@ static Value makeObject(VM *vm, size_t size, ObjectType type) {
     vm->objects = obj;
 
     Value result;
+    result.type = VAL_OBJ;
     result.as.obj = obj;
 
     return result;
@@ -215,7 +321,8 @@ static Value makeString(VM *vm, char *data, size_t length) {
     return result;
 }
 
-static Result loadConstants(VM *vm, uint8_t *code, size_t length) {
+static Result loadConstants(VM *vm, uint8_t *code, size_t length,
+                            size_t *outIndex) {
 
     size_t index = 0;
 
@@ -302,18 +409,21 @@ static Result loadConstants(VM *vm, uint8_t *code, size_t length) {
             } break;
         }
     }
+
+    *outIndex = index;
     return RESULT_OK;
 }
 
 Result executeCode(VM *vm, uint8_t *code, size_t length) {
 
-    if (loadConstants(vm, code, length) != RESULT_OK) {
+    size_t index;
+    if (loadConstants(vm, code, length, &index) != RESULT_OK) {
 
         printf("|| Could not load constants\n");
         return RESULT_ERR;
     }
 
-    uint8_t *ip = code;
+    uint8_t *ip = code + index;
 
     while ((size_t)(ip - code) < length) {
 
