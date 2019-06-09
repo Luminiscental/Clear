@@ -3,6 +3,10 @@
 
 #include "common.h"
 
+#define STR_MAX 512
+#define NUM_PLACES 7
+#define NUM_PRECISION 0.0000001
+
 typedef enum {
 
     OBJ_STRING
@@ -28,7 +32,9 @@ typedef enum {
 
     VAL_BOOL,
     VAL_NIL,
-    VAL_OBJ
+    VAL_OBJ,
+    VAL_INT,
+    VAL_NUM
 
 } ValueType;
 

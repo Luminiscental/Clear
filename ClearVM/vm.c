@@ -2,9 +2,12 @@
 #include "vm.h"
 
 #include "memory.h"
+#include "value.h"
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #define IMPL_STACK(T, N)                                                       \
                                                                                \
@@ -120,6 +123,97 @@ Result setGlobal(GlobalArray *array, size_t index, Value in) {
         return RESULT_ERR;                                                     \
     }
 
+#define POP(name)                                                              \
+    Value name;                                                                \
+    if (popValueStack256(&frame->stack, &name) != RESULT_OK) {                 \
+                                                                               \
+        printf("|| Could not pop value\n");                                    \
+        return RESULT_ERR;                                                     \
+    }
+
+#define PUSH(name)                                                             \
+    if (pushValueStack256(&frame->stack, name) != RESULT_OK) {                 \
+                                                                               \
+        printf("|| Could not push value\n");                                   \
+        return RESULT_ERR;                                                     \
+    }
+
+#define PEEK(name, offset)                                                     \
+    Value *name;                                                               \
+    if (peekValueStack256(&frame->stack, &name, offset) != RESULT_OK) {        \
+                                                                               \
+        printf("|| Could not peek value\n");                                   \
+        return RESULT_ERR;                                                     \
+    }
+
+static Value makeObject(VM *vm, size_t size, ObjectType type) {
+
+    void *ptr = reallocate(NULL, size);
+
+    ObjectValue *obj = ALLOCATE(ObjectValue);
+    obj->type = type;
+    obj->next = vm->objects;
+    obj->ptr = ptr;
+
+    vm->objects = obj;
+
+    Value result;
+    result.type = VAL_OBJ;
+    result.as.obj = obj;
+
+    return result;
+}
+
+static Value makeString(VM *vm, char *data, size_t length) {
+
+    Value result = makeObject(vm, sizeof(StringObject), OBJ_STRING);
+
+    StringObject *strObj = (StringObject *)result.as.obj->ptr;
+    strObj->length = length;
+    strObj->data = data;
+
+    return result;
+}
+
+static Value makeStringFromLiteral(VM *vm, const char *literal) {
+
+    size_t len = strnlen(literal, STR_MAX);
+    char *buffer = ALLOCATE_ARRAY(char, len + 1);
+    memcpy(buffer, literal, len + 1);
+
+    return makeString(vm, buffer, len);
+}
+
+static Value makeInt(int32_t unboxed) {
+
+    Value result;
+
+    result.type = VAL_INT;
+    result.as.s32 = unboxed;
+
+    return result;
+}
+
+static Value makeBool(bool unboxed) {
+
+    Value result;
+
+    result.type = VAL_BOOL;
+    result.as.b = unboxed;
+
+    return result;
+}
+
+static Value makeNum(double unboxed) {
+
+    Value result;
+
+    result.type = VAL_NUM;
+    result.as.f64 = unboxed;
+
+    return result;
+}
+
 static Result errorInstruction(VM *vm, uint8_t **ip, uint8_t *code,
                                size_t codeLength) {
 
@@ -192,9 +286,7 @@ static Result op_true(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
 
     GET_FRAME
 
-    Value truthValue;
-    truthValue.type = VAL_BOOL;
-    truthValue.as.b = true;
+    Value truthValue = makeBool(true);
 
     return pushValueStack256(&frame->stack, truthValue);
 }
@@ -207,9 +299,7 @@ static Result op_false(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
 
     GET_FRAME
 
-    Value falseValue;
-    falseValue.type = VAL_BOOL;
-    falseValue.as.b = false;
+    Value falseValue = makeBool(false);
 
     return pushValueStack256(&frame->stack, falseValue);
 }
@@ -365,6 +455,263 @@ static Result op_loadLocal(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
+static Result op_int(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    PEEK(value, 0)
+
+    switch (value->type) {
+
+        case VAL_BOOL: {
+
+            *value = makeInt(value->as.b ? 1 : 0);
+
+        } break;
+
+        case VAL_INT:
+            break;
+
+        case VAL_NIL: {
+
+            *value = makeInt(0);
+
+        } break;
+
+        case VAL_NUM: {
+
+            *value = makeInt((int)value->as.f64);
+
+        } break;
+
+        case VAL_OBJ: {
+
+            printf("|| Cannot cast object types\n");
+            return RESULT_ERR;
+
+        } break;
+
+        default: {
+
+            printf("|| Unknown value type %d\n", value->type);
+            return RESULT_ERR;
+
+        } break;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_bool(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    PEEK(value, 0)
+
+    switch (value->type) {
+
+        case VAL_BOOL:
+            break;
+
+        case VAL_INT: {
+
+            *value = makeBool(value->as.s32 != 0);
+
+        } break;
+
+        case VAL_NIL: {
+
+            *value = makeBool(false);
+
+        } break;
+
+        case VAL_NUM: {
+
+            *value = makeBool(value->as.f64 != 0);
+
+        } break;
+
+        case VAL_OBJ: {
+
+            printf("|| Cannot cast object types\n");
+            return RESULT_ERR;
+
+        } break;
+
+        default: {
+
+            printf("|| Unknown value type %d\n", value->type);
+            return RESULT_ERR;
+
+        } break;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_num(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    PEEK(value, 0)
+
+    switch (value->type) {
+
+        case VAL_BOOL: {
+
+            *value = makeNum(value->as.b ? 1.0 : 0.0);
+
+        } break;
+
+        case VAL_INT: {
+
+            *value = makeNum((double)value->as.s32);
+
+        } break;
+
+        case VAL_NIL: {
+
+            *value = makeNum(0.0);
+
+        } break;
+
+        case VAL_NUM:
+            break;
+
+        case VAL_OBJ: {
+
+            printf("|| Cannot cast object types\n");
+            return RESULT_ERR;
+
+        } break;
+
+        default: {
+
+            printf("|| Unknown value type %d\n", value->type);
+            return RESULT_ERR;
+
+        } break;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_str(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    PEEK(value, 0)
+
+    switch (value->type) {
+
+        case VAL_BOOL: {
+
+            if (value->as.b) {
+
+                *value = makeStringFromLiteral(vm, "true");
+
+            } else {
+
+                *value = makeStringFromLiteral(vm, "false");
+            }
+
+        } break;
+
+        case VAL_INT: {
+
+            size_t digits = 0;
+            int32_t i = value->as.s32;
+
+            do {
+
+                i /= 10;
+                digits++;
+
+            } while (i != 0);
+
+            size_t length = value->as.s32 < 0 ? 1 + digits : digits;
+
+            char *buffer = ALLOCATE_ARRAY(char, length + 1);
+            buffer[length] = '\0';
+
+            snprintf(buffer, length + 1, "%d", value->as.s32);
+
+            *value = makeString(vm, buffer, length);
+
+        } break;
+
+        case VAL_NIL: {
+
+            *value = makeStringFromLiteral(vm, "nil");
+
+        } break;
+
+        case VAL_NUM: {
+
+            double num = value->as.f64;
+
+            size_t signLength = num < 0 ? 1 : 0;
+            double size = num < 0 ? -num : num;
+            size_t preDecimalDigits = size < 1.0 ? 1 : 1 + (size_t)log10(size);
+
+            size_t length = signLength + preDecimalDigits + 1 + NUM_PLACES;
+
+            char *buffer = ALLOCATE_ARRAY(char, length + 1);
+            buffer[length] = '\0';
+
+            snprintf(buffer, length + 1, "%.*f", NUM_PLACES, num);
+
+            *value = makeString(vm, buffer, length);
+
+        } break;
+
+        case VAL_OBJ: {
+
+            printf("|| Cannot cast object types\n");
+            return RESULT_ERR;
+
+        } break;
+
+        default: {
+
+            printf("|| Unknown value type %d\n", value->type);
+            return RESULT_ERR;
+
+        } break;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_clock(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    Value clockValue = makeNum((double)clock() / CLOCKS_PER_SEC);
+
+    return pushValueStack256(&frame->stack, clockValue);
+}
+
 static Result op_pushScope(VM *vm, uint8_t **ip, uint8_t *code,
                            size_t codeLength) {
 
@@ -439,41 +786,18 @@ Result initVM(VM *vm) {
     INSTR(OP_DEFINE_LOCAL, op_defineLocal);
     INSTR(OP_LOAD_LOCAL, op_loadLocal);
 
+    INSTR(OP_INT, op_int);
+    INSTR(OP_BOOL, op_bool);
+    INSTR(OP_NUM, op_num);
+    INSTR(OP_STR, op_str);
+    INSTR(OP_CLOCK, op_clock);
+
     INSTR(OP_PUSH_SCOPE, op_pushScope);
     INSTR(OP_POP_SCOPE, op_popScope);
 
 #undef INSTR
 
     return RESULT_OK;
-}
-
-static Value makeObject(VM *vm, size_t size, ObjectType type) {
-
-    void *ptr = reallocate(NULL, size);
-
-    ObjectValue *obj = ALLOCATE(ObjectValue);
-    obj->type = type;
-    obj->next = vm->objects;
-    obj->ptr = ptr;
-
-    vm->objects = obj;
-
-    Value result;
-    result.type = VAL_OBJ;
-    result.as.obj = obj;
-
-    return result;
-}
-
-static Value makeString(VM *vm, char *data, size_t length) {
-
-    Value result = makeObject(vm, sizeof(StringObject), OBJ_STRING);
-
-    StringObject *strObj = (StringObject *)result.as.obj->ptr;
-    strObj->length = length;
-    strObj->data = data;
-
-    return result;
 }
 
 static Result loadConstants(VM *vm, uint8_t *code, size_t length,
