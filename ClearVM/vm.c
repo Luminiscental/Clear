@@ -734,6 +734,33 @@ static Result op_print(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
+static Result op_popScope(VM *vm, uint8_t **ip, uint8_t *code,
+                          size_t codeLength);
+
+static Result op_return(VM *vm, uint8_t **ip, uint8_t *code,
+                        size_t codeLength) {
+
+    GET_FRAME
+
+    POP(returnValue)
+
+    if (op_popScope(vm, ip, code, codeLength) != RESULT_OK) {
+
+        printf("|| Could not unwind call stack\n");
+        return RESULT_ERR;
+    }
+
+    PUSH(returnValue)
+
+    return RESULT_OK;
+}
+
+static Result op_returnVoid(VM *vm, uint8_t **ip, uint8_t *code,
+                            size_t codeLength) {
+
+    return op_popScope(vm, ip, code, codeLength);
+}
+
 static Result op_pop(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
 
     UNUSED(ip);
@@ -828,6 +855,8 @@ Result initVM(VM *vm) {
     INSTR(OP_CLOCK, op_clock);
 
     INSTR(OP_PRINT, op_print);
+    INSTR(OP_RETURN, op_return);
+    INSTR(OP_RETURN_VOID, op_returnVoid);
     INSTR(OP_POP, op_pop);
 
     INSTR(OP_PUSH_SCOPE, op_pushScope);
