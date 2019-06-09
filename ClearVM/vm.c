@@ -278,6 +278,129 @@ static Result op_loadGlobal(VM *vm, uint8_t **ip, uint8_t *code,
     return pushValueStack256(&frame->stack, global);
 }
 
+static Result op_defineLocal(VM *vm, uint8_t **ip, uint8_t *code,
+                             size_t codeLength) {
+
+    GET_FRAME
+
+    uint8_t index;
+    if (readU8(ip, code, codeLength, &index) != RESULT_OK) {
+
+        printf("|| Could not read local index\n");
+        return RESULT_ERR;
+    }
+
+    Value local;
+    if (popValueStack256(&frame->stack, &local) != RESULT_OK) {
+
+        printf("|| Could not pop local value\n");
+        return RESULT_ERR;
+    }
+
+    size_t localCount = frame->locals.next - frame->locals.values;
+
+    if (index > localCount) {
+
+        printf("|| Local %d defined out of range\n", index);
+        return RESULT_ERR;
+
+    } else if (index == localCount) {
+
+        if (pushValueStack64(&frame->locals, local) != RESULT_OK) {
+
+            printf("|| Could not push local\n");
+            return RESULT_ERR;
+        }
+
+    } else {
+
+        Value *prev;
+        if (peekValueStack64(&frame->locals, &prev, localCount - 1 - index) !=
+            RESULT_OK) {
+
+            printf("|| Could not peek at local value to mutate\n");
+            return RESULT_ERR;
+        }
+
+        *prev = local;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_loadLocal(VM *vm, uint8_t **ip, uint8_t *code,
+                           size_t codeLength) {
+
+    GET_FRAME
+
+    uint8_t index;
+    if (readU8(ip, code, codeLength, &index) != RESULT_OK) {
+
+        printf("|| Could not read local index\n");
+        return RESULT_ERR;
+    }
+
+    size_t localCount = frame->locals.next - frame->locals.values;
+
+    if (index >= localCount) {
+
+        printf("|| Reference to undefined local %d\n", index);
+        return RESULT_ERR;
+    }
+
+    Value *local;
+    if (peekValueStack64(&frame->locals, &local, localCount - 1 - index) !=
+        RESULT_OK) {
+
+        printf("|| Could not peek local value\n");
+        return RESULT_ERR;
+    }
+
+    if (pushValueStack256(&frame->stack, *local) != RESULT_OK) {
+
+        printf("|| Could not push local onto the stack\n");
+        return RESULT_ERR;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_pushScope(VM *vm, uint8_t **ip, uint8_t *code,
+                           size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    Frame nextFrame;
+    if (pushFrameStack64(&vm->frames, nextFrame) != RESULT_OK) {
+
+        printf("|| Could not push frame\n");
+        return RESULT_ERR;
+    }
+
+    Frame *ref;
+    if (peekFrameStack64(&vm->frames, &ref, 0) != RESULT_OK) {
+
+        printf("|| Could not peek pushed frame\n");
+        return RESULT_ERR;
+    }
+
+    initFrame(ref);
+
+    return RESULT_OK;
+}
+
+static Result op_popScope(VM *vm, uint8_t **ip, uint8_t *code,
+                          size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    return popFrameStack64(&vm->frames, NULL);
+}
+
 #undef GET_FRAME
 
 Result initVM(VM *vm) {
@@ -290,22 +413,11 @@ Result initVM(VM *vm) {
     initGlobalArray(&vm->globals);
     initFrameStack64(&vm->frames);
 
-    Frame globalFrame;
-
-    if (pushFrameStack64(&vm->frames, globalFrame) != RESULT_OK) {
+    if (op_pushScope(vm, NULL, NULL, 0) != RESULT_OK) {
 
         printf("|| Could not push global frame\n");
         return RESULT_ERR;
     }
-
-    Frame *globalPtr;
-    if (peekFrameStack64(&vm->frames, &globalPtr, 0) != RESULT_OK) {
-
-        printf("|| Could not peek global frame\n");
-        return RESULT_ERR;
-    }
-
-    initFrame(globalPtr);
 
     for (size_t i = 0; i < OP_COUNT; i++) {
 
@@ -324,6 +436,11 @@ Result initVM(VM *vm) {
 
     INSTR(OP_DEFINE_GLOBAL, op_defineGlobal);
     INSTR(OP_LOAD_GLOBAL, op_loadGlobal);
+    INSTR(OP_DEFINE_LOCAL, op_defineLocal);
+    INSTR(OP_LOAD_LOCAL, op_loadLocal);
+
+    INSTR(OP_PUSH_SCOPE, op_pushScope);
+    INSTR(OP_POP_SCOPE, op_popScope);
 
 #undef INSTR
 

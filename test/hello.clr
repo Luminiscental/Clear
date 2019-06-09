@@ -1,3 +1,9 @@
 
-val hello = "Hello, World!";
-print hello;
+var msg = "";
+
+{
+    val hello = "Hello, World!";
+    msg = hello;
+}
+
+print msg;
