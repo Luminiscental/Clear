@@ -71,6 +71,47 @@ void initFrame(Frame *frame) {
     initValueStack64(&frame->locals);
 }
 
+void initGlobalArray(GlobalArray *array) {
+
+    for (size_t i = 0; i < GLOBAL_MAX; i++) {
+
+        array->isSet[i] = false;
+    }
+}
+
+Result getGlobal(GlobalArray *array, size_t index, Value *out) {
+
+    if (index >= GLOBAL_MAX) {
+
+        return RESULT_ERR;
+    }
+
+    if (!array->isSet[index]) {
+
+        return RESULT_ERR;
+    }
+
+    if (out != NULL) {
+
+        *out = array->data[index];
+    }
+
+    return RESULT_OK;
+}
+
+Result setGlobal(GlobalArray *array, size_t index, Value in) {
+
+    if (index >= GLOBAL_MAX) {
+
+        return RESULT_ERR;
+    }
+
+    array->data[index] = in;
+    array->isSet[index] = true;
+
+    return RESULT_OK;
+}
+
 #define GET_FRAME                                                              \
     Frame *frame;                                                              \
     if (peekFrameStack64(&vm->frames, &frame, 0) != RESULT_OK) {               \
@@ -206,13 +247,10 @@ static Result op_defineGlobal(VM *vm, uint8_t **ip, uint8_t *code,
         return RESULT_ERR;
     }
 
-    Value nilValue;
-    nilValue.type = VAL_NIL;
+    if (setGlobal(&vm->globals, index, value) != RESULT_OK) {
 
-    // TODO: This probably shouldn't be a ValueList
-    while (setValueList(&vm->globals, index, value) != RESULT_OK) {
-
-        appendValueList(&vm->globals, nilValue);
+        printf("|| Invalid global index %d\n", index);
+        return RESULT_ERR;
     }
 
     return RESULT_OK;
@@ -231,7 +269,7 @@ static Result op_loadGlobal(VM *vm, uint8_t **ip, uint8_t *code,
     }
 
     Value global;
-    if (getValueList(&vm->globals, index, &global) != RESULT_OK) {
+    if (getGlobal(&vm->globals, index, &global) != RESULT_OK) {
 
         printf("|| Undefined global %d\n", index);
         return RESULT_ERR;
@@ -249,7 +287,7 @@ Result initVM(VM *vm) {
 
     vm->objects = NULL;
 
-    initValueList(&vm->globals);
+    initGlobalArray(&vm->globals);
     initFrameStack64(&vm->frames);
 
     Frame globalFrame;
@@ -465,6 +503,4 @@ void freeVM(VM *vm) {
 
         FREE_ARRAY(Value, vm->constants, vm->constantCount);
     }
-
-    freeValueList(&vm->globals);
 }

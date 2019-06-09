@@ -41,13 +41,26 @@ typedef struct sVM VM;
 typedef Result (*Instruction)(VM *vm, uint8_t **ip, uint8_t *code,
                               size_t codeLength);
 
+#define GLOBAL_MAX 256
+
+typedef struct {
+
+    bool isSet[GLOBAL_MAX];
+    Value data[GLOBAL_MAX];
+
+} GlobalArray;
+
+void initGlobalArray(GlobalArray *array);
+Result getGlobal(GlobalArray *array, size_t index, Value *out);
+Result setGlobal(GlobalArray *array, size_t index, Value in);
+
 typedef struct sVM {
 
     FrameStack64 frames;
 
     ObjectValue *objects;
 
-    ValueList globals;
+    GlobalArray globals;
 
     Value *constants;
     size_t constantCount;
