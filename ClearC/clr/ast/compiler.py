@@ -4,7 +4,7 @@ from clr.assemble import assembled_size
 from clr.tokens import TokenType, token_info
 from clr.constants import ClrUint, Constants
 from clr.ast.index_annotations import IndexAnnotationType, INDEX_OF_THIS
-from clr.ast.type_annotations import BUILTINS, VOID_TYPE
+from clr.ast.type_annotations import BUILTINS, VOID_TYPE, STR_TYPE
 from clr.ast.visitor import DeclVisitor
 from clr.ast.expression_nodes import IdentExpr
 
@@ -216,9 +216,10 @@ class Compiler(DeclVisitor):
     def visit_print_stmt(self, node):
         super().visit_print_stmt(node)
         if node.value is None:
-            self.program.simple_op(OpCode.PRINT_BLANK)
-        else:
-            self.program.simple_op(OpCode.PRINT)
+            self.program.load_constant(self.constants.add(""))
+        elif node.value.type_annotation != STR_TYPE:
+            self.program.simple_op(OpCode.STR)
+        self.program.simple_op(OpCode.PRINT)
 
     def visit_if_stmt(self, node):
         # No super because we need the jumps in the right place

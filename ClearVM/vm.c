@@ -712,6 +712,41 @@ static Result op_clock(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return pushValueStack256(&frame->stack, clockValue);
 }
 
+static Result op_print(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    POP(str)
+
+    if (str.type != VAL_OBJ || str.as.obj->type != OBJ_STRING) {
+
+        printf("|| Cannot print non-string value\n");
+        return RESULT_ERR;
+    }
+
+    StringObject *strObj = (StringObject *)str.as.obj->ptr;
+    printf("%s\n", strObj->data);
+
+    return RESULT_OK;
+}
+
+static Result op_pop(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+
+    UNUSED(ip);
+    UNUSED(code);
+    UNUSED(codeLength);
+
+    GET_FRAME
+
+    POP(_)
+
+    return RESULT_OK;
+}
+
 static Result op_pushScope(VM *vm, uint8_t **ip, uint8_t *code,
                            size_t codeLength) {
 
@@ -792,6 +827,9 @@ Result initVM(VM *vm) {
     INSTR(OP_STR, op_str);
     INSTR(OP_CLOCK, op_clock);
 
+    INSTR(OP_PRINT, op_print);
+    INSTR(OP_POP, op_pop);
+
     INSTR(OP_PUSH_SCOPE, op_pushScope);
     INSTR(OP_POP_SCOPE, op_popScope);
 
@@ -827,7 +865,7 @@ static Result loadConstants(VM *vm, uint8_t *code, size_t length,
                 index++;
 
                 int32_t value = *(int32_t *)(code + index);
-                vm->constants[i].as.s32 = value;
+                vm->constants[i] = makeInt(value);
 
                 index += sizeof(int32_t);
 
@@ -844,7 +882,7 @@ static Result loadConstants(VM *vm, uint8_t *code, size_t length,
                 index++;
 
                 double value = *(double *)(code + index);
-                vm->constants[i].as.f64 = value;
+                vm->constants[i] = makeNum(value);
 
                 index += sizeof(double);
 
