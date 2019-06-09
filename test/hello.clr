@@ -9,4 +9,5 @@ var msg = "";
 print msg;
 print 2;
 print 0i;
-print 1 + 1;
+print -2i;
+print 1 + -1;

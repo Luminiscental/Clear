@@ -4,7 +4,14 @@ from clr.assemble import assembled_size
 from clr.tokens import TokenType, token_info
 from clr.constants import ClrUint, Constants
 from clr.ast.index_annotations import IndexAnnotationType, INDEX_OF_THIS
-from clr.ast.type_annotations import BUILTINS, VOID_TYPE, STR_TYPE
+from clr.ast.type_annotations import (
+    BUILTINS,
+    VOID_TYPE,
+    STR_TYPE,
+    INT_TYPE,
+    NUM_TYPE,
+    BOOL_TYPE,
+)
 from clr.ast.visitor import DeclVisitor
 from clr.ast.expression_nodes import IdentExpr
 
@@ -286,13 +293,20 @@ class Compiler(DeclVisitor):
 
     def visit_unary_expr(self, node):
         super().visit_unary_expr(node)
-        {
-            TokenType.MINUS: lambda: self.program.simple_op(OpCode.NEGATE),
-            TokenType.BANG: lambda: self.program.simple_op(OpCode.NOT),
-        }.get(
-            node.operator.token_type,
-            emit_error(f"Unknown unary operator! {token_info(node.operator)}"),
-        )()
+        self.program.simple_op(
+            {
+                TokenType.MINUS: lambda: {
+                    INT_TYPE: OpCode.INT_NEG,
+                    NUM_TYPE: OpCode.NUM_NEG,
+                },
+                TokenType.BANG: lambda: {BOOL_TYPE: OpCode.NOT},
+            }.get(
+                node.operator.token_type,
+                emit_error(f"Unknown unary operator! {token_info(node.operator)}"),
+            )()[
+                node.type_annotation
+            ]
+        )
         self._end_expression(node)
 
     def visit_assign_expr(self, node):
@@ -314,10 +328,10 @@ class Compiler(DeclVisitor):
     def visit_binary_expr(self, node):
         super().visit_binary_expr(node)
         binary_codes = {
-            TokenType.PLUS: OpCode.ADD,
-            TokenType.MINUS: OpCode.SUBTRACT,
-            TokenType.STAR: OpCode.MULTIPLY,
-            TokenType.SLASH: OpCode.DIVIDE,
+            TokenType.PLUS: {INT_TYPE: OpCode.INT_ADD, NUM_TYPE: OpCode.NUM_ADD},
+            TokenType.MINUS: {INT_TYPE: OpCode.INT_SUB, NUM_TYPE: OpCode.NUM_SUB},
+            TokenType.STAR: {INT_TYPE: OpCode.INT_MUL, NUM_TYPE: OpCode.NUM_MUL},
+            TokenType.SLASH: {INT_TYPE: OpCode.INT_DIV, NUM_TYPE: OpCode.NUM_DIV},
             TokenType.EQUAL_EQUAL: OpCode.EQUAL,
             TokenType.BANG_EQUAL: OpCode.NEQUAL,
             TokenType.LESS: OpCode.LESS,
@@ -327,7 +341,9 @@ class Compiler(DeclVisitor):
         }
         if node.operator.token_type not in binary_codes:
             emit_error(f"Unknown binary operator! {token_info(node.operator)}")()
-        self.program.simple_op(binary_codes[node.operator.token_type])
+        self.program.simple_op(
+            binary_codes[node.operator.token_type][node.type_annotation]
+        )
         self._end_expression(node)
 
     def visit_unpack_expr(self, node):

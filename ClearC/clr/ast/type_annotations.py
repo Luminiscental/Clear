@@ -34,6 +34,9 @@ class TypeAnnotation:
             return False
         return self.kind == other.kind
 
+    def __hash__(self):
+        return hash(str(self.kind))
+
     def matches(self, other):
         return union_type(self, other) == other
 
@@ -86,6 +89,9 @@ class IdentifierTypeAnnotation(TypeAnnotation):
             and self.identifier == other.identifier
         )
 
+    def __hash__(self):
+        return hash(super()) ^ hash(self.identifier)
+
 
 class OptionalTypeAnnotation(TypeAnnotation):
     def __init__(self, target):
@@ -97,6 +103,9 @@ class OptionalTypeAnnotation(TypeAnnotation):
 
     def __eq__(self, other):
         return isinstance(other, OptionalTypeAnnotation) and self.target == other.target
+
+    def __hash__(self):
+        return hash(super()) ^ hash(self.target)
 
 
 class FunctionTypeAnnotation(TypeAnnotation):
@@ -116,6 +125,9 @@ class FunctionTypeAnnotation(TypeAnnotation):
             and self.return_type == other.return_type
             and self.signature == other.signature
         )
+
+    def __hash__(self):
+        return hash(super()) ^ hash(self.return_type) + 13 * hash(self.signature)
 
 
 INT_TYPE = TypeAnnotation(TypeAnnotationType.INT)

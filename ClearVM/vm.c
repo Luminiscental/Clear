@@ -249,8 +249,51 @@ DEFN_READ(U8, uint8_t)
 
 #undef DEFN_READ
 
-static Result op_loadConst(VM *vm, uint8_t **ip, uint8_t *code,
-                           size_t codeLength) {
+#define OP(name)                                                               \
+    static Result op_##name(VM *vm, uint8_t **ip, uint8_t *code,               \
+                            size_t codeLength)
+#define UNARY_OP(name, op)                                                     \
+    OP(int##name) {                                                            \
+        UNUSED(ip);                                                            \
+        UNUSED(code);                                                          \
+        UNUSED(codeLength);                                                    \
+        GET_FRAME                                                              \
+        PEEK(value, 0)                                                         \
+        *value = makeInt(op(value->as.s32));                                   \
+        return RESULT_OK;                                                      \
+    }                                                                          \
+    OP(num##name) {                                                            \
+        UNUSED(ip);                                                            \
+        UNUSED(code);                                                          \
+        UNUSED(codeLength);                                                    \
+        GET_FRAME                                                              \
+        PEEK(value, 0)                                                         \
+        *value = makeNum(op(value->as.f64));                                   \
+        return RESULT_OK;                                                      \
+    }
+#define BINARY_OP(name, op)                                                    \
+    OP(int##name) {                                                            \
+        UNUSED(ip);                                                            \
+        UNUSED(code);                                                          \
+        UNUSED(codeLength);                                                    \
+        GET_FRAME                                                              \
+        POP(b)                                                                 \
+        PEEK(a, 0)                                                             \
+        *a = makeInt((a->as.s32)op(b.as.s32));                                 \
+        return RESULT_OK;                                                      \
+    }                                                                          \
+    OP(num##name) {                                                            \
+        UNUSED(ip);                                                            \
+        UNUSED(code);                                                          \
+        UNUSED(codeLength);                                                    \
+        GET_FRAME                                                              \
+        POP(b)                                                                 \
+        PEEK(a, 0)                                                             \
+        *a = makeNum((a->as.f64)op(b.as.f64));                                 \
+        return RESULT_OK;                                                      \
+    }
+
+OP(loadConst) {
 
     GET_FRAME
 
@@ -278,7 +321,7 @@ static Result op_loadConst(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
-static Result op_true(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(true) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -291,7 +334,7 @@ static Result op_true(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return pushValueStack256(&frame->stack, truthValue);
 }
 
-static Result op_false(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(false) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -304,7 +347,7 @@ static Result op_false(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return pushValueStack256(&frame->stack, falseValue);
 }
 
-static Result op_nil(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(nil) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -318,8 +361,7 @@ static Result op_nil(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return pushValueStack256(&frame->stack, nilValue);
 }
 
-static Result op_defineGlobal(VM *vm, uint8_t **ip, uint8_t *code,
-                              size_t codeLength) {
+OP(defineGlobal) {
 
     GET_FRAME
 
@@ -346,8 +388,7 @@ static Result op_defineGlobal(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
-static Result op_loadGlobal(VM *vm, uint8_t **ip, uint8_t *code,
-                            size_t codeLength) {
+OP(loadGlobal) {
 
     GET_FRAME
 
@@ -368,8 +409,7 @@ static Result op_loadGlobal(VM *vm, uint8_t **ip, uint8_t *code,
     return pushValueStack256(&frame->stack, global);
 }
 
-static Result op_defineLocal(VM *vm, uint8_t **ip, uint8_t *code,
-                             size_t codeLength) {
+OP(defineLocal) {
 
     GET_FRAME
 
@@ -418,8 +458,7 @@ static Result op_defineLocal(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
-static Result op_loadLocal(VM *vm, uint8_t **ip, uint8_t *code,
-                           size_t codeLength) {
+OP(loadLocal) {
 
     GET_FRAME
 
@@ -455,7 +494,7 @@ static Result op_loadLocal(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
-static Result op_int(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(int) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -506,7 +545,7 @@ static Result op_int(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
-static Result op_bool(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(bool) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -557,7 +596,7 @@ static Result op_bool(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
-static Result op_num(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(num) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -608,7 +647,7 @@ static Result op_num(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
-static Result op_str(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(str) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -699,7 +738,7 @@ static Result op_str(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
-static Result op_clock(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(clock) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -712,7 +751,7 @@ static Result op_clock(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return pushValueStack256(&frame->stack, clockValue);
 }
 
-static Result op_print(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(print) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -734,11 +773,9 @@ static Result op_print(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
-static Result op_popScope(VM *vm, uint8_t **ip, uint8_t *code,
-                          size_t codeLength);
+OP(popScope);
 
-static Result op_return(VM *vm, uint8_t **ip, uint8_t *code,
-                        size_t codeLength) {
+OP(return ) {
 
     GET_FRAME
 
@@ -755,13 +792,9 @@ static Result op_return(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
-static Result op_returnVoid(VM *vm, uint8_t **ip, uint8_t *code,
-                            size_t codeLength) {
+OP(returnVoid) { return op_popScope(vm, ip, code, codeLength); }
 
-    return op_popScope(vm, ip, code, codeLength);
-}
-
-static Result op_pop(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
+OP(pop) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -774,8 +807,13 @@ static Result op_pop(VM *vm, uint8_t **ip, uint8_t *code, size_t codeLength) {
     return RESULT_OK;
 }
 
-static Result op_pushScope(VM *vm, uint8_t **ip, uint8_t *code,
-                           size_t codeLength) {
+UNARY_OP(Neg, -)
+BINARY_OP(Add, +)
+BINARY_OP(Sub, -)
+BINARY_OP(Mul, *)
+BINARY_OP(Div, /)
+
+OP(pushScope) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -800,8 +838,7 @@ static Result op_pushScope(VM *vm, uint8_t **ip, uint8_t *code,
     return RESULT_OK;
 }
 
-static Result op_popScope(VM *vm, uint8_t **ip, uint8_t *code,
-                          size_t codeLength) {
+OP(popScope) {
 
     UNUSED(ip);
     UNUSED(code);
@@ -810,6 +847,8 @@ static Result op_popScope(VM *vm, uint8_t **ip, uint8_t *code,
     return popFrameStack64(&vm->frames, NULL);
 }
 
+#undef UNARY_OP
+#undef OP
 #undef GET_FRAME
 
 Result initVM(VM *vm) {
@@ -858,6 +897,17 @@ Result initVM(VM *vm) {
     INSTR(OP_RETURN, op_return);
     INSTR(OP_RETURN_VOID, op_returnVoid);
     INSTR(OP_POP, op_pop);
+
+    INSTR(OP_INT_NEG, op_intNeg);
+    INSTR(OP_NUM_NEG, op_numNeg);
+    INSTR(OP_INT_ADD, op_intAdd);
+    INSTR(OP_NUM_ADD, op_numAdd);
+    INSTR(OP_INT_SUB, op_intSub);
+    INSTR(OP_NUM_SUB, op_numSub);
+    INSTR(OP_INT_MUL, op_intMul);
+    INSTR(OP_NUM_MUL, op_numMul);
+    INSTR(OP_INT_DIV, op_intDiv);
+    INSTR(OP_NUM_DIV, op_numDiv);
 
     INSTR(OP_PUSH_SCOPE, op_pushScope);
     INSTR(OP_POP_SCOPE, op_popScope);
