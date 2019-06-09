@@ -37,45 +37,43 @@ class OpCode(Enum):
     CLOCK = 16
     # Statements
     PRINT = 17
-    PRINT_BLANK = 18
-    RETURN = 19
-    RETURN_VOID = 20
-    POP = 21
+    RETURN = 18
+    RETURN_VOID = 19
+    POP = 20
     # Arithmetic operators
-    NEGATE = 22
-    ADD = 23
-    SUBTRACT = 24
-    MULTIPLY = 25
-    DIVIDE = 26
+    NEGATE = 21
+    ADD = 22
+    SUBTRACT = 23
+    MULTIPLY = 24
+    DIVIDE = 25
     # Comparison operators
-    LESS = 27
-    NLESS = 28
-    GREATER = 29
-    NGREATER = 30
-    EQUAL = 31
-    NEQUAL = 32
+    LESS = 26
+    NLESS = 27
+    GREATER = 28
+    NGREATER = 29
+    EQUAL = 30
+    NEQUAL = 31
     # Boolean operators
-    NOT = 33
+    NOT = 32
     # Scoping
-    PUSH_SCOPE = 34
-    POP_SCOPE = 35
+    PUSH_SCOPE = 33
+    POP_SCOPE = 34
     # Control flow
-    JUMP = 36
-    JUMP_IF_NOT = 37
-    LOOP = 38
+    JUMP = 35
+    JUMP_IF_NOT = 36
+    LOOP = 37
     # Functions
-    LOAD_PARAM = 39
-    START_FUNCTION = 40
-    CALL = 41
+    LOAD_PARAM = 38
+    START_FUNCTION = 39
+    CALL = 40
     # Closures
-    CLOSURE = 42
-    LOAD_UPVALUE = 43
-    SET_UPVALUE = 44
+    CLOSURE = 41
+    LOAD_UPVALUE = 42
+    SET_UPVALUE = 43
     # Structs
-    STRUCT = 45
-    GET_FIELD = 46
-    GET_FIELDS = 47
-    SET_FIELD = 48
+    STRUCT = 44
+    GET_FIELD = 45
+    SET_FIELD = 45
 
     def __str__(self):
         return "OP_" + self.name

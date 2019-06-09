@@ -75,7 +75,6 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         SIMPLE(OP_CLOCK)
 
         SIMPLE(OP_PRINT)
-        SIMPLE(OP_PRINT_BLANK)
         SIMPLE(OP_RETURN)
         SIMPLE(OP_RETURN_VOID)
         SIMPLE(OP_POP)
