@@ -71,7 +71,7 @@ static Result readU8(VM *vm, uint8_t *out) {
         printf("|| Stack underflow\n");                                        \
         return RESULT_ERR;                                                     \
     }                                                                          \
-    Value name = *vm->sp--;
+    Value name = *--vm->sp;
 
 #define PUSH(name)                                                             \
     if (vm->sp - vm->stack == STACK_MAX) {                                     \
@@ -105,8 +105,16 @@ static Result errorInstruction(VM *vm) {
     return RESULT_ERR;
 }
 
+// TODO: Make this consistent with disassembly
+#ifdef DEBUG_TRACE
+#define TRACE(x) x
+#else
+#define TRACE(x)
+#endif
+
 #define UNARY_OP(name, op)                                                     \
     static Result op_##name(VM *vm) {                                          \
+        TRACE(printf("op_" #name "\n");)                                       \
         PEEK(value, 0)                                                         \
         Value a = *value;                                                      \
         *value = op;                                                           \
@@ -115,6 +123,7 @@ static Result errorInstruction(VM *vm) {
 
 #define BINARY_OP(name, op)                                                    \
     static Result op_##name(VM *vm) {                                          \
+        TRACE(printf("op_" #name "\n");)                                       \
         POP(second)                                                            \
         PEEK(first, 0)                                                         \
         Value a = *first;                                                      \
@@ -124,6 +133,8 @@ static Result errorInstruction(VM *vm) {
     }
 
 static Result op_pushConst(VM *vm) {
+
+    TRACE(printf("op_pushConst\n");)
 
     READ(index)
 
@@ -140,6 +151,8 @@ static Result op_pushConst(VM *vm) {
 
 static Result op_pushTrue(VM *vm) {
 
+    TRACE(printf("op_pushTrue\n");)
+
     PUSH(makeBool(true))
 
     return RESULT_OK;
@@ -147,12 +160,16 @@ static Result op_pushTrue(VM *vm) {
 
 static Result op_pushFalse(VM *vm) {
 
+    TRACE(printf("op_pushFalse\n");)
+
     PUSH(makeBool(false))
 
     return RESULT_OK;
 }
 
 static Result op_pushNil(VM *vm) {
+
+    TRACE(printf("op_pushNil\n");)
 
     Value nilValue;
     nilValue.type = VAL_NIL;
@@ -163,6 +180,8 @@ static Result op_pushNil(VM *vm) {
 }
 
 static Result op_setGlobal(VM *vm) {
+
+    TRACE(printf("op_setGlobal\n");)
 
     READ(index)
 
@@ -179,6 +198,8 @@ static Result op_setGlobal(VM *vm) {
 
 static Result op_pushGlobal(VM *vm) {
 
+    TRACE(printf("op_pushGlobal\n");)
+
     READ(index)
 
     Value global;
@@ -194,6 +215,8 @@ static Result op_pushGlobal(VM *vm) {
 }
 
 static Result op_setLocal(VM *vm) {
+
+    TRACE(printf("op_setLocal\n");)
 
     READ(index)
 
@@ -212,6 +235,8 @@ static Result op_setLocal(VM *vm) {
 
 static Result op_getLocal(VM *vm) {
 
+    TRACE(printf("op_getLocal\n");)
+
     READ(index)
 
     if (index >= vm->sp - vm->fp) {
@@ -226,6 +251,8 @@ static Result op_getLocal(VM *vm) {
 }
 
 static Result op_int(VM *vm) {
+
+    TRACE(printf("op_int\n");)
 
     PEEK(value, 0)
 
@@ -272,6 +299,8 @@ static Result op_int(VM *vm) {
 
 static Result op_bool(VM *vm) {
 
+    TRACE(printf("op_bool\n");)
+
     PEEK(value, 0)
 
     switch (value->type) {
@@ -316,6 +345,8 @@ static Result op_bool(VM *vm) {
 }
 
 static Result op_num(VM *vm) {
+
+    TRACE(printf("op_num\n");)
 
     PEEK(value, 0)
 
@@ -362,6 +393,8 @@ static Result op_num(VM *vm) {
 
 static Result op_str(VM *vm) {
 
+    TRACE(printf("op_str\n");)
+
     PEEK(value, 0)
 
     return stringifyValue(vm, *value, value);
@@ -369,12 +402,16 @@ static Result op_str(VM *vm) {
 
 static Result op_clock(VM *vm) {
 
+    TRACE(printf("op_clock\n");)
+
     PUSH(makeNum((double)clock() / CLOCKS_PER_SEC))
 
     return RESULT_OK;
 }
 
 static Result op_print(VM *vm) {
+
+    TRACE(printf("op_print\n");)
 
     POP(str)
 
@@ -391,6 +428,8 @@ static Result op_print(VM *vm) {
 }
 
 static Result op_pop(VM *vm) {
+
+    TRACE(printf("op_pop\n");)
 
     POP(_)
     UNUSED(_);
@@ -594,20 +633,11 @@ static Result loadConstants(VM *vm, uint8_t *code, size_t length,
     return RESULT_OK;
 }
 
-Result executeCode(VM *vm, uint8_t *code, size_t length) {
+static Result runVM(VM *vm) {
 
-    size_t index;
-    if (loadConstants(vm, code, length, &index) != RESULT_OK) {
+    while (vm->end - vm->ip > 0) {
 
-        printf("|| Could not load constants\n");
-        return RESULT_ERR;
-    }
-
-    uint8_t *ip = code + index;
-
-    while ((size_t)(ip - code) < length) {
-
-        uint8_t opcode = *ip++;
+        uint8_t opcode = *vm->ip++;
 
         if (opcode >= OP_COUNT) {
 
@@ -620,9 +650,37 @@ Result executeCode(VM *vm, uint8_t *code, size_t length) {
             printf("|| Opcode %d failed\n", opcode);
             return RESULT_ERR;
         }
+
+#ifdef DEBUG_STACK
+
+        printf("\t\t\t");
+        for (Value *value = vm->stack; value < vm->sp; value++) {
+
+            printf("[");
+            printValue(*value);
+            printf("] ");
+        }
+        printf("\n");
+
+#endif
     }
 
     return RESULT_OK;
+}
+
+Result executeCode(VM *vm, uint8_t *code, size_t length) {
+
+    size_t index;
+    if (loadConstants(vm, code, length, &index) != RESULT_OK) {
+
+        printf("|| Could not load constants\n");
+        return RESULT_ERR;
+    }
+
+    vm->end = code + length;
+    vm->ip = code + index;
+
+    return runVM(vm);
 }
 
 static void freeObjects(VM *vm) {

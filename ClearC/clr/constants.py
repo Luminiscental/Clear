@@ -1,4 +1,4 @@
-from clr.values import OpCode, DEBUG
+from clr.values import ConstantType, DEBUG
 from clr.errors import emit_error
 
 
@@ -101,9 +101,9 @@ class Constants:
     def _store(self, value):
         try:
             op_type = {
-                ClrNum: OpCode.NUMBER,
-                ClrStr: OpCode.STRING,
-                ClrInt: OpCode.INTEGER,
+                ClrNum: ConstantType.NUM,
+                ClrStr: ConstantType.STR,
+                ClrInt: ConstantType.INT,
             }[type(value)]
         except KeyError:
             emit_error(f"Unknown constant value type: {type(value)}")()

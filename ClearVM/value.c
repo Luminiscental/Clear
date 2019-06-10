@@ -245,6 +245,53 @@ bool valuesEqual(Value a, Value b) {
     }
 }
 
+// TODO: Make this consistent with OP_PRINT
+void printValue(Value value) {
+
+    switch (value.type) {
+
+        case VAL_BOOL: {
+
+            printf(value.as.b ? "true" : "false");
+
+        } break;
+
+        case VAL_INT: {
+
+            printf("%d", value.as.s32);
+
+        } break;
+
+        case VAL_NIL: {
+
+            printf("nil");
+
+        } break;
+
+        case VAL_NUM: {
+
+            printf("%f", value.as.f64);
+
+        } break;
+
+        case VAL_OBJ: {
+
+            ObjectValue obj = *value.as.obj;
+
+            switch (obj.type) {
+
+                case OBJ_STRING: {
+
+                    StringObject strObj = *(StringObject *)obj.ptr;
+                    printf("%s", strObj.data);
+
+                } break;
+            }
+
+        } break;
+    }
+}
+
 void initValueList(ValueList *list) {
 
     list->data = NULL;

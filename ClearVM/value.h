@@ -66,6 +66,8 @@ Result stringifyValue(VM *vm, Value input, Value *output);
 Value concatStrings(VM *vm, StringObject a, StringObject b);
 bool valuesEqual(Value a, Value b);
 
+void printValue(Value value);
+
 typedef struct {
 
     Value *data;

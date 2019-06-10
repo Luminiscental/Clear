@@ -1,3 +1,4 @@
+from collections import defaultdict
 from clr.errors import emit_error
 from clr.values import OpCode, DEBUG
 from clr.assemble import assembled_size
@@ -19,36 +20,59 @@ from clr.ast.expression_nodes import IdentExpr
 class Program:
     def __init__(self):
         self.code_list = []
+        self.scopes = [0]
 
     def load_constant(self, index):
-        self.code_list.append(OpCode.LOAD_CONST)
+        self.code_list.append(OpCode.PUSH_CONST)
         self.code_list.append(index)
+
+    def push_scope(self):
+        self.scopes.append(0)
+
+    def pop_scope(self):
+        for _ in range(self.scopes.pop()):
+            self.simple_op(OpCode.POP)
 
     def simple_op(self, opcode):
         self.code_list.append(opcode)
 
     def define_name(self, index):
-        opcode = {
-            IndexAnnotationType.GLOBAL: lambda: OpCode.DEFINE_GLOBAL,
-            IndexAnnotationType.LOCAL: lambda: OpCode.DEFINE_LOCAL,
-            IndexAnnotationType.UPVALUE: lambda: OpCode.SET_UPVALUE,
+        def add_local():
+            self.scopes[-1] += 1
+
+        {
+            IndexAnnotationType.GLOBAL: lambda: self.code_list.extend(
+                [OpCode.SET_GLOBAL, index.value]
+            ),
+            IndexAnnotationType.LOCAL: add_local,
+            IndexAnnotationType.UPVALUE: emit_error("Closures unimplemented"),
         }.get(
             index.kind, emit_error(f"Cannot define name with index kind {index.kind}!")
+        )()
+
+    def set_name(self, index):
+        opcode = {
+            IndexAnnotationType.GLOBAL: lambda: OpCode.SET_GLOBAL,
+            IndexAnnotationType.LOCAL: lambda: OpCode.SET_LOCAL,
+            IndexAnnotationType.UPVALUE: emit_error("Closures unimplemented"),
+        }.get(
+            index.kind, emit_error(f"Cannot set name with index kind {index.kind}!")
         )()
         self.code_list.append(opcode)
         self.code_list.append(index.value)
 
     def load_name(self, index):
         opcode = {
-            IndexAnnotationType.GLOBAL: lambda: OpCode.LOAD_GLOBAL,
-            IndexAnnotationType.LOCAL: lambda: OpCode.LOAD_LOCAL,
-            IndexAnnotationType.PARAM: lambda: OpCode.LOAD_PARAM,
-            IndexAnnotationType.UPVALUE: lambda: OpCode.LOAD_UPVALUE,
+            IndexAnnotationType.GLOBAL: lambda: OpCode.PUSH_GLOBAL,
+            IndexAnnotationType.LOCAL: lambda: OpCode.PUSH_LOCAL,
+            IndexAnnotationType.PARAM: emit_error("Functions unimplemented"),
+            IndexAnnotationType.UPVALUE: emit_error("Closures unimplemented"),
         }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
         self.code_list.append(opcode)
         self.code_list.append(index.value)
 
     def begin_function(self):
+        emit_error("Functions unimplemented")()
         self.code_list.append(OpCode.START_FUNCTION)
         index = len(self.code_list)
         # Insert temporary offset to later be patched
@@ -56,12 +80,14 @@ class Program:
         return index
 
     def end_function(self, index):
+        emit_error("Functions unimplemented")()
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         # Patch the previously inserted offset
         self.code_list[index] = ClrUint(offset)
 
     def make_closure(self, upvalues=None):
+        emit_error("Closures unimplemented")()
         upvalues = upvalues or []
         self.code_list.append(OpCode.CLOSURE)
         self.code_list.append(len(upvalues))
@@ -71,6 +97,7 @@ class Program:
             self.load_name(upvalue)
 
     def begin_jump(self, conditional=False):
+        emit_error("Control flow unimplemented")()
         self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
         index = len(self.code_list)
         if DEBUG:
@@ -81,6 +108,7 @@ class Program:
         return index
 
     def end_jump(self, jump_ref):
+        emit_error("Control flow unimplemented")()
         index = jump_ref
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
@@ -90,12 +118,14 @@ class Program:
         self.code_list[index] = ClrUint(offset)
 
     def begin_loop(self):
+        emit_error("Control flow unimplemented")()
         index = len(self.code_list)
         if DEBUG:
             print(f"Loop checkpoint for {index} picked")
         return index
 
     def loop_back(self, index):
+        emit_error("Control flow unimplemented")()
         self.code_list.append(OpCode.LOOP)
         offset_index = len(self.code_list)
         # Insert an offset temporarily to include it when calculating the actual offset.
@@ -125,6 +155,7 @@ class Compiler(DeclVisitor):
 
     def _end_expression(self, node):
         if node.polymorphed_fields is not None:
+            emit_error("Structs unimplemented")()
             self.program.simple_op(OpCode.GET_FIELDS)
             self.program.simple_op(len(node.polymorphed_fields))
             for field in node.polymorphed_fields:
@@ -133,6 +164,7 @@ class Compiler(DeclVisitor):
             self.program.simple_op(len(node.polymorphed_fields))
 
     def _make_function(self, node):
+        emit_error("Functions unimplemented")()
         function = self.program.begin_function()
         for decl in node.block.declarations:
             decl.accept(self)
@@ -141,6 +173,7 @@ class Compiler(DeclVisitor):
         self.program.end_function(function)
 
     def visit_func_decl(self, node):
+        emit_error("Functions unimplemented")()
         # No super as we handle scoping
         self._make_function(node)
         # Store the function object as a local to close over
@@ -159,10 +192,10 @@ class Compiler(DeclVisitor):
         self.program.define_name(node.index_annotation)
 
     def visit_prop_decl(self, node):
-        # TODO
-        pass
+        emit_error("Properties unimplemented")()
 
     def visit_struct_decl(self, node):
+        emit_error("Structs unimplemented")()
         # No super as we handle methods
         # Make all method function objects
         for method in node.methods.values():
@@ -229,6 +262,7 @@ class Compiler(DeclVisitor):
         self.program.simple_op(OpCode.PRINT)
 
     def visit_if_stmt(self, node):
+        emit_error("Control flow unimplemented")()
         # No super because we need the jumps in the right place
         # Create a list of jumps that skip to the end once a block completes
         final_jumps = []
@@ -255,6 +289,7 @@ class Compiler(DeclVisitor):
             self.program.end_jump(final_jump)
 
     def visit_while_stmt(self, node):
+        emit_error("Control flow unimplemented")()
         # No super because the loop starts before checking the condition
         loop = self.program.begin_loop()
         if node.condition is not None:
@@ -272,6 +307,7 @@ class Compiler(DeclVisitor):
             self.program.simple_op(OpCode.POP)
 
     def visit_ret_stmt(self, node):
+        emit_error("Functions unimplemented")()
         super().visit_ret_stmt(node)
         if node.value is None:
             self.program.simple_op(OpCode.RETURN_VOID)
@@ -285,11 +321,11 @@ class Compiler(DeclVisitor):
 
     def start_scope(self):
         super().start_scope()
-        self.program.simple_op(OpCode.PUSH_SCOPE)
+        self.program.push_scope()
 
     def end_scope(self):
         super().end_scope()
-        self.program.simple_op(OpCode.POP_SCOPE)
+        self.program.pop_scope()
 
     def visit_unary_expr(self, node):
         super().visit_unary_expr(node)
@@ -312,7 +348,7 @@ class Compiler(DeclVisitor):
     def visit_assign_expr(self, node):
         # Don't call super as we don't want to evaluate the left hand side
         node.right.accept(self)
-        self.program.define_name(node.left.index_annotation)
+        self.program.set_name(node.left.index_annotation)
         if DEBUG:
             print(f"Loading name for {node.left}")
         # Assignment is an expression so we load the assigned value as well
@@ -320,6 +356,7 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_access_expr(self, node):
+        emit_error("Structs unimplemented")()
         super().visit_access_expr(node)
         self.program.simple_op(OpCode.GET_FIELD)
         self.program.simple_op(node.right.index_annotation.value)
@@ -328,25 +365,35 @@ class Compiler(DeclVisitor):
     def visit_binary_expr(self, node):
         super().visit_binary_expr(node)
         binary_codes = {
-            TokenType.PLUS: {INT_TYPE: OpCode.INT_ADD, NUM_TYPE: OpCode.NUM_ADD},
-            TokenType.MINUS: {INT_TYPE: OpCode.INT_SUB, NUM_TYPE: OpCode.NUM_SUB},
-            TokenType.STAR: {INT_TYPE: OpCode.INT_MUL, NUM_TYPE: OpCode.NUM_MUL},
-            TokenType.SLASH: {INT_TYPE: OpCode.INT_DIV, NUM_TYPE: OpCode.NUM_DIV},
-            TokenType.EQUAL_EQUAL: OpCode.EQUAL,
-            TokenType.BANG_EQUAL: OpCode.NEQUAL,
-            TokenType.LESS: OpCode.LESS,
-            TokenType.GREATER_EQUAL: OpCode.NLESS,
-            TokenType.GREATER: OpCode.GREATER,
-            TokenType.LESS_EQUAL: OpCode.NGREATER,
+            TokenType.PLUS: {
+                INT_TYPE: [OpCode.INT_ADD],
+                NUM_TYPE: [OpCode.NUM_ADD],
+                STR_TYPE: [OpCode.STR_CAT],
+            },
+            TokenType.MINUS: {INT_TYPE: [OpCode.INT_SUB], NUM_TYPE: [OpCode.NUM_SUB]},
+            TokenType.STAR: {INT_TYPE: [OpCode.INT_MUL], NUM_TYPE: [OpCode.NUM_MUL]},
+            TokenType.SLASH: {INT_TYPE: [OpCode.INT_DIV], NUM_TYPE: [OpCode.NUM_DIV]},
+            TokenType.EQUAL_EQUAL: defaultdict(lambda: [OpCode.EQUAL]),
+            TokenType.BANG_EQUAL: defaultdict(lambda: [OpCode.EQUAL, OpCode.NOT]),
+            TokenType.LESS: {INT_TYPE: [OpCode.INT_LESS], NUM_TYPE: [OpCode.NUM_LESS]},
+            TokenType.GREATER_EQUAL: {
+                INT_TYPE: [OpCode.INT_LESS, OpCode.NOT],
+                NUM_TYPE: [OpCode.NUM_LESS, OpCode.NOT],
+            },
+            TokenType.GREATER: {
+                INT_TYPE: [OpCode.INT_GREATER],
+                NUM_TYPE: [OpCode.NUM_GREATER, OpCode.NOT],
+            },
+            TokenType.LESS_EQUAL: {INT_TYPE: [OpCode.INT_GREATER, OpCode.NOT]},
         }
         if node.operator.token_type not in binary_codes:
             emit_error(f"Unknown binary operator! {token_info(node.operator)}")()
-        self.program.simple_op(
-            binary_codes[node.operator.token_type][node.type_annotation]
-        )
+        for code in binary_codes[node.operator.token_type][node.left.type_annotation]:
+            self.program.simple_op(code)
         self._end_expression(node)
 
     def visit_unpack_expr(self, node):
+        emit_error("Control flow unimplemented")()
         # No super as we need the jumps in the right place
         # Load the target value
         node.target.accept(self)
@@ -416,6 +463,7 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_lambda_expr(self, node):
+        emit_error("Functions unimplemented")()
         # No super as we handle params / scoping
         function = self.program.begin_function()
         node.result.accept(self)
@@ -430,6 +478,7 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_if_expr(self, node):
+        emit_error("Control flow unimplemented")()
         # No super because we need the jumps in the right place
         # Create a list of jumps that skip to the end once a block completes
         final_jumps = []
@@ -458,12 +507,14 @@ class Compiler(DeclVisitor):
                 arg.accept(self)
             self.program.simple_op(opcode)
         else:
+            emit_error("Functions unimplemented")()
             super().visit_call_expr(node)
             self.program.simple_op(OpCode.CALL)
             self.program.simple_op(len(node.arguments))
         self._end_expression(node)
 
     def visit_construct_expr(self, node):
+        emit_error("Structs unimplemented")()
         # Load the constructor before calling super() as callable comes before arguments
         self.program.load_name(node.constructor_index_annotation)
         super().visit_construct_expr(node)
@@ -489,15 +540,16 @@ class Compiler(DeclVisitor):
 
     def visit_boolean_expr(self, node):
         super().visit_boolean_expr(node)
-        self.program.simple_op(OpCode.TRUE if node.value else OpCode.FALSE)
+        self.program.simple_op(OpCode.PUSH_TRUE if node.value else OpCode.PUSH_FALSE)
         self._end_expression(node)
 
     def visit_keyword_expr(self, node):
         super().visit_keyword_expr(node)
         if node.token.token_type == TokenType.THIS:
+            emit_error("Structs unimplemented")()
             self.program.load_name(node.index_annotation)
         elif node.token.token_type == TokenType.NIL:
-            self.program.simple_op(OpCode.NIL)
+            self.program.simple_op(OpCode.PUSH_NIL)
         self._end_expression(node)
 
     def visit_ident_expr(self, node):
@@ -508,6 +560,7 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_and_expr(self, node):
+        emit_error("Control flow unimplemented")()
         # No super because we need to put the jumps in the right place
         node.left.accept(self)
         # If the first value is false don't bother checking the second
@@ -519,6 +572,7 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_or_expr(self, node):
+        emit_error("Control flow unimplemented")()
         # No super because we need to put the jumps in the right place
         node.left.accept(self)
         # If the first value is false jump past the shortcircuit

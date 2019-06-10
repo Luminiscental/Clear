@@ -1,0 +1,16 @@
+
+var global = 3;
+
+{
+    val local = global;
+    print "a: " + str(local + 2);
+    {
+        global = -3 * 2;
+        var copy2 = global;
+        print "b: " + str(copy2);
+        copy2 = 5.3;
+        print "c: " + str(copy2);
+    }
+}
+
+print "d: " + str(global * -1);

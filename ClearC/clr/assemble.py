@@ -3,7 +3,7 @@ This module provides the assemble function for converting a list of Clear byteco
 as objects like OpCode or ClrNum into actual bytes, as a bytearray.
 """
 import struct
-from clr.values import OpCode, DEBUG_ASSEMBLE
+from clr.values import OpCode, ConstantType, DEBUG_ASSEMBLE
 from clr.errors import emit_error
 from clr.constants import ClrInt, ClrUint, ClrNum, ClrStr
 
@@ -94,6 +94,7 @@ def assemble(code_list):
             ClrInt: _assemble_int,
             ClrUint: _assemble_uint,
             OpCode: _assemble_op,
+            ConstantType: _assemble_op,
             int: _assemble_index,
         }.get(type(code), emit_error(f"Unknown code type to assemble! {type(code)}"))(
             code, raw_bytes

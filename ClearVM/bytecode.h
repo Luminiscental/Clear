@@ -36,10 +36,10 @@ typedef enum {
     OP_STR = 11, // op - pops value and converts to str
 
     OP_CLOCK = 12, // op - pushes clock value as num in seconds
+    OP_PRINT = 13, // op - pops value and prints it on a line
 
     // Actions
-    OP_PRINT = 13, // op - pops value and prints it on a line
-    OP_POP = 14,   // op - pops value
+    OP_POP = 14, // op - pops value
 
     // Arithmetic operators
     OP_INT_NEG = 15, // op - replaces top value with its int negation
