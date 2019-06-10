@@ -4,11 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-void *reallocate(void *previous,
-#ifdef DEBUG_MEM
-                 size_t oldSize,
-#endif
-                 size_t newSize) {
+void *reallocate(void *previous, size_t oldSize, size_t newSize) {
 
 #ifdef DEBUG_MEM
 
@@ -18,6 +14,10 @@ void *reallocate(void *previous,
     memoryUsage -= oldSize;
 
     printf("\t\t\t\t\t\t\t\tmemory: %zuB\n", memoryUsage);
+
+#else
+
+    UNUSED(oldSize);
 
 #endif
 

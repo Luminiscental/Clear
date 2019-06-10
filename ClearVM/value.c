@@ -10,7 +10,7 @@
 
 Value makeObject(VM *vm, size_t size, ObjectType type) {
 
-    void *ptr = reallocate(NULL, size);
+    void *ptr = reallocate(NULL, 0, size);
 
     ObjectValue *obj = ALLOCATE(ObjectValue);
     obj->type = type;

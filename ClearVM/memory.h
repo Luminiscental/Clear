@@ -19,17 +19,9 @@
 #define ALLOCATE_ARRAY(type, count)                                            \
     (type *)REALLOC(NULL, 0, sizeof(type) * (count))
 
-#ifdef DEBUG_MEM
 #define REALLOC(prev, old, new) reallocate(prev, old, new)
-#else
-#define REALLOC(prev, old, new) reallocate(prev, new)
-#endif
 
-void *reallocate(void *previous,
-#ifdef DEBUG_MEM
-                 size_t oldSize,
-#endif
-                 size_t newSize);
+void *reallocate(void *previous, size_t oldSize, size_t newSize);
 
 void freeObject(ObjectValue *obj);
 
