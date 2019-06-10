@@ -34,7 +34,8 @@ typedef enum {
     VAL_NIL,
     VAL_OBJ,
     VAL_INT,
-    VAL_NUM
+    VAL_NUM,
+    VAL_PTR
 
 } ValueType;
 
@@ -48,6 +49,7 @@ typedef struct {
         int32_t s32;
         double f64;
         ObjectValue *obj;
+        void *ptr;
 
     } as;
 
@@ -61,6 +63,7 @@ Value makeStringFromLiteral(VM *vm, const char *literal);
 Value makeInt(int32_t unboxed);
 Value makeBool(bool unboxed);
 Value makeNum(double unboxed);
+Value makePointer(void *unboxed);
 
 Result stringifyValue(VM *vm, Value input, Value *output);
 Value concatStrings(VM *vm, StringObject a, StringObject b);

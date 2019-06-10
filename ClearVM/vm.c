@@ -467,6 +467,8 @@ BINARY_OP(equal, makeBool(valuesEqual(a, b)))
 
 static Result op_jump(VM *vm) {
 
+    TRACE(printf("op_jump\n");)
+
     READ(offset)
 
     vm->ip += offset;
@@ -480,6 +482,8 @@ static Result op_jump(VM *vm) {
 }
 
 static Result op_jumpIfFalse(VM *vm) {
+
+    TRACE(printf("op_jumpIfFalse\n");)
 
     READ(offset)
     POP(cond)
@@ -499,6 +503,8 @@ static Result op_jumpIfFalse(VM *vm) {
 
 static Result op_loop(VM *vm) {
 
+    TRACE(printf("op_loop\n");)
+
     READ(offset)
 
     vm->ip -= offset;
@@ -507,6 +513,80 @@ static Result op_loop(VM *vm) {
         printf("|| Looped out of range\n");
         return RESULT_ERR;
     }
+
+    return RESULT_OK;
+}
+
+static Result op_function(VM *vm) {
+
+    TRACE(printf("op_function\n");)
+
+    READ(offset)
+
+    uint8_t *ip = vm->ip;
+    PUSH(makePointer(ip))
+    vm->ip += offset;
+
+    return RESULT_OK;
+}
+
+static Result op_call(VM *vm) {
+
+    TRACE(printf("op_call\n");)
+
+    READ(offset)
+
+    PUSH(makePointer(vm->ip + offset))
+    PUSH(makePointer(vm->fp))
+    vm->fp = vm->sp;
+
+    return RESULT_OK;
+}
+
+static Result op_load_ip(VM *vm) {
+
+    TRACE(printf("op_load_ip\n");)
+
+    POP(ipValue)
+
+    vm->ip = (uint8_t *)ipValue.as.ptr;
+
+    return RESULT_OK;
+}
+
+static Result op_load_fp(VM *vm) {
+
+    TRACE(printf("op_load_fp\n");)
+
+    POP(fpValue)
+
+    vm->fp = (Value *)fpValue.as.ptr;
+
+    return RESULT_OK;
+}
+
+static Result op_return(VM *vm) {
+
+    TRACE(printf("op_return\n");)
+
+    READ(paramCount)
+    POP(returnValue)
+
+    vm->sp -= paramCount;
+
+    if (op_load_ip(vm) != RESULT_OK) {
+
+        printf("|| Could not return from function\n");
+        return RESULT_ERR;
+    }
+
+    if (op_load_fp(vm) != RESULT_OK) {
+
+        printf("|| Couldn't unwind stack\n");
+        return RESULT_ERR;
+    }
+
+    PUSH(returnValue)
 
     return RESULT_OK;
 }
@@ -585,6 +665,12 @@ Result initVM(VM *vm) {
     INSTR(OP_JUMP, op_jump);
     INSTR(OP_JUMP_IF_FALSE, op_jumpIfFalse);
     INSTR(OP_LOOP, op_loop);
+
+    INSTR(OP_FUNCTION, op_function);
+    INSTR(OP_CALL, op_call);
+    INSTR(OP_LOAD_IP, op_load_ip);
+    INSTR(OP_LOAD_FP, op_load_fp);
+    INSTR(OP_RETURN, op_return);
 
 #undef INSTR
 

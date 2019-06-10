@@ -86,25 +86,26 @@ typedef enum {
     OP_FUNCTION =
         35, // op <u8> - pushes an ip value pointing to the next instruction
             // onto the stack and moves the ip forward by the given offset
-    OP_CALL = 36, // op <u8> - pushes fp onto the stack, pushes an ip value
-                  // offset from the next instruction by the given offset onto
-                  // the stack and points fp at it
-    OP_LOAD =
-        37, // op - pops an ip value off the stack and copies it into the ip
-    OP_RETURN = 38, // op <u8> - pops a return value off the stack, pops the
-                    // given number of extra values off the stack, does OP_LOAD,
-                    // pushes the return value back onto the stack
+    OP_CALL =
+        36, // op <u8> - pushes an ip value offset from the next instruction by
+            // the given offset onto the stack, pushes the fp onto the stack,
+            // and sets the fp to point to the top of the stack
+    OP_LOAD_IP = 37, // op - pops ip and copies it into the vm
+    OP_LOAD_FP = 38, // op - pops fp and copies it into the vm
+    OP_RETURN = 39,  // op <u8> - pops a return value off the stack, pops the
+                    // given number of extra values off the stack, loads ip then
+                    // fp, pushes the return value back onto the stack
 
     // Structs
-    OP_STRUCT = 39, // op <u8> - pops the given number of values off the stack
+    OP_STRUCT = 40, // op <u8> - pops the given number of values off the stack
                     // and pushes a struct of them
-    OP_GET_FIELD = 40, // op <u8> - pops a value off the stack and pushes its
+    OP_GET_FIELD = 41, // op <u8> - pops a value off the stack and pushes its
                        // struct field at the given index
     OP_SET_FIELD =
-        41, // op <u8> - pops two values off the stack and sets the field of the
+        42, // op <u8> - pops two values off the stack and sets the field of the
             // lower value at the given index to the upper value
 
-    OP_COUNT = 42
+    OP_COUNT = 43
 
 } OpCode;
 

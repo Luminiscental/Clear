@@ -76,6 +76,16 @@ Value makeNum(double unboxed) {
     return result;
 }
 
+Value makePointer(void *unboxed) {
+
+    Value result;
+
+    result.type = VAL_PTR;
+    result.as.ptr = unboxed;
+
+    return result;
+}
+
 Result stringifyValue(VM *vm, Value input, Value *output) {
 
     switch (input.type) {
@@ -141,9 +151,10 @@ Result stringifyValue(VM *vm, Value input, Value *output) {
 
         } break;
 
+        case VAL_PTR:
         case VAL_OBJ: {
 
-            printf("|| Cannot cast object types\n");
+            printf("|| Cannot stringify reference types\n");
             return RESULT_ERR;
 
         } break;
@@ -212,6 +223,12 @@ bool valuesEqual(Value a, Value b) {
 
         } break;
 
+        case VAL_PTR: {
+
+            return a.as.ptr == b.as.ptr;
+
+        } break;
+
         case VAL_OBJ: {
 
             ObjectValue aObj = *a.as.obj;
@@ -271,6 +288,12 @@ void printValue(Value value) {
         case VAL_NUM: {
 
             printf("%f", value.as.f64);
+
+        } break;
+
+        case VAL_PTR: {
+
+            printf("%p", value.as.ptr);
 
         } break;
 

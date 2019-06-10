@@ -1,14 +1,7 @@
 
-if (1 + 1 == 2) {
-    print "nice";
-} else {
-    print "not nice";
+func hello() void {
+    val test = "hello";
+    print test;
 }
 
-print 2 < 3;
-
-var counter = 5i;
-while (counter > 0i) {
-    print counter;
-    counter = counter - 1i;
-}
+hello();

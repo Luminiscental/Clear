@@ -237,7 +237,7 @@ class FunctionNameIndexer(NameIndexer):
 
     def add_param(self, name):
         index = len(self.params)
-        pair = (name, IndexAnnotation(kind=IndexAnnotationType.PARAM, value=index))
+        pair = (name, IndexAnnotation(kind=IndexAnnotationType.LOCAL, value=index))
         self.params.append(pair)
 
     def add_upvalue(self, index):
@@ -251,9 +251,15 @@ class FunctionNameIndexer(NameIndexer):
             return index
         return self.add_upvalue(index)
 
+    def visit_ret_stmt(self, node):
+        node.param_count = len(self.params)
+
     def lookup_name(self, name):
         result = super().lookup_name(name)
-        if result.kind == IndexAnnotationType.UNRESOLVED:
+        if result.kind == IndexAnnotationType.LOCAL:
+            # Offset local values because parameters are stored beneath them
+            result.value += len(self.params)
+        elif result.kind == IndexAnnotationType.UNRESOLVED:
             # If it wasn't found look for it as a param
             for param_name, param_index in self.params:
                 if param_name == name:

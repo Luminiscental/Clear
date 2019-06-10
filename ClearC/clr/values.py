@@ -59,12 +59,13 @@ class OpCode(Enum):
     # Functions
     FUNCTION = 35
     CALL = 36
-    LOAD = 37
-    RETURN = 38
+    LOAD_IP = 37
+    LOAD_FP = 38
+    RETURN = 39
     # Structs
-    STRUCT = 39
-    GET_FIELD = 40
-    SET_FIELD = 41
+    STRUCT = 40
+    GET_FIELD = 41
+    SET_FIELD = 42
 
     def __str__(self):
         return "OP_" + self.name

@@ -3,7 +3,7 @@ from clr.errors import emit_error
 from clr.values import OpCode, DEBUG
 from clr.assemble import assembled_size
 from clr.tokens import TokenType, token_info
-from clr.constants import ClrUint, Constants
+from clr.constants import Constants
 from clr.ast.index_annotations import IndexAnnotationType, INDEX_OF_THIS
 from clr.ast.type_annotations import (
     BUILTINS,
@@ -45,7 +45,6 @@ class Program:
                 [OpCode.SET_GLOBAL, index.value]
             ),
             IndexAnnotationType.LOCAL: add_local,
-            IndexAnnotationType.UPVALUE: emit_error("Closures unimplemented"),
         }.get(
             index.kind, emit_error(f"Cannot define name with index kind {index.kind}!")
         )()
@@ -54,7 +53,6 @@ class Program:
         opcode = {
             IndexAnnotationType.GLOBAL: lambda: OpCode.SET_GLOBAL,
             IndexAnnotationType.LOCAL: lambda: OpCode.SET_LOCAL,
-            IndexAnnotationType.UPVALUE: emit_error("Closures unimplemented"),
         }.get(
             index.kind, emit_error(f"Cannot set name with index kind {index.kind}!")
         )()
@@ -65,26 +63,22 @@ class Program:
         opcode = {
             IndexAnnotationType.GLOBAL: lambda: OpCode.PUSH_GLOBAL,
             IndexAnnotationType.LOCAL: lambda: OpCode.PUSH_LOCAL,
-            IndexAnnotationType.PARAM: emit_error("Functions unimplemented"),
-            IndexAnnotationType.UPVALUE: emit_error("Closures unimplemented"),
         }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
         self.code_list.append(opcode)
         self.code_list.append(index.value)
 
     def begin_function(self):
-        emit_error("Functions unimplemented")()
-        self.code_list.append(OpCode.START_FUNCTION)
+        self.code_list.append(OpCode.FUNCTION)
         index = len(self.code_list)
         # Insert temporary offset to later be patched
-        self.code_list.append(ClrUint(0))
+        self.code_list.append(0)
         return index
 
     def end_function(self, index):
-        emit_error("Functions unimplemented")()
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         # Patch the previously inserted offset
-        self.code_list[index] = ClrUint(offset)
+        self.code_list[index] = offset
 
     def make_closure(self, upvalues=None):
         emit_error("Closures unimplemented")()
@@ -160,32 +154,36 @@ class Compiler(DeclVisitor):
             self.program.simple_op(len(node.polymorphed_fields))
 
     def _make_function(self, node):
-        emit_error("Functions unimplemented")()
         function = self.program.begin_function()
+        self.program.push_scope()
         for decl in node.block.declarations:
             decl.accept(self)
         if node.return_type.as_annotation == VOID_TYPE:
-            self.program.simple_op(OpCode.RETURN_VOID)
+            self.program.pop_scope()
+            for _ in range(len(node.params)):
+                self.program.simple_op(OpCode.POP)
+            self.program.simple_op(OpCode.LOAD_FP)
+            self.program.simple_op(OpCode.LOAD_IP)
         self.program.end_function(function)
 
     def visit_func_decl(self, node):
-        emit_error("Functions unimplemented")()
         # No super as we handle scoping
         self._make_function(node)
         # Store the function object as a local to close over
         self.program.define_name(node.index_annotation)
-        # Load the decorator if it exists
-        if node.decorator:
-            node.decorator.accept(self)
-        # Close the function
-        self.program.load_name(node.index_annotation)
-        self.program.make_closure(node.upvalues)
-        # Decorate the function
-        if node.decorator:
-            self.program.simple_op(OpCode.CALL)
-            self.program.simple_op(1)
-        # Define the function as the final value
-        self.program.define_name(node.index_annotation)
+
+    #        # Load the decorator if it exists
+    #        if node.decorator:
+    #            node.decorator.accept(self)
+    #        # Close the function
+    #        self.program.load_name(node.index_annotation)
+    #        self.program.make_closure(node.upvalues)
+    #        # Decorate the function
+    #        if node.decorator:
+    #            self.program.simple_op(OpCode.CALL)
+    #            self.program.simple_op(1)
+    #        # Define the function as the final value
+    #        self.program.define_name(node.index_annotation)
 
     def visit_prop_decl(self, node):
         emit_error("Properties unimplemented")()
@@ -293,12 +291,16 @@ class Compiler(DeclVisitor):
             self.program.end_jump(skip_jump)
 
     def visit_ret_stmt(self, node):
-        emit_error("Functions unimplemented")()
         super().visit_ret_stmt(node)
         if node.value is None:
-            self.program.simple_op(OpCode.RETURN_VOID)
+            self.program.pop_scope()
+            for _ in range(node.param_count):
+                self.program.simple_op(OpCode.POP)
+            self.program.simple_op(OpCode.LOAD_FP)
+            self.program.simple_op(OpCode.LOAD_IP)
         else:
             self.program.simple_op(OpCode.RETURN)
+            self.program.simple_op(node.param_count + len(self.program.scopes.pop()))
 
     def visit_expr_stmt(self, node):
         super().visit_expr_stmt(node)
@@ -379,7 +381,7 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_unpack_expr(self, node):
-        emit_error("Functions (needed for unpack expressions) unimplemented")()
+        emit_error("Unpack expressions unimplemented")()
         # No super as we need the jumps in the right place
         # Load the target value
         node.target.accept(self)
@@ -399,7 +401,7 @@ class Compiler(DeclVisitor):
             else:
                 self.program.simple_op(OpCode.RETURN_VOID)
             self.program.end_function(implicit_function)
-            self.program.make_closure(node.upvalues)
+            #            self.program.make_closure(node.upvalues)
             # Call the function with the target value as a single argument
             node.target.accept(self)
             self.program.simple_op(OpCode.CALL)
@@ -450,18 +452,18 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_lambda_expr(self, node):
-        emit_error("Functions unimplemented")()
         # No super as we handle params / scoping
         function = self.program.begin_function()
         node.result.accept(self)
-        return_op = (
-            OpCode.RETURN_VOID
+        return_ops = (
+            [OpCode.POP] * len(node.params) + [OpCode.LOAD_FP, OpCode.LOAD_IP]
             if node.type_annotation.return_type == VOID_TYPE
-            else OpCode.RETURN
+            else [OpCode.RETURN, len(node.params)]
         )
-        self.program.simple_op(return_op)
+        for opcode in return_ops:
+            self.program.simple_op(opcode)
         self.program.end_function(function)
-        self.program.make_closure(node.upvalues)
+        #        self.program.make_closure(node.upvalues)
         self._end_expression(node)
 
     def visit_if_expr(self, node):
@@ -493,10 +495,21 @@ class Compiler(DeclVisitor):
                 arg.accept(self)
             self.program.simple_op(opcode)
         else:
-            emit_error("Functions unimplemented")()
-            super().visit_call_expr(node)
+            # No super because calling is complicated
             self.program.simple_op(OpCode.CALL)
-            self.program.simple_op(len(node.arguments))
+            call_offset_index = len(self.program.code_list)
+            # Dummy offset to be patched
+            self.program.simple_op(0)
+            # Push the arguments
+            for arg in node.arguments:
+                arg.accept(self)
+            # Push the function (ip)
+            node.target.accept(self)
+            # Load the call frame
+            self.program.simple_op(OpCode.LOAD_IP)
+            # Patch the call offset to jump past the calling code on return
+            contained = self.program.code_list[call_offset_index + 1 :]
+            self.program.code_list[call_offset_index] = assembled_size(contained)
         self._end_expression(node)
 
     def visit_construct_expr(self, node):

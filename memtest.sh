@@ -10,6 +10,11 @@ else
     set -e
 
     echo ""
+    echo "-- Compiling test source --"
+
+    python ClearC/clrc.py test/$1
+
+    echo ""
     echo "-- Compiling VM --"
 
     pushd ClearVM
