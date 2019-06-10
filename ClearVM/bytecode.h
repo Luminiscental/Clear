@@ -5,85 +5,106 @@
 
 typedef enum {
 
-    // Constant storage
-    OP_STORE_CONST = 0,
-    OP_INTEGER = 1,
-    OP_NUMBER = 2,
-    OP_STRING = 3,
+    CONST_INT = 0,
+    CONST_NUM = 1,
+    CONST_STR = 2,
+    CONST_COUNT = 3
+
+} ConstantType;
+
+typedef enum {
 
     // Constant generation
-    OP_LOAD_CONST = 4,
-    OP_TRUE = 5,
-    OP_FALSE = 6,
-    OP_NIL = 7,
+    OP_PUSH_CONST = 0, // op <u8> - pushes constant from index
+
+    OP_PUSH_TRUE = 1,  // op - pushes true
+    OP_PUSH_FALSE = 2, // op - pushes false
+
+    OP_PUSH_NIL = 3, // op - pushes nil
 
     // Variables
-    OP_DEFINE_GLOBAL = 8,
-    OP_LOAD_GLOBAL = 9,
-    OP_DEFINE_LOCAL = 10,
-    OP_LOAD_LOCAL = 11,
+    OP_SET_GLOBAL = 4,  // op <u8> - pops value and sets as global at index
+    OP_PUSH_GLOBAL = 5, // op <u8> - pushes global at index
+
+    OP_SET_LOCAL = 6,  // op <u8> - pops value and sets as local at index
+    OP_PUSH_LOCAL = 7, // op <u8> - pushes local at index
 
     // Built-ins
-    OP_INT = 12,
-    OP_BOOL = 13,
-    OP_NUM = 14,
-    OP_STR = 15,
-    OP_CLOCK = 16,
+    OP_INT = 8,  // op - pops value and converts to int
+    OP_BOOL = 9, // op - pops value and converts to bool
+    OP_NUM = 10, // op - pops value and converts to num
+    OP_STR = 11, // op - pops value and converts to str
 
-    // Statements
-    OP_PRINT = 17,
-    OP_RETURN = 18,
-    OP_RETURN_VOID = 19,
-    OP_POP = 20,
+    OP_CLOCK = 12, // op - pushes clock value as num in seconds
+
+    // Actions
+    OP_PRINT = 13, // op - pops value and prints it on a line
+    OP_POP = 14,   // op - pops value
 
     // Arithmetic operators
-    OP_INT_NEG = 21,
-    OP_NUM_NEG = 22,
-    OP_INT_ADD = 23,
-    OP_NUM_ADD = 24,
-    OP_INT_SUB = 25,
-    OP_NUM_SUB = 26,
-    OP_INT_MUL = 27,
-    OP_NUM_MUL = 28,
-    OP_INT_DIV = 29,
-    OP_NUM_DIV = 30,
+    OP_INT_NEG = 15, // op - replaces top value with its int negation
+    OP_NUM_NEG = 16, // op - replaces top value with its num negation
+
+    OP_INT_ADD = 17, // op - pops two values and pushes their int sum
+    OP_NUM_ADD = 18, // op - pops two values and pushes their num sum
+
+    OP_INT_SUB = 19, // op - pops two values and pushes their int difference
+    OP_NUM_SUB = 20, // op - pops two values and pushes their num difference
+
+    OP_INT_MUL = 21, // op - pops two values and pushes their int product
+    OP_NUM_MUL = 22, // op - pops two values and pushes their num product
+
+    OP_INT_DIV = 23, // op - pops two values and pushes their int ratio
+    OP_NUM_DIV = 24, // op - pops two values and pushes their num ratio
+
+    OP_STR_CAT = 25, // op - pops two values and pushes their str concatenation
+
+    OP_NOT = 26, // op - pops a value and pushes its boolean negation
 
     // Comparison operators
-    OP_LESS = 31,
-    OP_NLESS = 32,
-    OP_GREATER = 33,
-    OP_NGREATER = 34,
-    OP_EQUAL = 35,
-    OP_NEQUAL = 36,
+    OP_INT_LESS = 27, // op - pops two values and pushes a boolean for if the
+                      // lower int is less
+    OP_NUM_LESS = 28, // op - pops two values and pushes a boolean for if the
+                      // lower num is less
 
-    // Boolean operators
-    OP_NOT = 37,
+    OP_INT_GREATER = 29, // op - pops two values and pushes a boolean for if the
+                         // lower int is greater
+    OP_NUM_GREATER = 30, // op - pops two values and pushes a boolean for if the
+                         // lower num is greater
 
-    // Scoping
-    OP_PUSH_SCOPE = 38,
-    OP_POP_SCOPE = 39,
+    OP_EQUAL = 31, // op - pops two values and pushes a boolean for whether they
+                   // are equal
 
     // Control flow
-    OP_JUMP = 40,
-    OP_JUMP_IF_NOT = 41,
-    OP_LOOP = 42,
+    OP_JUMP = 32,          // op <u8> - moves the ip forward by the given offset
+    OP_JUMP_IF_FALSE = 33, // op <u8> - pops the stack and moves the ip forward
+                           // by the given offset if the popped value is false
+
+    OP_LOOP = 34, // op <u8> - moves the ip backward by the given offset
 
     // Functions
-    OP_LOAD_PARAM = 43,
-    OP_START_FUNCTION = 44,
-    OP_CALL = 45,
-
-    // Closures
-    OP_CLOSURE = 46,
-    OP_LOAD_UPVALUE = 47,
-    OP_SET_UPVALUE = 48,
+    OP_FUNCTION =
+        35, // op <u8> - pushes an ip value pointing to the next instruction
+            // onto the stack and moves the ip forward by the given offset
+    OP_CALL = 36, // op <u8> - pushes fp onto the stack, pushes an ip value
+                  // offset from the next instruction by the given offset onto
+                  // the stack and points fp at it
+    OP_LOAD =
+        37, // op - pops an ip value off the stack and copies it into the ip
+    OP_RETURN = 38, // op <u8> - pops a return value off the stack, pops the
+                    // given number of extra values off the stack, does OP_LOAD,
+                    // pushes the return value back onto the stack
 
     // Structs
-    OP_STRUCT = 49,
-    OP_GET_FIELD = 50,
-    OP_SET_FIELD = 51,
+    OP_STRUCT = 39, // op <u8> - pops the given number of values off the stack
+                    // and pushes a struct of them
+    OP_GET_FIELD = 40, // op <u8> - pops a value off the stack and pushes its
+                       // struct field at the given index
+    OP_SET_FIELD =
+        41, // op <u8> - pops two values off the stack and sets the field of the
+            // lower value at the given index to the upper value
 
-    OP_COUNT = 52
+    OP_COUNT = 42
 
 } OpCode;
 

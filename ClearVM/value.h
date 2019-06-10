@@ -53,6 +53,19 @@ typedef struct {
 
 } Value;
 
+typedef struct sVM VM;
+
+Value makeObject(VM *vm, size_t size, ObjectType type);
+Value makeString(VM *vm, char *data, size_t length);
+Value makeStringFromLiteral(VM *vm, const char *literal);
+Value makeInt(int32_t unboxed);
+Value makeBool(bool unboxed);
+Value makeNum(double unboxed);
+
+Result stringifyValue(VM *vm, Value input, Value *output);
+Value concatStrings(VM *vm, StringObject a, StringObject b);
+bool valuesEqual(Value a, Value b);
+
 typedef struct {
 
     Value *data;

@@ -7,8 +7,10 @@
 
 static Result disassembleSimple(const char *name, size_t *index) {
 
-    printf("%s\n", name);
     *index = *index + 1;
+
+    printf("%s\n", name);
+
     return RESULT_OK;
 }
 
@@ -32,7 +34,6 @@ static Result disassembleSimple(const char *name, size_t *index) {
     }
 
 DIS_UNARY(U8, "%d", uint8_t)
-DIS_UNARY(U32, "%d", uint32_t)
 DIS_UNARY(S32, "'%d'", int32_t)
 DIS_UNARY(F64, "'%f'", double)
 
@@ -53,20 +54,16 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
     case name: {                                                               \
         return disassembleU8(#name, code, length, index);                      \
     } break;
-#define U32(name)                                                              \
-    case name: {                                                               \
-        return disassembleU32(#name, code, length, index);                     \
-    } break;
 
-        U8(OP_LOAD_CONST)
-        SIMPLE(OP_TRUE)
-        SIMPLE(OP_FALSE)
-        SIMPLE(OP_NIL)
+        U8(OP_PUSH_CONST)
+        SIMPLE(OP_PUSH_TRUE)
+        SIMPLE(OP_PUSH_FALSE)
+        SIMPLE(OP_PUSH_NIL)
 
-        U8(OP_DEFINE_GLOBAL)
-        U8(OP_LOAD_GLOBAL)
-        U8(OP_DEFINE_LOCAL)
-        U8(OP_LOAD_LOCAL)
+        U8(OP_SET_GLOBAL)
+        U8(OP_PUSH_GLOBAL)
+        U8(OP_SET_LOCAL)
+        U8(OP_PUSH_LOCAL)
 
         SIMPLE(OP_INT)
         SIMPLE(OP_BOOL)
@@ -75,8 +72,6 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         SIMPLE(OP_CLOCK)
 
         SIMPLE(OP_PRINT)
-        SIMPLE(OP_RETURN)
-        SIMPLE(OP_RETURN_VOID)
         SIMPLE(OP_POP)
 
         SIMPLE(OP_INT_NEG)
@@ -89,36 +84,28 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         SIMPLE(OP_NUM_MUL)
         SIMPLE(OP_INT_DIV)
         SIMPLE(OP_NUM_DIV)
-
-        SIMPLE(OP_LESS)
-        SIMPLE(OP_NLESS)
-        SIMPLE(OP_GREATER)
-        SIMPLE(OP_NGREATER)
-        SIMPLE(OP_EQUAL)
-        SIMPLE(OP_NEQUAL)
-
+        SIMPLE(OP_STR_CAT)
         SIMPLE(OP_NOT)
 
-        SIMPLE(OP_PUSH_SCOPE)
-        SIMPLE(OP_POP_SCOPE)
+        SIMPLE(OP_INT_LESS)
+        SIMPLE(OP_NUM_LESS)
+        SIMPLE(OP_INT_GREATER)
+        SIMPLE(OP_NUM_GREATER)
+        SIMPLE(OP_EQUAL)
 
-        U32(OP_JUMP)
-        U32(OP_JUMP_IF_NOT)
-        U32(OP_LOOP)
+        U8(OP_JUMP)
+        U8(OP_JUMP_IF_FALSE)
+        U8(OP_LOOP)
 
-        U8(OP_LOAD_PARAM)
-        U32(OP_START_FUNCTION)
+        U8(OP_FUNCTION)
         U8(OP_CALL)
-
-        U8(OP_CLOSURE)
-        U8(OP_LOAD_UPVALUE)
-        U8(OP_SET_UPVALUE)
+        SIMPLE(OP_LOAD)
+        U8(OP_RETURN)
 
         U8(OP_STRUCT)
         U8(OP_GET_FIELD)
         U8(OP_SET_FIELD)
 
-#undef U32
 #undef U8
 #undef SIMPLE
 
@@ -144,7 +131,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
         switch (code[index]) {
 
-            case OP_INTEGER: {
+            case CONST_INT: {
 
                 if (disassembleS32("OP_INTEGER", code, length, &index) !=
                     RESULT_OK) {
@@ -154,7 +141,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
             } break;
 
-            case OP_NUMBER: {
+            case CONST_NUM: {
 
                 if (disassembleF64("OP_NUMBER", code, length, &index) !=
                     RESULT_OK) {
@@ -164,7 +151,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
             } break;
 
-            case OP_STRING: {
+            case CONST_STR: {
 
                 printf("%-18s ", "OP_STRING");
                 index++;

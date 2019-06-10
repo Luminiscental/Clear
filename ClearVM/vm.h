@@ -5,41 +5,7 @@
 #include "common.h"
 #include "value.h"
 
-#define DEFN_STACK(T, N)                                                       \
-                                                                               \
-    typedef struct {                                                           \
-                                                                               \
-        T values[N];                                                           \
-        T *next;                                                               \
-                                                                               \
-    } T##Stack##N;                                                             \
-                                                                               \
-    void init##T##Stack##N(T##Stack##N *stack);                                \
-    Result push##T##Stack##N(T##Stack##N *stack, T value);                     \
-    Result pop##T##Stack##N(T##Stack##N *stack, T *popped);                    \
-    Result peek##T##Stack##N(T##Stack##N *stack, T **peeked, size_t offset);
-
-DEFN_STACK(Value, 256)
-DEFN_STACK(Value, 64)
-
-typedef struct {
-
-    ValueStack256 stack;
-    ValueStack64 locals;
-    size_t paramCount;
-
-} Frame;
-
-void initFrame(Frame *frame);
-
-DEFN_STACK(Frame, 64)
-
-#undef DEFN_STACK
-
-typedef struct sVM VM;
-
-typedef Result (*Instruction)(VM *vm, uint8_t **ip, uint8_t *code,
-                              size_t codeLength);
+typedef Result (*Instruction)(VM *vm);
 
 #define GLOBAL_MAX 256
 
@@ -54,20 +20,27 @@ void initGlobalArray(GlobalArray *array);
 Result getGlobal(GlobalArray *array, size_t index, Value *out);
 Result setGlobal(GlobalArray *array, size_t index, Value in);
 
-typedef struct sVM {
+#define STACK_MAX 512
 
-    FrameStack64 frames;
+struct sVM {
 
-    ObjectValue *objects;
+    uint8_t *end; // points after the last byte of the code to execute
 
-    GlobalArray globals;
+    uint8_t *ip; // instruction pointer; points to next instruction to execute
+    Value *fp;   // frame pointer; points to first local in current frame
+    Value *sp;   // stack pointer; points to next available value on stack
 
-    Value *constants;
+    Value stack[STACK_MAX]; // stack storage (array)
+
+    GlobalArray globals; // global storage (array)
+
+    ObjectValue *objects; // heap storage (linked list)
+
+    Value *constants; // constant storage (array)
     size_t constantCount;
 
-    Instruction instructions[OP_COUNT];
-
-} VM;
+    Instruction instructions[OP_COUNT]; // Instruction function pointers
+};
 
 Result initVM(VM *vm);
 Result executeCode(VM *vm, uint8_t *code, size_t length);
