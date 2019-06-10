@@ -97,41 +97,37 @@ class Program:
             self.load_name(upvalue)
 
     def begin_jump(self, conditional=False):
-        emit_error("Control flow unimplemented")()
-        self.code_list.append(OpCode.JUMP_IF_NOT if conditional else OpCode.JUMP)
+        self.code_list.append(OpCode.JUMP_IF_FALSE if conditional else OpCode.JUMP)
         index = len(self.code_list)
         if DEBUG:
             print(f"Defining a jump from {index}")
         # Insert temporary offset to later be patched
-        temp_offset = ClrUint(0)
+        temp_offset = 0
         self.code_list.append(temp_offset)
         return index
 
     def end_jump(self, jump_ref):
-        emit_error("Control flow unimplemented")()
         index = jump_ref
         contained = self.code_list[index + 1 :]
         offset = assembled_size(contained)
         if DEBUG:
             print(f"Jump from {index} set with offset {offset}")
         # Patch the previously inserted offset
-        self.code_list[index] = ClrUint(offset)
+        self.code_list[index] = offset
 
     def begin_loop(self):
-        emit_error("Control flow unimplemented")()
         index = len(self.code_list)
         if DEBUG:
             print(f"Loop checkpoint for {index} picked")
         return index
 
     def loop_back(self, index):
-        emit_error("Control flow unimplemented")()
         self.code_list.append(OpCode.LOOP)
         offset_index = len(self.code_list)
         # Insert an offset temporarily to include it when calculating the actual offset.
-        self.code_list.append(ClrUint(0))
+        self.code_list.append(0)
         contained = self.code_list[index:]
-        offset = ClrUint(assembled_size(contained))
+        offset = assembled_size(contained)
         if DEBUG:
             print(f"Loop back to {index} set with offset {offset}")
         self.code_list[offset_index] = offset
@@ -262,7 +258,6 @@ class Compiler(DeclVisitor):
         self.program.simple_op(OpCode.PRINT)
 
     def visit_if_stmt(self, node):
-        emit_error("Control flow unimplemented")()
         # No super because we need the jumps in the right place
         # Create a list of jumps that skip to the end once a block completes
         final_jumps = []
@@ -270,16 +265,12 @@ class Compiler(DeclVisitor):
             cond.accept(self)
             # If the condition is false jump to the next block
             jump = self.program.begin_jump(conditional=True)
-            # Otherwise pop the condition as we don't need it
-            self.program.simple_op(OpCode.POP)
-            # And run the block
+            # Otherwise run the block
             block.accept(self)
             # Then jump to the end after the block completes
             final_jumps.append(self.program.begin_jump())
             # The jump to the next block goes after the jump to the end to avoid it
             self.program.end_jump(jump)
-            # Also pop the condition if the block was skipped
-            self.program.simple_op(OpCode.POP)
         if node.otherwise is not None:
             # If we haven't jumped to the end then all the previous blocks didn't execute so run the
             # else block
@@ -289,22 +280,17 @@ class Compiler(DeclVisitor):
             self.program.end_jump(final_jump)
 
     def visit_while_stmt(self, node):
-        emit_error("Control flow unimplemented")()
         # No super because the loop starts before checking the condition
         loop = self.program.begin_loop()
         if node.condition is not None:
             node.condition.accept(self)
             # If there is a condition jump to the end if it's false
             skip_jump = self.program.begin_jump(conditional=True)
-            # Otherwise pop the condition as we don't need it
-            self.program.simple_op(OpCode.POP)
         node.block.accept(self)
         # Go back to before the condition to check it again
         self.program.loop_back(loop)
         if node.condition is not None:
             self.program.end_jump(skip_jump)
-            # If we broke out the condition is still there so pop it
-            self.program.simple_op(OpCode.POP)
 
     def visit_ret_stmt(self, node):
         emit_error("Functions unimplemented")()
@@ -393,13 +379,14 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_unpack_expr(self, node):
-        emit_error("Control flow unimplemented")()
+        emit_error("Functions (needed for unpack expressions) unimplemented")()
         # No super as we need the jumps in the right place
         # Load the target value
         node.target.accept(self)
         # Compare check if it isn't nil
         self.program.simple_op(OpCode.NIL)
-        self.program.simple_op(OpCode.NEQUAL)
+        self.program.simple_op(OpCode.EQUAL)
+        self.program.simple_op(OpCode.NOT)
 
         def load_present_value():
             # Create the present value function
@@ -478,7 +465,6 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_if_expr(self, node):
-        emit_error("Control flow unimplemented")()
         # No super because we need the jumps in the right place
         # Create a list of jumps that skip to the end once a block completes
         final_jumps = []
@@ -486,10 +472,10 @@ class Compiler(DeclVisitor):
             cond.accept(self)
             # If the condition is false jump to the next block
             jump = self.program.begin_jump(conditional=True)
-            block.accept(self)
             # Otherwise jump to the end after the block completes
+            block.accept(self)
             final_jumps.append(self.program.begin_jump())
-            # The jump to the next block goes after the jump to the end to avoid it
+            # The jump to the next block skips after the jump to the end
             self.program.end_jump(jump)
         # If we haven't jumped to the end then all the previous blocks didn't execute so run the
         # else block
@@ -559,30 +545,41 @@ class Compiler(DeclVisitor):
         self.program.load_name(node.index_annotation)
         self._end_expression(node)
 
-    def visit_and_expr(self, node):
-        emit_error("Control flow unimplemented")()
-        # No super because we need to put the jumps in the right place
-        node.left.accept(self)
-        # If the first value is false don't bother checking the second
+    def _and_circuit(self, emit_left, emit_right):
+        emit_left()
+        # If the first value is false skip the second
         short_circuit = self.program.begin_jump(conditional=True)
-        # Otherwise pop the false value and load the second
-        self.program.simple_op(OpCode.POP)
-        node.right.accept(self)
+        # Otherwise load the second and jump past the false value
+        emit_right()
+        long_circuit = self.program.begin_jump()
+        # After short circuiting push the false value
         self.program.end_jump(short_circuit)
+        self.program.simple_op(OpCode.PUSH_FALSE)
+        # Skip this when long circuiting
+        self.program.end_jump(long_circuit)
+
+    def visit_and_expr(self, node):
+        # No super as we put jumps between the nodes
+        def emit_left():
+            node.left.accept(self)
+
+        def emit_right():
+            node.right.accept(self)
+
+        self._and_circuit(emit_left, emit_right)
         self._end_expression(node)
 
     def visit_or_expr(self, node):
-        emit_error("Control flow unimplemented")()
-        # No super because we need to put the jumps in the right place
-        node.left.accept(self)
-        # If the first value is false jump past the shortcircuit
-        long_circuit = self.program.begin_jump(conditional=True)
-        # If we haven't skipped the shortcircuit jump to the end
-        short_circuit = self.program.begin_jump()
-        # If we skipped the shortcircuit pop the first value to replace with the second one
-        self.program.end_jump(long_circuit)
-        self.program.simple_op(OpCode.POP)
-        node.right.accept(self)
-        # If we short circuited leave the true value on the stack
-        self.program.end_jump(short_circuit)
+        # No super as we put jumps between the nodes
+        # or is implemented as !(!a and !b)
+        def emit_left():
+            node.left.accept(self)
+            self.program.simple_op(OpCode.NOT)
+
+        def emit_right():
+            node.right.accept(self)
+            self.program.simple_op(OpCode.NOT)
+
+        self._and_circuit(emit_left, emit_right)
+        self.program.simple_op(OpCode.NOT)
         self._end_expression(node)

@@ -10,6 +10,8 @@ from clr.constants import ClrInt, ClrUint, ClrNum, ClrStr
 
 def _first_byte(value):
 
+    if value > 255 or value < 0:
+        emit_error(f"Couldn't assemble value {value} into a byte")()
     return bytes([value])[0]
 
 

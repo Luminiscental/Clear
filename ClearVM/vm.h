@@ -24,7 +24,8 @@ Result setGlobal(GlobalArray *array, size_t index, Value in);
 
 struct sVM {
 
-    uint8_t *end; // points after the last byte of the code to execute
+    uint8_t *start; // points to the first byte of the code to execute
+    uint8_t *end;   // points after the last byte of the code to execute
 
     uint8_t *ip; // instruction pointer; points to next instruction to execute
     Value *fp;   // frame pointer; points to first local in current frame

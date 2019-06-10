@@ -465,6 +465,52 @@ BINARY_OP(numGreater, makeBool(a.as.f64 > b.as.f64))
 
 BINARY_OP(equal, makeBool(valuesEqual(a, b)))
 
+static Result op_jump(VM *vm) {
+
+    READ(offset)
+
+    vm->ip += offset;
+    if (vm->ip > vm->end) {
+
+        printf("|| Jumped out of range\n");
+        return RESULT_ERR;
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_jumpIfFalse(VM *vm) {
+
+    READ(offset)
+    POP(cond)
+
+    if (!cond.as.b) {
+
+        vm->ip += offset;
+        if (vm->ip > vm->end) {
+
+            printf("|| Jumped out of range\n");
+            return RESULT_ERR;
+        }
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_loop(VM *vm) {
+
+    READ(offset)
+
+    vm->ip -= offset;
+    if (vm->ip < vm->start) {
+
+        printf("|| Looped out of range\n");
+        return RESULT_ERR;
+    }
+
+    return RESULT_OK;
+}
+
 #undef BINARY_OP
 #undef UNARY_OP
 #undef READ
@@ -474,6 +520,7 @@ BINARY_OP(equal, makeBool(valuesEqual(a, b)))
 
 Result initVM(VM *vm) {
 
+    vm->start = NULL;
     vm->end = NULL;
 
     vm->ip = NULL;
@@ -534,6 +581,10 @@ Result initVM(VM *vm) {
     INSTR(OP_INT_GREATER, op_intGreater);
     INSTR(OP_NUM_GREATER, op_numGreater);
     INSTR(OP_EQUAL, op_equal);
+
+    INSTR(OP_JUMP, op_jump);
+    INSTR(OP_JUMP_IF_FALSE, op_jumpIfFalse);
+    INSTR(OP_LOOP, op_loop);
 
 #undef INSTR
 
@@ -677,6 +728,7 @@ Result executeCode(VM *vm, uint8_t *code, size_t length) {
         return RESULT_ERR;
     }
 
+    vm->start = code;
     vm->end = code + length;
     vm->ip = code + index;
 
