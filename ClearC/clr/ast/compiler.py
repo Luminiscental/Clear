@@ -78,6 +78,7 @@ class Program:
             {
                 IndexAnnotationType.GLOBAL: lambda: [OpCode.PUSH_GLOBAL, index.value],
                 IndexAnnotationType.LOCAL: lambda: [OpCode.PUSH_LOCAL, index.value],
+                IndexAnnotationType.PARAM: lambda: [OpCode.PUSH_LOCAL, index.value],
                 IndexAnnotationType.UPVALUE: lambda: [
                     OpCode.PUSH_LOCAL,
                     0,
@@ -85,6 +86,7 @@ class Program:
                     index.value + 1,
                     OpCode.DEREF,
                 ],
+                IndexAnnotationType.THIS: lambda: [OpCode.PUSH_LOCAL, 0],
             }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
         )
 
@@ -511,12 +513,14 @@ class Compiler(DeclVisitor):
                 arg.accept(self)
             self.program.simple_op(opcode)
         else:
+            # Push the function
+            node.target.accept(self)
             # Push the arguments
             for arg in node.arguments:
                 arg.accept(self)
-            # Push the function (ip)
-            node.target.accept(self)
+            # Get the ip from the function
             self.program.simple_op(OpCode.EXTRACT_FIELD)
+            self.program.simple_op(len(node.arguments))
             self.program.simple_op(0)
             # Make the new frame
             self.program.simple_op(OpCode.CALL)

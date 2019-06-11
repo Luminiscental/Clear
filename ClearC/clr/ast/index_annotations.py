@@ -7,6 +7,7 @@ class IndexAnnotationType(Enum):
     LOCAL = "<local>"
     GLOBAL = "<global>"
     UPVALUE = "<upvalue>"
+    THIS = "<this>"
     PROPERTY = "<property>"
 
     def __str__(self):

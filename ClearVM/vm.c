@@ -706,9 +706,10 @@ static Result op_extractField(VM *vm) {
 
     TRACE(printf("op_extractField\n");)
 
+    READ(offset)
     READ(index)
 
-    PEEK(structValue, 0)
+    PEEK(structValue, offset)
 
     if (structValue->type != VAL_OBJ ||
         structValue->as.obj->type != OBJ_STRUCT) {

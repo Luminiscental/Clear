@@ -162,22 +162,17 @@ class NameIndexer(StructTrackingDeclVisitor):
     def _index_function(self, node, is_method=False):
         if node.decorator:
             node.decorator.accept(self)
-        # If it's a method we don't associate it with a name so that it doesn't override anything
-        # and isn't accessible as its own object
-        if not is_method:
-            node.index_annotation = self._declare_name(node.name.lexeme)
         function = FunctionNameIndexer(self, is_method)
-        if is_method:
-            function.scopes[function.level]["this"] = IndexAnnotation(
-                kind=IndexAnnotationType.UPVALUE, value=0
-            )
-            function.upvalues = [INDEX_OF_THIS]
+        function.scopes[function.level][node.name.lexeme] = IndexAnnotation(
+            kind=IndexAnnotationType.THIS
+        )
         for _, name in node.params:
             function.add_param(name.lexeme)
         for decl in node.block.declarations:
             decl.accept(function)
         node.upvalues.extend(function.upvalues)
         self.errors.extend(function.errors)
+        node.index_annotation = self._declare_name(node.name.lexeme)
 
     def visit_func_decl(self, node):
         # No super as we handle the params / scoping
@@ -237,7 +232,7 @@ class FunctionNameIndexer(NameIndexer):
 
     def add_param(self, name):
         index = len(self.params)
-        pair = (name, IndexAnnotation(kind=IndexAnnotationType.LOCAL, value=index))
+        pair = (name, IndexAnnotation(kind=IndexAnnotationType.PARAM, value=index))
         self.params.append(pair)
 
     def add_upvalue(self, index):
@@ -265,6 +260,8 @@ class FunctionNameIndexer(NameIndexer):
             for param_name, param_index in self.params:
                 if param_name == name:
                     result = param_index
+                    # Offset because of function beneath parameters
+                    result.value += 1
         if result.kind == IndexAnnotationType.UNRESOLVED:
             # If it still isn't found look for it as an upvalue
             lookup = self.parent.lookup_name(name)

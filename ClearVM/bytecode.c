@@ -54,6 +54,25 @@ static Result disassembleGetFields(uint8_t *code, size_t length,
     return RESULT_OK;
 }
 
+static Result disassembleExtractFields(uint8_t *code, size_t length,
+                                       size_t *index) {
+
+    *index = *index + 1;
+
+    if (*index > length - 2 * sizeof(uint8_t)) {
+
+        printf("\n|| EOF while parsing constant uint8_t\n");
+    }
+
+    uint8_t *offset = (uint8_t *)(code + *index);
+    uint8_t *field = (uint8_t *)(code + *index + sizeof(uint8_t));
+    *index = *index + 2 * sizeof(uint8_t);
+
+    printf("%-18s %d %d\n", "OP_EXTRACT_FIELD", *offset, *field);
+
+    return RESULT_OK;
+}
+
 #define DIS_UNARY(fName, format, type)                                         \
     static Result disassemble##fName(const char *name, uint8_t *code,          \
                                      size_t length, size_t *index) {           \
@@ -146,7 +165,12 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
 
         U8(OP_STRUCT)
         U8(OP_GET_FIELD)
-        U8(OP_EXTRACT_FIELD)
+
+        case OP_EXTRACT_FIELD: {
+
+            return disassembleExtractFields(code, length, index);
+
+        } break;
 
         case OP_GET_FIELDS: {
 
