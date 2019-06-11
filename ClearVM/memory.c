@@ -50,6 +50,13 @@ void freeObject(ObjectValue *obj) {
 
         } break;
 
+        case OBJ_UPVALUE: {
+
+            UpvalueObject *upvalueObj = (UpvalueObject *)obj->ptr;
+            FREE(UpvalueObject, upvalueObj);
+
+        } break;
+
         default: {
 
             printf("|| Unknown object type %d could not be freed\n", obj->type);

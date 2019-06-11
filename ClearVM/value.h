@@ -10,7 +10,8 @@
 typedef enum {
 
     OBJ_STRING,
-    OBJ_STRUCT
+    OBJ_STRUCT,
+    OBJ_UPVALUE
 
 } ObjectType;
 
@@ -21,21 +22,6 @@ struct sObjectValue {
     void *ptr;
     ObjectValue *next;
 };
-
-typedef struct {
-
-    size_t length;
-    char *data;
-
-} StringObject;
-
-typedef struct sValue Value;
-typedef struct {
-
-    size_t fieldCount;
-    Value *fields;
-
-} StructObject;
 
 typedef enum {
 
@@ -48,9 +34,12 @@ typedef enum {
 
 } ValueType;
 
-struct sValue {
+typedef struct sUpvalueObject UpvalueObject;
+
+typedef struct {
 
     ValueType type;
+    UpvalueObject *references;
 
     union {
 
@@ -61,6 +50,29 @@ struct sValue {
         void *ptr;
 
     } as;
+
+} Value;
+
+typedef struct {
+
+    size_t length;
+    char *data;
+
+} StringObject;
+
+typedef struct {
+
+    size_t fieldCount;
+    Value *fields;
+
+} StructObject;
+
+struct sUpvalueObject {
+
+    Value *ptr;
+    Value closed;
+
+    UpvalueObject *next;
 };
 
 typedef struct sVM VM;
@@ -69,12 +81,14 @@ Value makeObject(VM *vm, size_t size, ObjectType type);
 Value makeString(VM *vm, char *data, size_t length);
 Value makeStringFromLiteral(VM *vm, const char *literal);
 Value makeStruct(VM *vm, size_t fieldCount);
+Value makeUpvalue(VM *vm, Value *from);
 
 Value makeInt(int32_t unboxed);
 Value makeBool(bool unboxed);
 Value makeNum(double unboxed);
 Value makePointer(void *unboxed);
 
+void closeUpvalue(UpvalueObject *upvalue);
 Result stringifyValue(VM *vm, Value input, Value *output);
 Value concatStrings(VM *vm, StringObject a, StringObject b);
 bool valuesEqual(Value a, Value b);

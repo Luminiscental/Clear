@@ -305,7 +305,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         node.result.accept(self)
         self.end_scope()
         node.type_annotation = FunctionTypeAnnotation(
-            return_type=node.result.type_annotation, signature=param_types
+            return_type=node.result.type_annotation, signature=param_types, ref=node
         )
 
     def visit_if_expr(self, node):
@@ -529,7 +529,7 @@ class TypeResolver(StructTrackingDeclVisitor):
         return_type = node.return_type.as_annotation
         # Create an annotation for the function signature
         node.type_annotation = FunctionTypeAnnotation(
-            return_type=return_type, signature=param_types
+            return_type=return_type, signature=param_types, ref=node
         )
         if node.decorator:
             node.decorator.accept(self)

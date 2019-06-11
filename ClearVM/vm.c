@@ -228,6 +228,7 @@ static Result op_setLocal(VM *vm) {
         return RESULT_ERR;
     }
 
+    value.references = vm->fp[index].references;
     vm->fp[index] = value;
 
     return RESULT_OK;
@@ -431,8 +432,13 @@ static Result op_pop(VM *vm) {
 
     TRACE(printf("op_pop\n");)
 
-    POP(_)
-    UNUSED(_);
+    POP(value)
+
+    while (value.references != NULL) {
+
+        closeUpvalue(value.references);
+        value.references = value.references->next;
+    }
 
     return RESULT_OK;
 }
@@ -453,6 +459,8 @@ BINARY_OP(intDiv, makeInt(a.as.s32 / b.as.s32))
 BINARY_OP(numDiv, makeNum(a.as.f64 / b.as.f64))
 
 static Result op_strCat(VM *vm) {
+
+    TRACE(printf("op_strCat\n");)
 
     POP(b)
 
@@ -561,47 +569,73 @@ static Result op_call(VM *vm) {
 
     Value *params = ALLOCATE_ARRAY(Value, paramCount);
 
+#define POP_(name)                                                             \
+    if (vm->sp - vm->stack == 0) {                                             \
+                                                                               \
+        printf("|| Stack underflow\n");                                        \
+        FREE_ARRAY(Value, params, paramCount);                                 \
+        return RESULT_ERR;                                                     \
+    }                                                                          \
+    Value name = *--vm->sp;
+
+#define PUSH_(name)                                                            \
+    if (vm->sp - vm->stack == STACK_MAX) {                                     \
+                                                                               \
+        printf("|| Stack overflow\n");                                         \
+        FREE_ARRAY(Value, params, paramCount);                                 \
+        return RESULT_ERR;                                                     \
+    } else {                                                                   \
+        *vm->sp++ = name;                                                      \
+    }
+
     // TODO: POPN and PUSHN
 
     for (int i = paramCount - 1; i >= 0; i--) {
 
-        POP(param)
+        POP_(param)
 
         params[i] = param;
     }
 
-    PUSH(makePointer(vm->ip))
-    PUSH(makePointer(vm->fp))
+    PUSH_(makePointer(vm->ip))
+    PUSH_(makePointer(vm->fp))
 
     vm->fp = vm->sp;
     vm->ip = function.as.ptr;
 
     for (size_t i = 0; i < paramCount; i++) {
 
-        PUSH(params[i])
+        PUSH_(params[i])
     }
+
+#undef PUSH_
+#undef POP_
 
     FREE_ARRAY(Value, params, paramCount);
 
     return RESULT_OK;
 }
 
-static Result op_load_ip(VM *vm) {
+static Result op_loadIp(VM *vm) {
 
     TRACE(printf("op_load_ip\n");)
 
     POP(ipValue)
+
+    // TODO: Safety
 
     vm->ip = ipValue.as.ptr;
 
     return RESULT_OK;
 }
 
-static Result op_load_fp(VM *vm) {
+static Result op_loadFp(VM *vm) {
 
     TRACE(printf("op_load_fp\n");)
 
     POP(fpValue)
+
+    // TODO: Safety
 
     vm->fp = (Value *)fpValue.as.ptr;
 
@@ -668,6 +702,27 @@ static Result op_getField(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_extractField(VM *vm) {
+
+    TRACE(printf("op_extractField\n");)
+
+    READ(index)
+
+    PEEK(structValue, 0)
+
+    if (structValue->type != VAL_OBJ ||
+        structValue->as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Cannot get field from non-struct value\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue->as.obj->ptr;
+    PUSH(structObj->fields[index])
+
+    return RESULT_OK;
+}
+
 static Result op_getFields(VM *vm) {
 
     TRACE(printf("op_getFields\n");)
@@ -719,6 +774,37 @@ static Result op_setField(VM *vm) {
     }
 
     structObj->fields[index] = field;
+
+    return RESULT_OK;
+}
+
+static Result op_refLocal(VM *vm) {
+
+    TRACE(printf("op_refLocal\n");)
+
+    READ(index)
+
+    Value result = makeUpvalue(vm, vm->fp + index);
+
+    PUSH(result)
+
+    return RESULT_OK;
+}
+
+static Result op_deref(VM *vm) {
+
+    TRACE(printf("op_deref\n");)
+
+    PEEK(upvalue, 0)
+
+    if (upvalue->type != VAL_OBJ || upvalue->as.obj->type != OBJ_UPVALUE) {
+
+        printf("|| Cannot dereference non-upvalue\n");
+        return RESULT_ERR;
+    }
+
+    UpvalueObject *upvalueObj = (UpvalueObject *)upvalue->as.obj->ptr;
+    *upvalue = *upvalueObj->ptr;
 
     return RESULT_OK;
 }
@@ -800,14 +886,19 @@ Result initVM(VM *vm) {
 
     INSTR(OP_FUNCTION, op_function);
     INSTR(OP_CALL, op_call);
-    INSTR(OP_LOAD_IP, op_load_ip);
-    INSTR(OP_LOAD_FP, op_load_fp);
+    INSTR(OP_LOAD_IP, op_loadIp);
+    INSTR(OP_LOAD_FP, op_loadFp);
     INSTR(OP_SET_RETURN, op_setReturn);
     INSTR(OP_PUSH_RETURN, op_pushReturn);
 
     INSTR(OP_STRUCT, op_struct);
     INSTR(OP_GET_FIELD, op_getField);
+    INSTR(OP_EXTRACT_FIELD, op_extractField);
+    INSTR(OP_GET_FIELDS, op_getFields);
     INSTR(OP_SET_FIELD, op_setField);
+
+    INSTR(OP_REF_LOCAL, op_refLocal);
+    INSTR(OP_DEREF, op_deref);
 
 #undef INSTR
 
@@ -930,14 +1021,14 @@ static Result runVM(VM *vm) {
         printf("\t\t\t");
         for (Value *value = vm->stack; value < vm->sp; value++) {
 
-            printf("[");
-            printValue(*value);
-            printf("] ");
-
-            if (value == vm->fp - 1) {
+            if (value == vm->fp) {
 
                 printf(" | ");
             }
+
+            printf("[");
+            printValue(*value);
+            printf("] ");
         }
         printf("\n");
 

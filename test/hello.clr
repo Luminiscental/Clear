@@ -1,14 +1,26 @@
 
+var logger = func() "[No log]";
+print logger();
+
 {
-    func hello() void {
-        val test = "hello";
-        print test;
+    val newline = "
+";
+
+    func greeting(str name) str {
+        return "Hello " + name + "!";
     }
 
-    func a() int {
-        return 1i + 2i;
+    var msg = greeting("World");
+
+    func log_msg() str {
+        return "[Logging the message]" + newline + msg + newline + "[Done]";
     }
 
-    hello();
-    print a();
+    print log_msg();
+
+    msg = "...";
+
+    logger = log_msg;
 }
+
+print logger();

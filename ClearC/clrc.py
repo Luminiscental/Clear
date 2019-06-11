@@ -15,8 +15,12 @@ def main():
     if DEBUG:
         print("src:", source_file_name)
         print("dest:", dest_file_name)
-    with open(source_file_name, "r") as source_file:
-        source = source_file.read()
+    try:
+        with open(source_file_name, "r") as source_file:
+            source = source_file.read()
+    except FileNotFoundError:
+        print(f"No file found for {source_file_name}")
+        sys.exit(1)
     try:
         ast = Ast.from_source(source)
         # TODO: Gen debug symbols

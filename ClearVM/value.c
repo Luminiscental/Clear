@@ -21,6 +21,7 @@ Value makeObject(VM *vm, size_t size, ObjectType type) {
 
     Value result;
     result.type = VAL_OBJ;
+    result.references = NULL;
     result.as.obj = obj;
 
     return result;
@@ -57,11 +58,25 @@ Value makeStruct(VM *vm, size_t fieldCount) {
     return result;
 }
 
+Value makeUpvalue(VM *vm, Value *from) {
+
+    Value result = makeObject(vm, sizeof(UpvalueObject), OBJ_UPVALUE);
+
+    UpvalueObject *upvalueObj = (UpvalueObject *)result.as.obj->ptr;
+    upvalueObj->ptr = from;
+    upvalueObj->next = from->references;
+
+    from->references = upvalueObj;
+
+    return result;
+}
+
 Value makeInt(int32_t unboxed) {
 
     Value result;
 
     result.type = VAL_INT;
+    result.references = NULL;
     result.as.s32 = unboxed;
 
     return result;
@@ -72,6 +87,7 @@ Value makeBool(bool unboxed) {
     Value result;
 
     result.type = VAL_BOOL;
+    result.references = NULL;
     result.as.b = unboxed;
 
     return result;
@@ -82,6 +98,7 @@ Value makeNum(double unboxed) {
     Value result;
 
     result.type = VAL_NUM;
+    result.references = NULL;
     result.as.f64 = unboxed;
 
     return result;
@@ -92,9 +109,16 @@ Value makePointer(void *unboxed) {
     Value result;
 
     result.type = VAL_PTR;
+    result.references = NULL;
     result.as.ptr = unboxed;
 
     return result;
+}
+
+void closeUpvalue(UpvalueObject *upvalue) {
+
+    upvalue->closed = *upvalue->ptr;
+    upvalue->ptr = &upvalue->closed;
 }
 
 Result stringifyValue(VM *vm, Value input, Value *output) {
@@ -317,14 +341,35 @@ void printValue(Value value) {
                 case OBJ_STRING: {
 
                     StringObject strObj = *(StringObject *)obj.ptr;
-                    printf("%s", strObj.data);
+                    printf("\"%s\"", strObj.data);
 
                 } break;
 
                 case OBJ_STRUCT: {
 
                     StructObject structObj = *(StructObject *)obj.ptr;
-                    printf("struct <%zu>", structObj.fieldCount);
+
+                    printf("struct <");
+
+                    for (size_t i = 0; i < structObj.fieldCount - 1; i++) {
+
+                        printValue(structObj.fields[i]);
+                        printf(", ");
+                    }
+
+                    printValue(structObj.fields[structObj.fieldCount - 1]);
+
+                    printf(">");
+
+                } break;
+
+                case OBJ_UPVALUE: {
+
+                    UpvalueObject upvalueObj = *(UpvalueObject *)obj.ptr;
+
+                    printf("upvalue <");
+                    printValue(*upvalueObj.ptr);
+                    printf(">");
 
                 } break;
             }

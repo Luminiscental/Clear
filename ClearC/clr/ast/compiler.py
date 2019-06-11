@@ -49,23 +49,44 @@ class Program:
             index.kind, emit_error(f"Cannot define name with index kind {index.kind}!")
         )()
 
-    def set_name(self, index):
-        opcode = {
-            IndexAnnotationType.GLOBAL: lambda: OpCode.SET_GLOBAL,
-            IndexAnnotationType.LOCAL: lambda: OpCode.SET_LOCAL,
+    def set_name(self, index, emit_value):
+        def set_global():
+            emit_value()
+            self.code_list.extend([OpCode.SET_GLOBAL, index.value])
+
+        def set_local():
+            emit_value()
+            self.code_list.extend([OpCode.SET_LOCAL, index.value])
+
+        def set_upvalue():
+            self.code_list.extend([OpCode.PUSH_LOCAL, 0])
+            emit_value()
+            self.code_list.extend(
+                [OpCode.SET_FIELD, index.value + 1, OpCode.SET_LOCAL, 0]
+            )
+
+        {
+            IndexAnnotationType.GLOBAL: set_global,
+            IndexAnnotationType.LOCAL: set_local,
+            IndexAnnotationType.UPVALUE: set_upvalue,
         }.get(
             index.kind, emit_error(f"Cannot set name with index kind {index.kind}!")
         )()
-        self.code_list.append(opcode)
-        self.code_list.append(index.value)
 
     def load_name(self, index):
-        opcode = {
-            IndexAnnotationType.GLOBAL: lambda: OpCode.PUSH_GLOBAL,
-            IndexAnnotationType.LOCAL: lambda: OpCode.PUSH_LOCAL,
-        }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
-        self.code_list.append(opcode)
-        self.code_list.append(index.value)
+        self.code_list.extend(
+            {
+                IndexAnnotationType.GLOBAL: lambda: [OpCode.PUSH_GLOBAL, index.value],
+                IndexAnnotationType.LOCAL: lambda: [OpCode.PUSH_LOCAL, index.value],
+                IndexAnnotationType.UPVALUE: lambda: [
+                    OpCode.PUSH_LOCAL,
+                    0,
+                    OpCode.GET_FIELD,
+                    index.value + 1,
+                    OpCode.DEREF,
+                ],
+            }.get(index.kind, emit_error(f"Cannot load unresolved name of {index}!"))()
+        )
 
     def begin_function(self):
         self.code_list.append(OpCode.FUNCTION)
@@ -80,15 +101,14 @@ class Program:
         # Patch the previously inserted offset
         self.code_list[index] = offset
 
-    def make_closure(self, upvalues=None):
-        emit_error("Closures unimplemented")()
-        upvalues = upvalues or []
-        self.code_list.append(OpCode.CLOSURE)
-        self.code_list.append(len(upvalues))
+    def make_closure(self, upvalues):
         for upvalue in upvalues:
             if DEBUG:
                 print(f"Loading upvalue {upvalue}")
-            self.load_name(upvalue)
+            self.code_list.append(OpCode.REF_LOCAL)
+            self.code_list.append(upvalue.value)
+        self.code_list.append(OpCode.STRUCT)
+        self.code_list.append(len(upvalues) + 1)
 
     def begin_jump(self, conditional=False):
         self.code_list.append(OpCode.JUMP_IF_FALSE if conditional else OpCode.JUMP)
@@ -135,6 +155,7 @@ class Compiler(DeclVisitor):
         super().__init__()
         self.program = Program()
         self.constants = Constants()
+        self.pops = 0
 
     def flush_code(self):
         return self.constants.flush() + self.program.flush()
@@ -153,37 +174,38 @@ class Compiler(DeclVisitor):
             self.program.simple_op(OpCode.STRUCT)
             self.program.simple_op(len(node.polymorphed_fields))
 
+    def _emit_return(self):
+        for _ in range(self.pops):
+            self.program.simple_op(OpCode.POP)
+        self.program.simple_op(OpCode.LOAD_FP)
+        self.program.simple_op(OpCode.LOAD_IP)
+
     def _make_function(self, node):
+        self.pops = len(node.params) + 1
         function = self.program.begin_function()
         self.program.push_scope()
         for decl in node.block.declarations:
             decl.accept(self)
         if node.return_type.as_annotation == VOID_TYPE:
             self.program.pop_scope()
-            for _ in range(len(node.params)):
-                self.program.simple_op(OpCode.POP)
-            self.program.simple_op(OpCode.LOAD_FP)
-            self.program.simple_op(OpCode.LOAD_IP)
+            self._emit_return()
         self.program.end_function(function)
 
     def visit_func_decl(self, node):
         # No super as we handle scoping
         self._make_function(node)
-        # Store the function object as a local to close over
+        self.program.make_closure(node.upvalues)
+        # Load the decorator if it exists
+        if node.decorator:
+            emit_error("fixme")()
+            node.decorator.accept(self)
+            self.program.simple_op(OpCode.GET_FIELD)
+            self.program.simple_op(0)
+            self.program.simple_op(OpCode.CALL)
+            self.program.simple_op(1)
+            self.program.simple_op(OpCode.PUSH_RETURN)
+        # Define the function as the final value
         self.program.define_name(node.index_annotation)
-
-    #        # Load the decorator if it exists
-    #        if node.decorator:
-    #            node.decorator.accept(self)
-    #        # Close the function
-    #        self.program.load_name(node.index_annotation)
-    #        self.program.make_closure(node.upvalues)
-    #        # Decorate the function
-    #        if node.decorator:
-    #            self.program.simple_op(OpCode.CALL)
-    #            self.program.simple_op(1)
-    #        # Define the function as the final value
-    #        self.program.define_name(node.index_annotation)
 
     def visit_prop_decl(self, node):
         emit_error("Properties unimplemented")()
@@ -295,10 +317,7 @@ class Compiler(DeclVisitor):
         if node.value is not None:
             self.program.simple_op(OpCode.SET_RETURN)
         self.program.pop_scope()
-        for _ in range(node.param_count):
-            self.program.simple_op(OpCode.POP)
-        self.program.simple_op(OpCode.LOAD_FP)
-        self.program.simple_op(OpCode.LOAD_IP)
+        self._emit_return()
 
     def visit_expr_stmt(self, node):
         super().visit_expr_stmt(node)
@@ -333,8 +352,9 @@ class Compiler(DeclVisitor):
 
     def visit_assign_expr(self, node):
         # Don't call super as we don't want to evaluate the left hand side
-        node.right.accept(self)
-        self.program.set_name(node.left.index_annotation)
+        self.program.set_name(
+            node.left.index_annotation, lambda: node.right.accept(self)
+        )
         if DEBUG:
             print(f"Loading name for {node.left}")
         # Assignment is an expression so we load the assigned value as well
@@ -399,7 +419,7 @@ class Compiler(DeclVisitor):
             else:
                 self.program.simple_op(OpCode.RETURN_VOID)
             self.program.end_function(implicit_function)
-            #            self.program.make_closure(node.upvalues)
+            self.program.make_closure(node.upvalues)
             # Call the function with the target value as a single argument
             node.target.accept(self)
             self.program.simple_op(OpCode.CALL)
@@ -451,17 +471,15 @@ class Compiler(DeclVisitor):
 
     def visit_lambda_expr(self, node):
         # No super as we handle params / scoping
+        self.pops = len(node.params) + 1
         function = self.program.begin_function()
         node.result.accept(self)
         void_ret = node.type_annotation.return_type == VOID_TYPE
         if not void_ret:
             self.program.simple_op(OpCode.SET_RETURN)
-        for _ in node.params:
-            self.program.simple_op(OpCode.POP)
-        self.program.simple_op(OpCode.LOAD_FP)
-        self.program.simple_op(OpCode.LOAD_IP)
+        self._emit_return()
         self.program.end_function(function)
-        #        self.program.make_closure(node.upvalues)
+        self.program.make_closure(node.upvalues)
         self._end_expression(node)
 
     def visit_if_expr(self, node):
@@ -486,22 +504,23 @@ class Compiler(DeclVisitor):
         self._end_expression(node)
 
     def visit_call_expr(self, node):
+        # No super as evaluation order is subtle
         if isinstance(node.target, IdentExpr) and node.target.name.lexeme in BUILTINS:
-            # Don't call super if it's a built-in because we don't want to evaluate the name
             opcode = BUILTINS[node.target.name.lexeme].opcode
             for arg in node.arguments:
                 arg.accept(self)
             self.program.simple_op(opcode)
         else:
-            # No super because calling is complicated
             # Push the arguments
             for arg in node.arguments:
                 arg.accept(self)
             # Push the function (ip)
             node.target.accept(self)
+            self.program.simple_op(OpCode.EXTRACT_FIELD)
+            self.program.simple_op(0)
             # Make the new frame
             self.program.simple_op(OpCode.CALL)
-            self.program.simple_op(len(node.arguments))
+            self.program.simple_op(len(node.arguments) + 1)
             # Fetch the return value if there is one
             if node.target.type_annotation.return_type != VOID_TYPE:
                 self.program.simple_op(OpCode.PUSH_RETURN)

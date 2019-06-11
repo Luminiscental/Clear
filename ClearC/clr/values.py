@@ -66,8 +66,12 @@ class OpCode(Enum):
     # Structs
     STRUCT = 41
     GET_FIELD = 42
-    GET_FIELDS = 43
-    SET_FIELD = 44
+    EXTRACT_FIELD = 43
+    GET_FIELDS = 44
+    SET_FIELD = 45
+    # Upvalues
+    REF_LOCAL = 46
+    DEREF = 47
 
     def __str__(self):
         return "OP_" + self.name

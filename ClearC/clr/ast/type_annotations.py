@@ -109,10 +109,11 @@ class OptionalTypeAnnotation(TypeAnnotation):
 
 
 class FunctionTypeAnnotation(TypeAnnotation):
-    def __init__(self, return_type, signature):
+    def __init__(self, return_type, signature, ref):
         super().__init__(TypeAnnotationType.FUNCTION)
         self.return_type = return_type
         self.signature = signature
+        self.ref = ref
 
     def __repr__(self):
         return (
