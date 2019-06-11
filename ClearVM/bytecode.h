@@ -86,10 +86,9 @@ typedef enum {
     OP_FUNCTION =
         35, // op <u8> - pushes an ip value pointing to the next instruction
             // onto the stack and moves the ip forward by the given offset
-    OP_CALL =
-        36, // op <u8> - pushes an ip value offset from the next instruction by
-            // the given offset onto the stack, pushes the fp onto the stack,
-            // and sets the fp to point to the top of the stack
+    OP_CALL = 36, // op <u8> - pops an ip off the stack, then the given number
+                  // of arguments, then pushes the current ip and fp and the
+                  // arguments onto the stack and loads the popped ip
     OP_LOAD_IP = 37, // op - pops ip and copies it into the vm
     OP_LOAD_FP = 38, // op - pops fp and copies it into the vm
     OP_SET_RETURN =

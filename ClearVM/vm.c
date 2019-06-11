@@ -534,11 +534,33 @@ static Result op_call(VM *vm) {
 
     TRACE(printf("op_call\n");)
 
-    READ(offset)
+    READ(paramCount)
 
-    PUSH(makePointer(vm->ip + offset))
+    POP(function)
+
+    Value *params = ALLOCATE_ARRAY(Value, paramCount);
+
+    // TODO: POPN and PUSHN
+
+    for (int i = paramCount - 1; i >= 0; i--) {
+
+        POP(param)
+
+        params[i] = param;
+    }
+
+    PUSH(makePointer(vm->ip))
     PUSH(makePointer(vm->fp))
+
     vm->fp = vm->sp;
+    vm->ip = function.as.ptr;
+
+    for (size_t i = 0; i < paramCount; i++) {
+
+        PUSH(params[i])
+    }
+
+    FREE_ARRAY(Value, params, paramCount);
 
     return RESULT_OK;
 }
@@ -549,7 +571,7 @@ static Result op_load_ip(VM *vm) {
 
     POP(ipValue)
 
-    vm->ip = (uint8_t *)ipValue.as.ptr;
+    vm->ip = ipValue.as.ptr;
 
     return RESULT_OK;
 }
@@ -790,6 +812,11 @@ static Result runVM(VM *vm) {
             printf("[");
             printValue(*value);
             printf("] ");
+
+            if (value == vm->fp - 1) {
+
+                printf(" | ");
+            }
         }
         printf("\n");
 

@@ -1,12 +1,14 @@
 
-func hello() void {
-    val test = "hello";
-    print test;
-}
+{
+    func hello() void {
+        val test = "hello";
+        print test;
+    }
 
-func a() int {
-    return 1i + 2i;
-}
+    func a() int {
+        return 1i + 2i;
+    }
 
-hello();
-print a();
+    hello();
+    print a();
+}

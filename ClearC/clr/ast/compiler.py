@@ -494,20 +494,14 @@ class Compiler(DeclVisitor):
             self.program.simple_op(opcode)
         else:
             # No super because calling is complicated
-            self.program.simple_op(OpCode.CALL)
-            call_offset_index = len(self.program.code_list)
-            # Dummy offset to be patched
-            self.program.simple_op(0)
             # Push the arguments
             for arg in node.arguments:
                 arg.accept(self)
             # Push the function (ip)
             node.target.accept(self)
-            # Load the call frame
-            self.program.simple_op(OpCode.LOAD_IP)
-            # Patch the call offset to jump past the calling code on return
-            contained = self.program.code_list[call_offset_index + 1 :]
-            self.program.code_list[call_offset_index] = assembled_size(contained)
+            # Make the new frame
+            self.program.simple_op(OpCode.CALL)
+            self.program.simple_op(len(node.arguments))
             # Fetch the return value if there is one
             if node.target.type_annotation.return_type != VOID_TYPE:
                 self.program.simple_op(OpCode.PUSH_RETURN)
