@@ -92,20 +92,20 @@ typedef enum {
             // and sets the fp to point to the top of the stack
     OP_LOAD_IP = 37, // op - pops ip and copies it into the vm
     OP_LOAD_FP = 38, // op - pops fp and copies it into the vm
-    OP_RETURN = 39,  // op <u8> - pops a return value off the stack, pops the
-                    // given number of extra values off the stack, loads ip then
-                    // fp, pushes the return value back onto the stack
+    OP_SET_RETURN =
+        39, // op - pops a value off the stack and puts it in the return store
+    OP_PUSH_RETURN = 40, // op - pushes the return store onto the stack
 
     // Structs
-    OP_STRUCT = 40, // op <u8> - pops the given number of values off the stack
+    OP_STRUCT = 41, // op <u8> - pops the given number of values off the stack
                     // and pushes a struct of them
-    OP_GET_FIELD = 41, // op <u8> - pops a value off the stack and pushes its
+    OP_GET_FIELD = 42, // op <u8> - pops a value off the stack and pushes its
                        // struct field at the given index
     OP_SET_FIELD =
-        42, // op <u8> - pops two values off the stack and sets the field of the
+        43, // op <u8> - pops two values off the stack and sets the field of the
             // lower value at the given index to the upper value
 
-    OP_COUNT = 43
+    OP_COUNT = 44
 
 } OpCode;
 

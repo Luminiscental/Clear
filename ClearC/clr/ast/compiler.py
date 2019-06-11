@@ -292,15 +292,13 @@ class Compiler(DeclVisitor):
 
     def visit_ret_stmt(self, node):
         super().visit_ret_stmt(node)
-        if node.value is None:
-            self.program.pop_scope()
-            for _ in range(node.param_count):
-                self.program.simple_op(OpCode.POP)
-            self.program.simple_op(OpCode.LOAD_FP)
-            self.program.simple_op(OpCode.LOAD_IP)
-        else:
-            self.program.simple_op(OpCode.RETURN)
-            self.program.simple_op(node.param_count + len(self.program.scopes.pop()))
+        if node.value is not None:
+            self.program.simple_op(OpCode.SET_RETURN)
+        self.program.pop_scope()
+        for _ in range(node.param_count):
+            self.program.simple_op(OpCode.POP)
+        self.program.simple_op(OpCode.LOAD_FP)
+        self.program.simple_op(OpCode.LOAD_IP)
 
     def visit_expr_stmt(self, node):
         super().visit_expr_stmt(node)
@@ -455,13 +453,13 @@ class Compiler(DeclVisitor):
         # No super as we handle params / scoping
         function = self.program.begin_function()
         node.result.accept(self)
-        return_ops = (
-            [OpCode.POP] * len(node.params) + [OpCode.LOAD_FP, OpCode.LOAD_IP]
-            if node.type_annotation.return_type == VOID_TYPE
-            else [OpCode.RETURN, len(node.params)]
-        )
-        for opcode in return_ops:
-            self.program.simple_op(opcode)
+        void_ret = node.type_annotation.return_type == VOID_TYPE
+        if not void_ret:
+            self.program.simple_op(OpCode.SET_RETURN)
+        for _ in node.params:
+            self.program.simple_op(OpCode.POP)
+        self.program.simple_op(OpCode.LOAD_FP)
+        self.program.simple_op(OpCode.LOAD_IP)
         self.program.end_function(function)
         #        self.program.make_closure(node.upvalues)
         self._end_expression(node)
@@ -510,6 +508,9 @@ class Compiler(DeclVisitor):
             # Patch the call offset to jump past the calling code on return
             contained = self.program.code_list[call_offset_index + 1 :]
             self.program.code_list[call_offset_index] = assembled_size(contained)
+            # Fetch the return value if there is one
+            if node.target.type_annotation.return_type != VOID_TYPE:
+                self.program.simple_op(OpCode.PUSH_RETURN)
         self._end_expression(node)
 
     def visit_construct_expr(self, node):

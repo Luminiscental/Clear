@@ -101,7 +101,8 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         U8(OP_CALL)
         SIMPLE(OP_LOAD_IP)
         SIMPLE(OP_LOAD_FP)
-        U8(OP_RETURN)
+        SIMPLE(OP_SET_RETURN)
+        SIMPLE(OP_PUSH_RETURN)
 
         U8(OP_STRUCT)
         U8(OP_GET_FIELD)

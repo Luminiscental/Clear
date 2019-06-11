@@ -61,11 +61,12 @@ class OpCode(Enum):
     CALL = 36
     LOAD_IP = 37
     LOAD_FP = 38
-    RETURN = 39
+    SET_RETURN = 39
+    PUSH_RETURN = 40
     # Structs
-    STRUCT = 40
-    GET_FIELD = 41
-    SET_FIELD = 42
+    STRUCT = 41
+    GET_FIELD = 42
+    SET_FIELD = 43
 
     def __str__(self):
         return "OP_" + self.name

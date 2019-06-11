@@ -565,28 +565,21 @@ static Result op_load_fp(VM *vm) {
     return RESULT_OK;
 }
 
-static Result op_return(VM *vm) {
+static Result op_setReturn(VM *vm) {
 
-    TRACE(printf("op_return\n");)
+    TRACE(printf("op_setReturn\n");)
 
-    READ(paramCount)
     POP(returnValue)
+    vm->returnStore = returnValue;
 
-    vm->sp -= paramCount;
+    return RESULT_OK;
+}
 
-    if (op_load_ip(vm) != RESULT_OK) {
+static Result op_pushReturn(VM *vm) {
 
-        printf("|| Could not return from function\n");
-        return RESULT_ERR;
-    }
+    TRACE(printf("op_pushReturn\n");)
 
-    if (op_load_fp(vm) != RESULT_OK) {
-
-        printf("|| Couldn't unwind stack\n");
-        return RESULT_ERR;
-    }
-
-    PUSH(returnValue)
+    PUSH(vm->returnStore)
 
     return RESULT_OK;
 }
@@ -670,7 +663,8 @@ Result initVM(VM *vm) {
     INSTR(OP_CALL, op_call);
     INSTR(OP_LOAD_IP, op_load_ip);
     INSTR(OP_LOAD_FP, op_load_fp);
-    INSTR(OP_RETURN, op_return);
+    INSTR(OP_SET_RETURN, op_setReturn);
+    INSTR(OP_PUSH_RETURN, op_pushReturn);
 
 #undef INSTR
 

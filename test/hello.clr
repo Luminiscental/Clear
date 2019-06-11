@@ -4,4 +4,9 @@ func hello() void {
     print test;
 }
 
+func a() int {
+    return 1i + 2i;
+}
+
 hello();
+print a();
