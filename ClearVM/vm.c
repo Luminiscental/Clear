@@ -810,6 +810,25 @@ static Result op_deref(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_setRef(VM *vm) {
+
+    TRACE(printf("op_setRef\n");)
+
+    POP(value)
+    POP(upvalue)
+
+    if (upvalue.type != VAL_OBJ || upvalue.as.obj->type != OBJ_UPVALUE) {
+
+        printf("|| Cannot dereference non-upvalue\n");
+        return RESULT_ERR;
+    }
+
+    UpvalueObject *upvalueObj = (UpvalueObject *)upvalue.as.obj->ptr;
+    *upvalueObj->ptr = value;
+
+    return RESULT_OK;
+}
+
 #undef BINARY_OP
 #undef UNARY_OP
 #undef READ
@@ -900,6 +919,7 @@ Result initVM(VM *vm) {
 
     INSTR(OP_REF_LOCAL, op_refLocal);
     INSTR(OP_DEREF, op_deref);
+    INSTR(OP_SET_REF, op_setRef);
 
 #undef INSTR
 

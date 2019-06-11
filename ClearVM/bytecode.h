@@ -116,8 +116,10 @@ typedef enum {
     OP_REF_LOCAL = 46, // op <u8|index> - pushes an upvalue referencing the
                        // local at the given index
     OP_DEREF = 47,     // op - pops an upvalue and pushes its referenced value
+    OP_SET_REF = 48,   // op - pops a value, then an upvalue, and copies the
+                       // popped value into the upvalue
 
-    OP_COUNT = 48
+    OP_COUNT = 49
 
 } OpCode;
 

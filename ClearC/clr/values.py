@@ -72,6 +72,7 @@ class OpCode(Enum):
     # Upvalues
     REF_LOCAL = 46
     DEREF = 47
+    SET_REF = 48
 
     def __str__(self):
         return "OP_" + self.name

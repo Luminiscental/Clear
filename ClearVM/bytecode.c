@@ -182,6 +182,7 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
 
             U8(OP_REF_LOCAL)
             SIMPLE(OP_DEREF)
+            SIMPLE(OP_SET_REF)
 
 #undef U8
 #undef SIMPLE

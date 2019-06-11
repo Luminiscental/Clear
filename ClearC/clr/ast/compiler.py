@@ -60,10 +60,9 @@ class Program:
 
         def set_upvalue():
             self.code_list.extend([OpCode.PUSH_LOCAL, 0])
+            self.code_list.extend([OpCode.GET_FIELD, index.value + 1])
             emit_value()
-            self.code_list.extend(
-                [OpCode.SET_FIELD, index.value + 1, OpCode.SET_LOCAL, 0]
-            )
+            self.code_list.append(OpCode.SET_REF)
 
         {
             IndexAnnotationType.GLOBAL: set_global,
