@@ -9,7 +9,8 @@
 
 typedef enum {
 
-    OBJ_STRING
+    OBJ_STRING,
+    OBJ_STRUCT
 
 } ObjectType;
 
@@ -28,6 +29,14 @@ typedef struct {
 
 } StringObject;
 
+typedef struct sValue Value;
+typedef struct {
+
+    size_t fieldCount;
+    Value *fields;
+
+} StructObject;
+
 typedef enum {
 
     VAL_BOOL,
@@ -39,7 +48,7 @@ typedef enum {
 
 } ValueType;
 
-typedef struct {
+struct sValue {
 
     ValueType type;
 
@@ -52,14 +61,15 @@ typedef struct {
         void *ptr;
 
     } as;
-
-} Value;
+};
 
 typedef struct sVM VM;
 
 Value makeObject(VM *vm, size_t size, ObjectType type);
 Value makeString(VM *vm, char *data, size_t length);
 Value makeStringFromLiteral(VM *vm, const char *literal);
+Value makeStruct(VM *vm, size_t fieldCount);
+
 Value makeInt(int32_t unboxed);
 Value makeBool(bool unboxed);
 Value makeNum(double unboxed);

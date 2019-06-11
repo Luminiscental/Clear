@@ -452,8 +452,29 @@ BINARY_OP(numMul, makeNum(a.as.f64 *b.as.f64))
 BINARY_OP(intDiv, makeInt(a.as.s32 / b.as.s32))
 BINARY_OP(numDiv, makeNum(a.as.f64 / b.as.f64))
 
-BINARY_OP(strCat, concatStrings(vm, *(StringObject *)a.as.obj->ptr,
-                                *(StringObject *)b.as.obj->ptr))
+static Result op_strCat(VM *vm) {
+
+    POP(b)
+
+    PEEK(a, 0)
+
+    if (b.type != VAL_OBJ || b.as.obj->type != OBJ_STRING) {
+
+        printf("|| Cannot concatenate non-string values\n");
+        return RESULT_ERR;
+    }
+
+    if (a->type != VAL_OBJ || a->as.obj->type != OBJ_STRING) {
+
+        printf("|| Cannot concatenate non-string values\n");
+        return RESULT_ERR;
+    }
+
+    *a = concatStrings(vm, *(StringObject *)a->as.obj->ptr,
+                       *(StringObject *)b.as.obj->ptr);
+
+    return RESULT_OK;
+}
 
 UNARY_OP(not, makeBool(!a.as.b))
 
@@ -606,6 +627,102 @@ static Result op_pushReturn(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_struct(VM *vm) {
+
+    TRACE(printf("op_struct\n");)
+
+    READ(fieldCount)
+
+    Value result = makeStruct(vm, fieldCount);
+    StructObject *structObj = (StructObject *)result.as.obj->ptr;
+
+    for (int i = fieldCount - 1; i >= 0; i--) {
+
+        POP(field)
+
+        structObj->fields[i] = field;
+    }
+
+    PUSH(result)
+
+    return RESULT_OK;
+}
+
+static Result op_getField(VM *vm) {
+
+    TRACE(printf("op_getField\n");)
+
+    READ(index)
+
+    POP(structValue)
+
+    if (structValue.type != VAL_OBJ || structValue.as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Cannot get field from non-struct value\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
+    PUSH(structObj->fields[index])
+
+    return RESULT_OK;
+}
+
+static Result op_getFields(VM *vm) {
+
+    TRACE(printf("op_getFields\n");)
+
+    READ(fieldCount)
+
+    POP(structValue)
+
+    if (structValue.type != VAL_OBJ || structValue.as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Cannot get field from non-struct value\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
+
+    for (size_t i = 0; i < fieldCount; i++) {
+
+        READ(fieldIndex)
+        PUSH(structObj->fields[fieldIndex])
+    }
+
+    return RESULT_OK;
+}
+
+static Result op_setField(VM *vm) {
+
+    TRACE(printf("op_setField\n");)
+
+    READ(index)
+
+    POP(field)
+
+    PEEK(structValue, 0)
+
+    if (structValue->type != VAL_OBJ ||
+        structValue->as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Cannot set field on non-struct value\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue->as.obj->ptr;
+
+    if (index >= structObj->fieldCount) {
+
+        printf("|| Field %d out of range\n", index);
+        return RESULT_ERR;
+    }
+
+    structObj->fields[index] = field;
+
+    return RESULT_OK;
+}
+
 #undef BINARY_OP
 #undef UNARY_OP
 #undef READ
@@ -687,6 +804,10 @@ Result initVM(VM *vm) {
     INSTR(OP_LOAD_FP, op_load_fp);
     INSTR(OP_SET_RETURN, op_setReturn);
     INSTR(OP_PUSH_RETURN, op_pushReturn);
+
+    INSTR(OP_STRUCT, op_struct);
+    INSTR(OP_GET_FIELD, op_getField);
+    INSTR(OP_SET_FIELD, op_setField);
 
 #undef INSTR
 

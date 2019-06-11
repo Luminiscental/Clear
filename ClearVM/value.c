@@ -46,6 +46,17 @@ Value makeStringFromLiteral(VM *vm, const char *literal) {
     return makeString(vm, buffer, len);
 }
 
+Value makeStruct(VM *vm, size_t fieldCount) {
+
+    Value result = makeObject(vm, sizeof(StructObject), OBJ_STRUCT);
+
+    StructObject *structObj = (StructObject *)result.as.obj->ptr;
+    structObj->fieldCount = fieldCount;
+    structObj->fields = ALLOCATE_ARRAY(Value, fieldCount);
+
+    return result;
+}
+
 Value makeInt(int32_t unboxed) {
 
     Value result;
@@ -307,6 +318,13 @@ void printValue(Value value) {
 
                     StringObject strObj = *(StringObject *)obj.ptr;
                     printf("%s", strObj.data);
+
+                } break;
+
+                case OBJ_STRUCT: {
+
+                    StructObject structObj = *(StructObject *)obj.ptr;
+                    printf("struct <%zu>", structObj.fieldCount);
 
                 } break;
             }

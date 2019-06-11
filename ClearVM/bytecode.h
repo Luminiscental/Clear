@@ -100,11 +100,15 @@ typedef enum {
                     // and pushes a struct of them
     OP_GET_FIELD = 42, // op <u8> - pops a value off the stack and pushes its
                        // struct field at the given index
+    OP_GET_FIELDS =
+        43, // op <u8> [<u8>] - Takes a number of fields followed by the indices
+            // of those fields, pops a value and pushes its fields at those
+            // indices onto the stack, last index on top
     OP_SET_FIELD =
-        43, // op <u8> - pops two values off the stack and sets the field of the
-            // lower value at the given index to the upper value
+        44, // op <u8> - pops a value off the stack, then sets the struct field
+            // of the remaining value at the given index to it
 
-    OP_COUNT = 44
+    OP_COUNT = 45
 
 } OpCode;
 

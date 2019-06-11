@@ -42,6 +42,14 @@ void freeObject(ObjectValue *obj) {
 
         } break;
 
+        case OBJ_STRUCT: {
+
+            StructObject *structObj = (StructObject *)obj->ptr;
+            FREE_ARRAY(Value, structObj->fields, structObj->fieldCount);
+            FREE(StructObject, structObj);
+
+        } break;
+
         default: {
 
             printf("|| Unknown object type %d could not be freed\n", obj->type);
