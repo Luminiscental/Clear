@@ -161,12 +161,27 @@ def tokenize_source(source: str) -> List[Token]:
         (r"[0-9]+i", TokenType.INT_LITERAL),
         (r"[0-9]+(\.[0-9]+)?", TokenType.NUM_LITERAL),
         (r"\".*?\"", TokenType.STR_LITERAL),
+        (r"\+", TokenType.PLUS),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 
     lexer = Lexer(source)
     lexer.run(consume_rules, skip_rules, fallback_rule)
-    return lexer.tokens
+
+    def keywordize(token: Token) -> Token:
+        keywords = {
+            "nil": TokenType.NIL,
+            "true": TokenType.TRUE,
+            "false": TokenType.FALSE,
+        }
+
+        if token.kind == TokenType.IDENTIFIER:
+            lexeme = str(token.lexeme)
+            if lexeme in keywords:
+                token.kind = keywords[lexeme]
+        return token
+
+    return [keywordize(token) for token in lexer.tokens]
 
 
 class Ast:
