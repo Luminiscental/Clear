@@ -30,7 +30,8 @@ typedef enum {
     VAL_OBJ,
     VAL_INT,
     VAL_NUM,
-    VAL_PTR
+    VAL_IP,
+    VAL_FP
 
 } ValueType;
 
@@ -86,7 +87,8 @@ Value makeUpvalue(VM *vm, Value *from);
 Value makeInt(int32_t unboxed);
 Value makeBool(bool unboxed);
 Value makeNum(double unboxed);
-Value makePointer(void *unboxed);
+Value makeIP(uint8_t *unboxed);
+Value makeFP(Value *unboxed);
 
 void closeUpvalue(UpvalueObject *upvalue);
 Result stringifyValue(VM *vm, Value input, Value *output);

@@ -553,7 +553,7 @@ static Result op_function(VM *vm) {
     READ(offset)
 
     uint8_t *ip = vm->ip;
-    PUSH(makePointer(ip))
+    PUSH(makeIP(ip))
     vm->ip += offset;
 
     return RESULT_OK;
@@ -597,8 +597,8 @@ static Result op_call(VM *vm) {
         params[i] = param;
     }
 
-    PUSH_(makePointer(vm->ip))
-    PUSH_(makePointer(vm->fp))
+    PUSH_(makeIP(vm->ip))
+    PUSH_(makeFP(vm->fp))
 
     vm->fp = vm->sp;
     vm->ip = function.as.ptr;
@@ -622,7 +622,11 @@ static Result op_loadIp(VM *vm) {
 
     POP(ipValue)
 
-    // TODO: Safety
+    if (ipValue.type != VAL_IP) {
+
+        printf("|| Cannot load non-code pointer to ip\n");
+        return RESULT_ERR;
+    }
 
     vm->ip = ipValue.as.ptr;
 
@@ -635,7 +639,11 @@ static Result op_loadFp(VM *vm) {
 
     POP(fpValue)
 
-    // TODO: Safety
+    if (fpValue.type != VAL_FP) {
+
+        printf("|| Cannot load non-value pointer to fp\n");
+        return RESULT_ERR;
+    }
 
     vm->fp = (Value *)fpValue.as.ptr;
 
