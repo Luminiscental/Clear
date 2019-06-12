@@ -32,7 +32,7 @@ def main() -> None:
         print(f"No file found for {source_file_name}")
         sys.exit(1)
 
-    ast = clr.parse_source(source)
+    ast = clr.Ast(clr.tokenize_source(source))
     constants, instructions = clr.compile_ast(ast)
     try:
         byte_code = bc.assemble_code(constants, instructions)

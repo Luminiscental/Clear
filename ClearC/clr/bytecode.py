@@ -54,13 +54,7 @@ def pack_constant(constant: Constant) -> PackedConstant:
     Takes a python object and packs it as a Clear constant.
     """
     if isinstance(constant, int):
-        if constant > 255:
-            raise IndexTooLargeError()
-        if constant < 0:
-            raise NegativeIndexError()
-        arr = bytearray()
-        arr.append(constant)
-        return (ConstantType.INT, arr)
+        return (ConstantType.INT, bytearray(struct.pack("i", constant)))
 
     if isinstance(constant, float):
         return (ConstantType.NUM, bytearray(struct.pack("d", constant)))
@@ -162,5 +156,9 @@ def assemble_code(
         if isinstance(instruction, Opcode):
             result.append(instruction.value)
         else:
+            if instruction > 255:
+                raise IndexTooLargeError()
+            elif instruction < 0:
+                raise NegativeIndexError()
             result.append(instruction)
     return result
