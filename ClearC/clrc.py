@@ -4,12 +4,13 @@ Given a module name, it loads the .clr file, compiles it,
 and exports the assembled .clr.b.
 """
 import sys
-import clr
+import clr.core as clr
+import clr.bytecode as bc
 
 DEBUG = False
 
 
-def main():
+def main() -> None:
     """
     The main entry point function, everything is contained here.
     """
@@ -32,8 +33,18 @@ def main():
         sys.exit(1)
 
     ast = clr.parse_source(source)
-    code = clr.compile_ast(ast)
-    byte_code = clr.assemble_code(code)
+    constants, instructions = clr.compile_ast(ast)
+    try:
+        byte_code = bc.assemble_code(constants, instructions)
+    except bc.IndexTooLargeError:
+        print("Couldn't assemble; too many variables")
+        sys.exit(1)
+    except bc.NegativeIndexError:
+        print("Couldn't assemble; some variables were unresolved")
+        sys.exit(1)
+    except bc.StringTooLongError:
+        print("Couldn't assemble; string literal was too long")
+        sys.exit(1)
 
     with open(dest_file_name, "wb") as dest_file:
         dest_file.write(byte_code)

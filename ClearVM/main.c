@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
 
     if (byteCode.length == 0) {
 
-        printf("File contains no instructions!\n");
+        printf("File contains no header!\n");
         EXIT(1);
     }
 

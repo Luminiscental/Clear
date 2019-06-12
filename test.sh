@@ -12,7 +12,13 @@ else
     echo ""
     echo "-- Compiling test source --"
 
-    python ClearC/clrc.py test/$1
+    pushd ClearC
+
+    mypy clrc.py --strict
+    mypy -p clr --strict
+    python clrc.py ../test/$1
+
+    popd
 
     echo ""
     echo "-- Compiling VM --"
@@ -28,7 +34,7 @@ else
     echo ""
     echo "-- Running bytecode --"
 
-    ./clr ../../test/$1
+    valgrind --leak-check=full ./clr ../../test/$1
 
     echo ""
     echo ""
