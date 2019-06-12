@@ -103,6 +103,12 @@ int main(int argc, char **argv) {
 
     FileBuffer byteCode = readFile(argv[1]);
 
+    if (byteCode.length == 0) {
+
+        printf("File contains no instructions!\n");
+        EXIT(1);
+    }
+
     if (byteCode.buffer == NULL) {
 
         printf("Could not read file!\n");
