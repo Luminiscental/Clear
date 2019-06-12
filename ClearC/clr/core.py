@@ -2,9 +2,10 @@
 Contains functions for lexing, parsing and compiling Clear code.
 """
 
-from typing import List, Tuple
+from typing import List, Tuple, Iterable, Optional
 
 import enum
+import re
 import clr.bytecode as bc
 
 
@@ -19,14 +20,16 @@ class SourceView:
         self.source = source
 
     def __repr__(self) -> str:
-        view = '"' + str(self) + '"'
-        return f"SourceView[{view}]"
+        return f"SourceView[{str(self)}]"
 
     def __str__(self) -> str:
         return self.source[self.start : self.end + 1]
 
     @staticmethod
     def full(source: str) -> "SourceView":
+        """
+        Takes a string and makes a SourceView into the whole string.
+        """
         return SourceView(source=source, start=0, end=len(source))
 
 
@@ -68,20 +71,102 @@ class Token:
         return str(self.lexeme)
 
 
+class Lexer:
+    """
+    Class for walking over a source string and emitting tokens or skipping based on regex patterns.
+    """
+
+    def __init__(self, source: str) -> None:
+        self.source = source
+        self.start = 0
+        self.end = 0
+        self.tokens: List[Token] = []
+
+    def done(self) -> bool:
+        """
+        Returns whether the source has been fully used up or not.
+        """
+        return self.end == len(self.source)
+
+    def reset(self) -> None:
+        """
+        Resets the lexer to the start of its source
+        """
+        self.start = 0
+        self.end = 0
+
+    def consume(self, pattern: str, kind: TokenType) -> bool:
+        """
+        Check if the pattern is matched, and if it is emit it as a token and move after it.
+        Returns whether the match was found.
+        """
+        match = re.match(pattern, self.source[self.end :])
+        if match:
+            literal = match.group(0)
+            region = SourceView(
+                source=self.source, start=self.start, end=self.end + len(literal) - 1
+            )
+            lexeme = SourceView(
+                source=self.source, start=self.end, end=self.end + len(literal) - 1
+            )
+            self.tokens.append(Token(kind=kind, region=region, lexeme=lexeme))
+            self.end += len(literal)
+            self.start = self.end
+            return True
+        return False
+
+    def skip(self, pattern: str) -> bool:
+        """
+        Check if the pattern is matched, and if it is move after it while leaving the start of
+        the region before, so that the next consumed token will include this skipped region.
+        Returns whether the match was found.
+        """
+        match = re.match(pattern, self.source[self.end :])
+        if match:
+            literal = match.group(0)
+            self.end += len(literal)
+            return True
+        return False
+
+    def run(
+        self,
+        consume_rules: Optional[Iterable[Tuple[str, TokenType]]] = None,
+        skip_rules: Optional[Iterable[str]] = None,
+        fallback: Optional[Tuple[str, TokenType]] = None,
+    ) -> None:
+        """
+        Given an optional iterable of patterns to consume to token types, an optional iterable of
+        patterns to skip, and an optional fallback pattern to consume to a fallback token type,
+        loops over the source with these rules until reaching the end, or until reaching something
+        it can't consume.
+        """
+        while not self.done():
+            if consume_rules and any(
+                self.consume(pattern, kind) for pattern, kind in consume_rules
+            ):
+                continue
+            if skip_rules and any(self.skip(pattern) for pattern in skip_rules):
+                continue
+            if not fallback or not self.consume(fallback[0], fallback[1]):
+                break
+
+
 def tokenize_source(source: str) -> List[Token]:
     """
     Given a string of Clear source code, lexes it into a list of tokens.
     """
-    fullview = SourceView.full(source)
-    test_int = SourceView.full("27i")
-    test_num = SourceView.full("5.3")
-    test_string = SourceView.full('"hello"')
-    return [
-        Token(kind=TokenType.INT_LITERAL, region=test_int, lexeme=test_int),
-        Token(kind=TokenType.NUM_LITERAL, region=test_num, lexeme=test_num),
-        Token(kind=TokenType.STR_LITERAL, region=test_string, lexeme=test_string),
-        Token(kind=TokenType.ERROR, region=fullview, lexeme=fullview),
+    skip_rules = [r"//.*", r"\s+"]
+    consume_rules = [
+        (r"[a-zA-Z_][a-zA-Z0-9_]*", TokenType.IDENTIFIER),
+        (r"[0-9]+i", TokenType.INT_LITERAL),
+        (r"[0-9]+(\.[0-9]+)?", TokenType.NUM_LITERAL),
+        (r"\".*?\"", TokenType.STR_LITERAL),
     ]
+    fallback_rule = (r".", TokenType.ERROR)
+
+    lexer = Lexer(source)
+    lexer.run(consume_rules, skip_rules, fallback_rule)
+    return lexer.tokens
 
 
 class Ast:
