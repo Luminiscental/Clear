@@ -104,11 +104,22 @@ Value makeNum(double unboxed) {
     return result;
 }
 
-Value makePointer(void *unboxed) {
+Value makeIP(uint8_t *unboxed) {
 
     Value result;
 
-    result.type = VAL_PTR;
+    result.type = VAL_IP;
+    result.references = NULL;
+    result.as.ptr = unboxed;
+
+    return result;
+}
+
+Value makeFP(Value *unboxed) {
+
+    Value result;
+
+    result.type = VAL_FP;
     result.references = NULL;
     result.as.ptr = unboxed;
 
@@ -186,7 +197,8 @@ Result stringifyValue(VM *vm, Value input, Value *output) {
 
         } break;
 
-        case VAL_PTR:
+        case VAL_IP:
+        case VAL_FP:
         case VAL_OBJ: {
 
             printf("|| Cannot stringify reference types\n");
@@ -258,7 +270,8 @@ bool valuesEqual(Value a, Value b) {
 
         } break;
 
-        case VAL_PTR: {
+        case VAL_IP:
+        case VAL_FP: {
 
             return a.as.ptr == b.as.ptr;
 
@@ -326,9 +339,15 @@ void printValue(Value value) {
 
         } break;
 
-        case VAL_PTR: {
+        case VAL_IP: {
 
-            printf("%p", value.as.ptr);
+            printf("ip <%p>", value.as.ptr);
+
+        } break;
+
+        case VAL_FP: {
+
+            printf("fp <%p>", value.as.ptr);
 
         } break;
 
