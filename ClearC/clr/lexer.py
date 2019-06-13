@@ -1,12 +1,17 @@
 """
-Contains functions for lexing, parsing and compiling Clear code.
+Contains functions and definitions for lexing Clear code into a list of tokens.
 """
 
-from typing import List, Tuple, Iterable, Optional
+from typing import List, Optional, Iterable, Tuple
 
 import enum
 import re
-import clr.bytecode as bc
+
+
+class IncompatibleSourceError(Exception):
+    """
+    Custom exception for when source views expected to have the same source have different sources.
+    """
 
 
 class SourceView:
@@ -26,11 +31,14 @@ class SourceView:
         return self.source[self.start : self.end + 1]
 
     @staticmethod
-    def full(source: str) -> "SourceView":
+    def range(start: "SourceView", end: "SourceView") -> "SourceView":
         """
-        Takes a string and makes a SourceView into the whole string.
+        Takes a start and end view and returns a view of the whole range between them.
+        If they view separate sources raises an IncompatibleSourceError.
         """
-        return SourceView(source=source, start=0, end=len(source))
+        if start.source != end.source:
+            raise IncompatibleSourceError()
+        return SourceView(source=start.source, start=start.start, end=end.end)
 
 
 @enum.unique
@@ -45,11 +53,21 @@ class TokenType(enum.Enum):
     NUM_LITERAL = enum.auto()
     STR_LITERAL = enum.auto()
     # Keywords
-    NIL = enum.auto()
-    TRUE = enum.auto()
-    FALSE = enum.auto()
+    VAL = enum.auto()
+    FUNC = enum.auto()
+    IF = enum.auto()
+    ELSE = enum.auto()
+    WHILE = enum.auto()
+    RETURN = enum.auto()
+    PRINT = enum.auto()
     # Symbols
-    PLUS = enum.auto()
+    EQUALS = enum.auto()
+    COMMA = enum.auto()
+    SEMICOLON = enum.auto()
+    LEFT_BRACE = enum.auto()
+    RIGHT_BRACE = enum.auto()
+    LEFT_PAREN = enum.auto()
+    RIGHT_PAREN = enum.auto()
     # Special
     ERROR = enum.auto()
 
@@ -76,11 +94,13 @@ class Lexer:
     Class for walking over a source string and emitting tokens or skipping based on regex patterns.
     """
 
+    tokens: List[Token]
+
     def __init__(self, source: str) -> None:
         self.source = source
         self.start = 0
         self.end = 0
-        self.tokens: List[Token] = []
+        self.tokens = []
 
     def done(self) -> bool:
         """
@@ -161,7 +181,13 @@ def tokenize_source(source: str) -> List[Token]:
         (r"[0-9]+i", TokenType.INT_LITERAL),
         (r"[0-9]+(\.[0-9]+)?", TokenType.NUM_LITERAL),
         (r"\".*?\"", TokenType.STR_LITERAL),
-        (r"\+", TokenType.PLUS),
+        (r"=", TokenType.EQUALS),
+        (r",", TokenType.COMMA),
+        (r";", TokenType.SEMICOLON),
+        (r"{", TokenType.LEFT_BRACE),
+        (r"}", TokenType.RIGHT_BRACE),
+        (r"\(", TokenType.LEFT_PAREN),
+        (r"\)", TokenType.RIGHT_PAREN),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 
@@ -170,9 +196,13 @@ def tokenize_source(source: str) -> List[Token]:
 
     def keywordize(token: Token) -> Token:
         keywords = {
-            "nil": TokenType.NIL,
-            "true": TokenType.TRUE,
-            "false": TokenType.FALSE,
+            "val": TokenType.VAL,
+            "func": TokenType.FUNC,
+            "if": TokenType.IF,
+            "else": TokenType.ELSE,
+            "while": TokenType.WHILE,
+            "return": TokenType.RETURN,
+            "print": TokenType.PRINT,
         }
 
         if token.kind == TokenType.IDENTIFIER:
@@ -182,36 +212,3 @@ def tokenize_source(source: str) -> List[Token]:
         return token
 
     return [keywordize(token) for token in lexer.tokens]
-
-
-class Ast:
-    """
-    Represents an AST of a Clear program.
-    """
-
-    def __init__(self, tokens: List[Token]) -> None:
-        self.tokens = tokens
-
-    def __repr__(self) -> str:
-        return f"Ast(tokens={self.tokens})"
-
-    def __str__(self) -> str:
-        return "".join(str(token) for token in self.tokens)
-
-
-def compile_ast(ast: Ast) -> Tuple[List[bc.Constant], List[bc.Instruction]]:
-    """
-    Given an AST for a Clear program, returns the constants used and the instructions to execute it.
-    """
-    constants: List[bc.Constant] = []
-    for token in ast.tokens:
-        if token.kind == TokenType.INT_LITERAL:
-            value_str = str(token.lexeme)[:-1]
-            constants.append(int(value_str))
-        elif token.kind == TokenType.NUM_LITERAL:
-            value_str = str(token.lexeme)
-            constants.append(float(value_str))
-        elif token.kind == TokenType.STR_LITERAL:
-            value_str = str(token.lexeme)[1:-1]
-            constants.append(value_str)
-    return (constants, [])

@@ -1,32 +1,6 @@
 
-func just_print(int value) void {
-    print "consumed " + str(value);
+func hello() void {
+    print "hello";
 }
 
-var consumer = just_print;
-
-func test_consumer() void {
-    consumer(2i);
-    consumer(3i);
-    consumer(-5i);
-    consumer(-312i);
-}
-
-test_consumer();
-
-{
-    var state = "";
-
-    func state_machine(int value) void {
-        if (state != "") {
-            state = state + ", ";
-        }
-        state = state + str(value);
-
-        print "state = [" + state + "]";
-    }
-
-    consumer = state_machine;
-}
-
-test_consumer();
+val x = "hello"

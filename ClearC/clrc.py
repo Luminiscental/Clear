@@ -3,11 +3,12 @@ Simple program to interface with the compiler.
 Given a module name, it loads the .clr file, compiles it,
 and exports the assembled .clr.b.
 """
-import sys
-import clr.core as clr
-import clr.bytecode as bc
 
-DEBUG = False
+import sys
+
+import clr.bytecode as bytecode
+import clr.lexer as lexer
+import clr.parser as parser
 
 
 def main() -> None:
@@ -21,9 +22,8 @@ def main() -> None:
 
     source_file_name = sys.argv[1] + ".clr"
     dest_file_name = source_file_name + ".b"
-    if DEBUG:
-        print("src:", source_file_name)
-        print("dest:", dest_file_name)
+    print(f"src: {source_file_name}")
+    print(f"dest: {dest_file_name}")
 
     try:
         with open(source_file_name, "r") as source_file:
@@ -32,22 +32,26 @@ def main() -> None:
         print(f"No file found for {source_file_name}")
         sys.exit(1)
 
-    ast = clr.Ast(clr.tokenize_source(source))
-    constants, instructions = clr.compile_ast(ast)
+    tokens = lexer.tokenize_source(source)
+    parsetree = parser.parse_tokens(tokens)
+
+    constants = []
+    instructions = []
+
     try:
-        byte_code = bc.assemble_code(constants, instructions)
-    except bc.IndexTooLargeError:
+        assembled = bytecode.assemble_code(constants, instructions)
+    except bytecode.IndexTooLargeError:
         print("Couldn't assemble; too many variables")
         sys.exit(1)
-    except bc.NegativeIndexError:
+    except bytecode.NegativeIndexError:
         print("Couldn't assemble; some variables were unresolved")
         sys.exit(1)
-    except bc.StringTooLongError:
+    except bytecode.StringTooLongError:
         print("Couldn't assemble; string literal was too long")
         sys.exit(1)
 
     with open(dest_file_name, "wb") as dest_file:
-        dest_file.write(byte_code)
+        dest_file.write(assembled)
 
 
 if __name__ == "__main__":
