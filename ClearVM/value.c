@@ -201,7 +201,7 @@ Result stringifyValue(VM *vm, Value input, Value *output) {
         case VAL_FP:
         case VAL_OBJ: {
 
-            printf("|| Cannot stringify reference types\n");
+            printf("|| Cannot cast pointer types\n");
             return RESULT_ERR;
 
         } break;
@@ -300,7 +300,7 @@ bool valuesEqual(Value a, Value b) {
                 } break;
 
                 default:
-                    return false;
+                    return aObj.ptr == bObj.ptr;
             }
 
         } break;
