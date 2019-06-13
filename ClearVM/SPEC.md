@@ -201,11 +201,11 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : `true` becomes `1`, `false` becomes `0`
+    `VAL_BOOL` : `true` → `1`, `false` → `0`
 
-    `VAL_NIL` : becomes `0`
+    `VAL_NIL` : `nil` → `0`
 
-    `VAL_INT` : unaffected
+    `VAL_INT` : `n` → `n`
 
     `VAL_NUM` : downcast with the same semantics as C cast from `double` to `int32_t`.
 
@@ -222,9 +222,9 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : unaffected
+    `VAL_BOOL` : `b` → `b`
 
-    `VAL_NIL` : becomes `false`
+    `VAL_NIL` : `nil` → `false`
 
     `VAL_INT` : `n` → `n != 0`
 
@@ -243,13 +243,13 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : `true` becomes `1.0`, `false` becomes `0.0`
+    `VAL_BOOL` : `true` → `1.0`, `false` → `0.0`
 
-    `VAL_NIL` : becomes `0.0`
+    `VAL_NIL` : `nil` → `0.0`
 
     `VAL_INT` : upcast with the same semantics as C cast from `int32_t` to `double`
 
-    `VAL_NUM` : unaffected
+    `VAL_NUM` : `x` → `x`
 
 - 0x0b (`OP_STR`)
 
@@ -264,9 +264,9 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : displayed as `"true"` or `"false"`
+    `VAL_BOOL` : `true` → `"true"`, `false` → `"false"`
 
-    `VAL_NIL` : displayed as `"nil"`
+    `VAL_NIL` : `nil` → `"nil"`
 
     `VAL_INT` : displayed as an integer
 
