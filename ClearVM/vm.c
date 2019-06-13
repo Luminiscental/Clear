@@ -280,9 +280,11 @@ static Result op_int(VM *vm) {
 
         } break;
 
+        case VAL_IP:
+        case VAL_FP:
         case VAL_OBJ: {
 
-            printf("|| Cannot cast object types\n");
+            printf("|| Cannot cast pointer types\n");
             return RESULT_ERR;
 
         } break;
@@ -323,13 +325,24 @@ static Result op_bool(VM *vm) {
 
         case VAL_NUM: {
 
-            *value = makeBool(value->as.f64 != 0);
+            double x = value->as.f64;
+
+            if (x > 0.0) {
+
+                *value = makeBool(x < NUM_PRECISION);
+
+            } else {
+
+                *value = makeBool(-x < NUM_PRECISION);
+            }
 
         } break;
 
+        case VAL_IP:
+        case VAL_FP:
         case VAL_OBJ: {
 
-            printf("|| Cannot cast object types\n");
+            printf("|| Cannot cast pointer types\n");
             return RESULT_ERR;
 
         } break;
@@ -374,9 +387,11 @@ static Result op_num(VM *vm) {
         case VAL_NUM:
             break;
 
+        case VAL_IP:
+        case VAL_FP:
         case VAL_OBJ: {
 
-            printf("|| Cannot cast object types\n");
+            printf("|| Cannot cast pointer types\n");
             return RESULT_ERR;
 
         } break;
@@ -845,6 +860,8 @@ static Result op_setRef(VM *vm) {
 #undef POP
 
 Result initVM(VM *vm) {
+
+    vm->returnStore.type = VAL_NIL;
 
     vm->start = NULL;
     vm->end = NULL;
