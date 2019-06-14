@@ -644,7 +644,7 @@ class ParseAtomType:
     """
     Parse node for an atomic type.
 
-    ParseAtomType : "int" | "num" | "bool" | "str" | "void" ;
+    ParseAtomType : identifier | "void" ;
     """
 
     def __init__(
@@ -658,18 +658,9 @@ class ParseAtomType:
         """
         Parse a ParseAtomType from a Parser.
         """
-        atoms = ["int", "num", "bool", "str"]
         errors = []
         if parser.match(lexer.TokenType.IDENTIFIER):
-            token = parser.prev()
-            if str(token.lexeme) not in atoms:
-                errors.append(
-                    ParseError(
-                        f'invalid type {token.lexeme}, expected one of {", ".join(atoms)}',
-                        token.region,
-                    )
-                )
-            ident: Union[lexer.Token, ParseError] = token
+            ident: Union[lexer.Token, ParseError] = parser.prev()
         elif parser.match(lexer.TokenType.VOID):
             ident = parser.prev()
         else:

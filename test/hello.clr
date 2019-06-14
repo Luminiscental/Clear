@@ -1,6 +1,6 @@
 
-func hello((func(int) int?)? f) void {
+func hello((func(int) int?)? f, MyType x) void {
     print "hello";
 }
 
-val x = "hello";
+val x MyType? = "hello";
