@@ -64,11 +64,11 @@ class Parser:
 
     def curr_region(self) -> lexer.SourceView:
         """
-        Returns a source view from the previous token's region to the current.
+        Returns a source view of the current token (or the previous if the parser is done).
         """
         curr = self.curr()
         if curr:
-            return lexer.SourceView.range(self.prev().region, curr.region)
+            return curr.region
         return self.prev().region
 
 
