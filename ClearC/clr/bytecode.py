@@ -1,5 +1,5 @@
 """
-Contains classes/functions for describing and assembling with Clear bytecode.
+Contains classes/functions for describing and assembling Clear bytecode.
 """
 
 from typing import Union, Tuple, Sequence, Iterable
