@@ -4,6 +4,8 @@ Given a module name, it loads the .clr file, compiles it,
 and exports the assembled .clr.b.
 """
 
+from typing import List
+
 import sys
 
 import clr.bytecode as bytecode
@@ -35,8 +37,8 @@ def main() -> None:
     tokens = lexer.tokenize_source(source)
     parsetree = parser.parse_tokens(tokens)
 
-    constants = []
-    instructions = []
+    constants: List[bytecode.Constant] = []
+    instructions: List[bytecode.Instruction] = []
 
     try:
         assembled = bytecode.assemble_code(constants, instructions)

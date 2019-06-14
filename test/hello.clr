@@ -1,6 +1,6 @@
 
-func hello() void {
+func hello((func(int) int?)? f) void {
     print "hello";
 }
 
-val x = "hello"
+val x = "hello";

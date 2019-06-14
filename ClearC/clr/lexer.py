@@ -60,6 +60,7 @@ class TokenType(enum.Enum):
     WHILE = enum.auto()
     RETURN = enum.auto()
     PRINT = enum.auto()
+    VOID = enum.auto()
     # Symbols
     EQUALS = enum.auto()
     COMMA = enum.auto()
@@ -68,6 +69,7 @@ class TokenType(enum.Enum):
     RIGHT_BRACE = enum.auto()
     LEFT_PAREN = enum.auto()
     RIGHT_PAREN = enum.auto()
+    QUESTION_MARK = enum.auto()
     # Special
     ERROR = enum.auto()
 
@@ -188,6 +190,7 @@ def tokenize_source(source: str) -> List[Token]:
         (r"}", TokenType.RIGHT_BRACE),
         (r"\(", TokenType.LEFT_PAREN),
         (r"\)", TokenType.RIGHT_PAREN),
+        (r"\?", TokenType.QUESTION_MARK),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 
@@ -198,6 +201,7 @@ def tokenize_source(source: str) -> List[Token]:
         keywords = {
             "val": TokenType.VAL,
             "func": TokenType.FUNC,
+            "void": TokenType.VOID,
             "if": TokenType.IF,
             "else": TokenType.ELSE,
             "while": TokenType.WHILE,

@@ -4,7 +4,7 @@ Contains functions and definitions for parsing a list of tokens into a parse tre
 
 from typing import List, Optional, Union, Tuple
 
-import lexer
+import clr.lexer as lexer
 
 
 class Parser:
@@ -255,6 +255,8 @@ class ParseParams:
                 ParseError("missing '(' to start parameter list", parser.curr_region())
             )
 
+        opener = parser.prev()
+
         if parser.match(lexer.TokenType.RIGHT_PAREN):
             return ParseParams(pairs, errors)
 
@@ -269,6 +271,12 @@ class ParseParams:
 
         parse_pair()
         while not parser.match(lexer.TokenType.RIGHT_PAREN):
+            before = parser.current
+            if parser.done():
+                errors.append(
+                    ParseError("missing ')' to finish parameters", opener.region)
+                )
+                break
             if not parser.match(lexer.TokenType.COMMA):
                 errors.append(
                     ParseError(
@@ -276,6 +284,8 @@ class ParseParams:
                     )
                 )
             parse_pair()
+            if parser.current == before:
+                break
 
         return ParseParams(pairs, errors)
 
@@ -540,25 +550,132 @@ class ParseExprStmt:
 class ParseType:
     """
     Parse node for a type.
+
+    ParseType : ( "(" ParseType ")" | ParseFuncType | ParseAtomType ) ( "?" )? ;
     """
 
-    def __init__(
-        self, token: Union[lexer.Token, ParseError], errors: List[ParseError]
-    ) -> None:
-        # FIXME
-        self.errors = errors
-        self.token = token
+    def __init__(self, type_node: Union["ParseFuncType", "ParseAtomType"]) -> None:
+        self.type_node = type_node
+        self.optional = False
+        self.errors: List[ParseError] = []
 
     @staticmethod
     def parse(parser: Parser) -> "ParseType":
         """
         Parse a ParseType from a Parser.
         """
-        token = parser.advance()
-        if token:
-            return ParseType(token, [])
-        err = ParseError("expected type before EOF", parser.curr_region())
-        return ParseType(err, [err])
+        if parser.match(lexer.TokenType.LEFT_PAREN):
+            result = ParseType.parse(parser)
+            if not parser.match(lexer.TokenType.RIGHT_PAREN):
+                result.errors.append(
+                    ParseError("missing ')' to end type grouping", parser.curr_region())
+                )
+        elif parser.match(lexer.TokenType.FUNC):
+            result = ParseType(ParseFuncType.finish(parser))
+        else:
+            result = ParseType(ParseAtomType.parse(parser))
+
+        if parser.match(lexer.TokenType.QUESTION_MARK):
+            result.optional = True
+
+        return result
+
+
+class ParseFuncType:
+    """
+    Parse node for a function type.
+
+    ParseFuncType : "func" "(" ( ParseType ( "," ParseType )* )? ")" ParseType ;
+    """
+
+    def __init__(
+        self, params: List[ParseType], return_type: ParseType, errors: List[ParseError]
+    ) -> None:
+        self.params = params
+        self.return_type = return_type
+        self.errors = errors
+
+    @staticmethod
+    def finish(parser: Parser) -> "ParseFuncType":
+        """
+        Parse a ParseFuncType from a Parser given that the "func" keyword has already been
+        consumed.
+        """
+        errors = []
+        params: List[ParseType] = []
+
+        if not parser.match(lexer.TokenType.LEFT_PAREN):
+            errors.append(
+                ParseError("missing '(' to begin parameter types", parser.curr_region())
+            )
+
+        opener = parser.prev()
+
+        if not parser.match(lexer.TokenType.RIGHT_PAREN):
+
+            def parse_param() -> None:
+                param_type = ParseType.parse(parser)
+                params.append(param_type)
+
+            parse_param()
+            while not parser.match(lexer.TokenType.RIGHT_PAREN):
+                before = parser.current
+                if parser.done():
+                    errors.append(
+                        ParseError("missing ')' for parameter types", opener.region)
+                    )
+                    break
+                if not parser.match(lexer.TokenType.COMMA):
+                    errors.append(
+                        ParseError(
+                            "missing ',' to delimit parameter types",
+                            parser.curr_region(),
+                        )
+                    )
+                parse_param()
+                if parser.current == before:
+                    break
+
+        return_type = ParseType.parse(parser)
+        return ParseFuncType(params, return_type, errors)
+
+
+class ParseAtomType:
+    """
+    Parse node for an atomic type.
+
+    ParseAtomType : "int" | "num" | "bool" | "str" | "void" ;
+    """
+
+    def __init__(
+        self, ident: Union[lexer.Token, ParseError], errors: List[ParseError]
+    ) -> None:
+        self.ident = ident
+        self.errors = errors
+
+    @staticmethod
+    def parse(parser: Parser) -> "ParseAtomType":
+        """
+        Parse a ParseAtomType from a Parser.
+        """
+        atoms = ["int", "num", "bool", "str"]
+        errors = []
+        if parser.match(lexer.TokenType.IDENTIFIER):
+            token = parser.prev()
+            if str(token.lexeme) not in atoms:
+                errors.append(
+                    ParseError(
+                        f'invalid type {token.lexeme}, expected one of {", ".join(atoms)}',
+                        token.region,
+                    )
+                )
+            ident: Union[lexer.Token, ParseError] = token
+        elif parser.match(lexer.TokenType.VOID):
+            ident = parser.prev()
+        else:
+            ident = ParseError("expected type", parser.curr_region())
+            errors.append(ident)
+        return ParseAtomType(ident, errors)
 
 
 class ParseExpr:
