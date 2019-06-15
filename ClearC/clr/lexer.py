@@ -79,13 +79,12 @@ class Token:
     Represents a single token within a string of Clear source code.
     """
 
-    def __init__(self, kind: TokenType, region: SourceView, lexeme: SourceView) -> None:
+    def __init__(self, kind: TokenType, lexeme: SourceView) -> None:
         self.kind = kind
-        self.region = region
         self.lexeme = lexeme
 
     def __repr__(self) -> str:
-        return f"Token(kind={self.kind}, region={self.region}, lexeme={self.lexeme})"
+        return f"Token(kind={self.kind}, lexeme={self.lexeme})"
 
     def __str__(self) -> str:
         return str(self.lexeme)
@@ -100,40 +99,30 @@ class Lexer:
 
     def __init__(self, source: str) -> None:
         self.source = source
-        self.start = 0
-        self.end = 0
+        self.cursor = 0
         self.tokens = []
 
     def done(self) -> bool:
         """
         Returns whether the source has been fully used up or not.
         """
-        return self.end == len(self.source)
-
-    def reset(self) -> None:
-        """
-        Resets the lexer to the start of its source
-        """
-        self.start = 0
-        self.end = 0
+        return self.cursor == len(self.source)
 
     def consume(self, pattern: str, kind: TokenType) -> bool:
         """
         Check if the pattern is matched, and if it is emit it as a token and move after it.
         Returns whether the match was found.
         """
-        match = re.match(pattern, self.source[self.end :])
+        match = re.match(pattern, self.source[self.cursor :])
         if match:
             literal = match.group(0)
-            region = SourceView(
-                source=self.source, start=self.start, end=self.end + len(literal) - 1
-            )
             lexeme = SourceView(
-                source=self.source, start=self.end, end=self.end + len(literal) - 1
+                source=self.source,
+                start=self.cursor,
+                end=self.cursor + len(literal) - 1,
             )
-            self.tokens.append(Token(kind=kind, region=region, lexeme=lexeme))
-            self.end += len(literal)
-            self.start = self.end
+            self.tokens.append(Token(kind=kind, lexeme=lexeme))
+            self.cursor += len(literal)
             return True
         return False
 
@@ -143,10 +132,10 @@ class Lexer:
         the region before, so that the next consumed token will include this skipped region.
         Returns whether the match was found.
         """
-        match = re.match(pattern, self.source[self.end :])
+        match = re.match(pattern, self.source[self.cursor :])
         if match:
             literal = match.group(0)
-            self.end += len(literal)
+            self.cursor += len(literal)
             return True
         return False
 

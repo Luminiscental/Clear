@@ -68,8 +68,8 @@ class Parser:
         """
         curr = self.curr()
         if curr:
-            return curr.region
-        return self.prev().region
+            return curr.lexeme
+        return self.prev().lexeme
 
 
 class ParseError:
@@ -274,7 +274,7 @@ class ParseParams:
             before = parser.current
             if parser.done():
                 errors.append(
-                    ParseError("missing ')' to finish parameters", opener.region)
+                    ParseError("missing ')' to finish parameters", opener.lexeme)
                 )
                 break
             if not parser.match(lexer.TokenType.COMMA):
@@ -394,7 +394,7 @@ class ParseBlockStmt:
         open_brace = parser.prev()
         while not parser.match(lexer.TokenType.RIGHT_BRACE):
             if parser.done():
-                errors.append(ParseError("unclosed block", open_brace.region))
+                errors.append(ParseError("unclosed block", open_brace.lexeme))
                 break
             decls.append(ParseDecl.parse(parser))
         return ParseBlockStmt(decls, errors)
@@ -622,7 +622,7 @@ class ParseFuncType:
                 before = parser.current
                 if parser.done():
                     errors.append(
-                        ParseError("missing ')' for parameter types", opener.region)
+                        ParseError("missing ')' for parameter types", opener.lexeme)
                     )
                     break
                 if not parser.match(lexer.TokenType.COMMA):
