@@ -104,22 +104,18 @@ typedef enum {
     OP_EXTRACT_FIELD =
         43, // op <u8|peekOffset> <u8|fieldIndex> - like OP_GET_FIELD but peeks
             // by the given offset instead of popping
-    OP_GET_FIELDS = 44, // op <u8|count> [<u8|index>] - Takes a number of fields
-                        // followed by the indices
-    // of those fields, pops a value and pushes its fields at those
-    // indices onto the stack, last index on top
-    OP_SET_FIELD = 45, // op <u8|index> - pops a value off the stack, then sets
+    OP_SET_FIELD = 44, // op <u8|index> - pops a value off the stack, then sets
                        // the struct field
                        // of the remaining value at the given index to it
 
     // Upvalues
-    OP_REF_LOCAL = 46, // op <u8|index> - pushes an upvalue referencing the
+    OP_REF_LOCAL = 45, // op <u8|index> - pushes an upvalue referencing the
                        // local at the given index
-    OP_DEREF = 47,     // op - pops an upvalue and pushes its referenced value
-    OP_SET_REF = 48,   // op - pops a value, then an upvalue, and copies the
+    OP_DEREF = 46,     // op - pops an upvalue and pushes its referenced value
+    OP_SET_REF = 47,   // op - pops a value, then an upvalue, and copies the
                        // popped value into the upvalue
 
-    OP_COUNT = 49
+    OP_COUNT = 48
 
 } OpCode;
 

@@ -502,10 +502,10 @@ static Result op_strCat(VM *vm) {
 UNARY_OP(not, makeBool(!a.as.b))
 
 BINARY_OP(intLess, makeBool(a.as.s32 < b.as.s32))
-BINARY_OP(numLess, makeBool(a.as.f64 < b.as.f64))
+BINARY_OP(numLess, makeBool(a.as.f64 < b.as.f64 - NUM_PRECISION))
 
 BINARY_OP(intGreater, makeBool(a.as.s32 > b.as.s32))
-BINARY_OP(numGreater, makeBool(a.as.f64 > b.as.f64))
+BINARY_OP(numGreater, makeBool(a.as.f64 > b.as.f64 + NUM_PRECISION))
 
 BINARY_OP(equal, makeBool(valuesEqual(a, b)))
 
@@ -581,6 +581,12 @@ static Result op_call(VM *vm) {
     READ(paramCount)
 
     POP(function)
+
+    if (function.type != VAL_IP) {
+
+        printf("|| Cannot call to a non-ip value\n");
+        return RESULT_ERR;
+    }
 
     Value *params = ALLOCATE_ARRAY(Value, paramCount);
 
@@ -720,6 +726,13 @@ static Result op_getField(VM *vm) {
     }
 
     StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
+
+    if (index >= structObj->fieldCount) {
+
+        printf("|| Field %d is out of range\n", index);
+        return RESULT_ERR;
+    }
+
     PUSH(structObj->fields[index])
 
     return RESULT_OK;
@@ -742,32 +755,14 @@ static Result op_extractField(VM *vm) {
     }
 
     StructObject *structObj = (StructObject *)structValue->as.obj->ptr;
-    PUSH(structObj->fields[index])
 
-    return RESULT_OK;
-}
+    if (index >= structObj->fieldCount) {
 
-static Result op_getFields(VM *vm) {
-
-    TRACE(printf("op_getFields\n");)
-
-    READ(fieldCount)
-
-    POP(structValue)
-
-    if (structValue.type != VAL_OBJ || structValue.as.obj->type != OBJ_STRUCT) {
-
-        printf("|| Cannot get field from non-struct value\n");
+        printf("|| Field %d is out of range\n", index);
         return RESULT_ERR;
     }
 
-    StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
-
-    for (size_t i = 0; i < fieldCount; i++) {
-
-        READ(fieldIndex)
-        PUSH(structObj->fields[fieldIndex])
-    }
+    PUSH(structObj->fields[index])
 
     return RESULT_OK;
 }
@@ -807,6 +802,12 @@ static Result op_refLocal(VM *vm) {
     TRACE(printf("op_refLocal\n");)
 
     READ(index)
+
+    if (index >= vm->sp - vm->fp) {
+
+        printf("|| Local %d out of range\n", index);
+        return RESULT_ERR;
+    }
 
     Value result = makeUpvalue(vm, vm->fp + index);
 
@@ -939,7 +940,6 @@ Result initVM(VM *vm) {
     INSTR(OP_STRUCT, op_struct);
     INSTR(OP_GET_FIELD, op_getField);
     INSTR(OP_EXTRACT_FIELD, op_extractField);
-    INSTR(OP_GET_FIELDS, op_getFields);
     INSTR(OP_SET_FIELD, op_setField);
 
     INSTR(OP_REF_LOCAL, op_refLocal);
@@ -956,8 +956,8 @@ static Result loadConstants(VM *vm, uint8_t *code, size_t length,
 
     size_t index = 0;
 
-    size_t constantCount = *(uint32_t *)code;
-    index = index + sizeof(uint32_t);
+    size_t constantCount = *(uint8_t *)code;
+    index = index + sizeof(uint8_t);
 
     vm->constants =
         GROW_ARRAY(vm->constants, Value, vm->constantCount, constantCount);

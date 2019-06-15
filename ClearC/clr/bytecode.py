@@ -59,9 +59,9 @@ def pack_constant(constant: Constant) -> PackedConstant:
     if isinstance(constant, float):
         return (ConstantType.NUM, bytearray(struct.pack("d", constant)))
 
-    arr = bytearray()
     if len(constant) > 255:
         raise StringTooLongError()
+    arr = bytearray()
     arr.append(len(constant))
     arr.extend(constant.encode())
     return (ConstantType.STR, arr)
@@ -71,8 +71,10 @@ def assemble_header(constants: Sequence[PackedConstant]) -> bytearray:
     """
     Takes a sequence of packed constants and assembles a Clear constant header from them.
     """
+    if len(constants) > 255:
+        raise IndexTooLargeError()
     result = bytearray()
-    result.extend(struct.pack("I", len(constants)))
+    result.append(len(constants))
     for (constant_type, constant_packed) in constants:
         result.append(constant_type.value)
         result.extend(constant_packed)
@@ -131,11 +133,10 @@ class Opcode(enum.Enum):
     STRUCT = 41
     GET_FIELD = 42
     EXTRACT_FIELD = 43
-    GET_FIELDS = 44
-    SET_FIELD = 45
-    REF_LOCAL = 46
-    DEREF = 47
-    SET_REF = 48
+    SET_FIELD = 44
+    REF_LOCAL = 45
+    DEREF = 46
+    SET_REF = 47
 
     def __str__(self) -> str:
         return "OP_" + self.name

@@ -46,10 +46,10 @@ The values on the stack contain a type flag and a union of data specific to each
 __Value Types__
 
 - `VAL_BOOL` : Boolean type values represent a `true` or `false` value. They can be created from
-    `OP_TRUE` or `OP_FALSE` instructions.
+    `OP_PUSH_TRUE` or `OP_PUSH_FALSE` instructions.
 
 - `VAL_NIL` : Nil type values are all considered the same, representing a singleton `nil` value.
-    They can be created from `OP_NIL` instructions.
+    They can be created from `OP_PUSH_NIL` instructions.
 
 - `VAL_OBJ` : Object type values are references to heap allocated objects, they contain a further
     flag for what type of object is referenced.
@@ -72,7 +72,7 @@ __Object Types__
 - `OBJ_STRING` : string objects represent a UTF-8 string of characters. They can be loaded as
     constants or created from `OP_STR_CAT` or `OP_STR` instructions.
 
-- `OBJ_STRUCT` : struct objects contain an immutable array of values with a known runtime length.
+- `OBJ_STRUCT` : struct objects contain an array of values with a known runtime length.
     They can be created from `OP_STRUCT` instructions.
 
 - `OBJ_UPVALUE` : upvalue objects contain a pointer to a referenced value, which is either on the
@@ -85,7 +85,7 @@ Clear binary files have a simple format, with a header for constants followed by
 
 ### Header
 
-The first 4 bytes are interpreted as an unsigned 32-bit integer, this is the number of constants in
+The first byte is interpreted as an unsigned 8-bit integer, this is the number of constants in
 the header (and can be 0). This is followed by a sequence of single byte flags describing the kind
 of constant in front of a packed constant value. The following byte flags are allowed:
 
@@ -103,7 +103,7 @@ __Opcodes__
 
 - 0x00 (`OP_PUSH_CONST`)
 
-    _Arguments_: `index` (unsigned byte index)
+    _Arguments_: `index` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -144,7 +144,7 @@ __Opcodes__
 
 - 0x04 (`OP_SET_GLOBAL`)
 
-    _Arguments_: `index` (unsigned byte index)
+    _Arguments_: `index` (unsigned byte)
 
     _Initial Stack_: `..., value`
 
@@ -155,7 +155,7 @@ __Opcodes__
 
 - 0x05 (`OP_PUSH_GLOBAL`)
 
-    _Arguments_: `index` (unsigned byte index)
+    _Arguments_: `index` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -166,7 +166,7 @@ __Opcodes__
 
 - 0x06 (`OP_SET_LOCAL`)
 
-    _Arguments_: `index` (unsigned byte index)
+    _Arguments_: `index` (unsigned byte)
 
     _Initial Stack_: `..., value`
 
@@ -201,11 +201,11 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : `true` becomes `1`, `false` becomes `0`
+    `VAL_BOOL` : `true` → `1`, `false` → `0`
 
-    `VAL_NIL` : becomes `0`
+    `VAL_NIL` : `nil` → `0`
 
-    `VAL_INT` : unaffected
+    `VAL_INT` : `n` → `n`
 
     `VAL_NUM` : downcast with the same semantics as C cast from `double` to `int32_t`.
 
@@ -222,9 +222,9 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : unaffected
+    `VAL_BOOL` : `b` → `b`
 
-    `VAL_NIL` : becomes `false`
+    `VAL_NIL` : `nil` → `false`
 
     `VAL_INT` : `n` → `n != 0`
 
@@ -243,13 +243,13 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : `true` becomes `1.0`, `false` becomes `0.0`
+    `VAL_BOOL` : `true` → `1.0`, `false` → `0.0`
 
-    `VAL_NIL` : becomes `0.0`
+    `VAL_NIL` : `nil` → `0.0`
 
     `VAL_INT` : upcast with the same semantics as C cast from `int32_t` to `double`
 
-    `VAL_NUM` : unaffected
+    `VAL_NUM` : `x` → `x`
 
 - 0x0b (`OP_STR`)
 
@@ -264,9 +264,9 @@ __Opcodes__
 
     Effects:
 
-    `VAL_BOOL` : displayed as `"true"` or `"false"`
+    `VAL_BOOL` : `true` → `"true"`, `false` → `"false"`
 
-    `VAL_NIL` : displayed as `"nil"`
+    `VAL_NIL` : `nil` → `"nil"`
 
     `VAL_INT` : displayed as an integer
 
@@ -497,7 +497,7 @@ __Opcodes__
 
 - 0x20 (`OP_JUMP`)
 
-    _Arguments_: `offset` (unsigned byte offset)
+    _Arguments_: `offset` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -508,7 +508,7 @@ __Opcodes__
 
 - 0x21 (`OP_JUMP_IF_FALSE`)
 
-    _Arguments_: `offset` (unsigned byte offset)
+    _Arguments_: `offset` (unsigned byte)
 
     _Initial Stack_: `..., flag`
 
@@ -519,7 +519,7 @@ __Opcodes__
 
 - 0x22 (`OP_LOOP`)
 
-    _Arguments_: `offset` (unsigned byte offset)
+    _Arguments_: `offset` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -528,7 +528,143 @@ __Opcodes__
     Decreases the IP by the given offset. If the resulting IP is outside of the program code this
     emits an error.
 
-// TODO: finish
+- 0x23 (`OP_FUNCTION`)
+
+    _Arguments_: `offset` (unsigned byte)
+
+    _Initial Stack_: `...`
+
+    _Final Stack_: `..., ip`
+
+    Given an offset, pushes the current IP onto the stack then increments the IP by the offset.
+
+- 0x24 (`OP_CALL`)
+
+    _Arguments_: `args` (unsigned byte)
+
+    _Initial Stack_: `..., arg0, arg1, ..., argn, ip`
+
+    _Final Stack_: `..., ip, fp, arg0, arg1, ..., argn`
+
+    Given a number of arguments, pops an IP followed by that many values off the stack, then pushes
+    the current IP and FP followed by the arguments and loads the popped IP. If the top value is
+    not an IP value this emits an error.
+
+- 0x25 (`OP_LOAD_IP`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `..., ip`
+
+    _Final Stack_: `...`
+
+    Pops an IP value off the stack and copies it into the vm's IP. If the value is not an IP this
+    emits an error.
+
+- 0x26 (`OP_LOAD_FP`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `..., fp`
+
+    _Final Stack_: `...`
+
+    Pops an FP value off the stack and copies it into the vm's FP. If the value is not an FP this
+    emits an error.
+
+- 0x27 (`OP_SET_RETURN`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `..., value`
+
+    _Final Stack_: `...`
+
+    Pops a value off the stack and puts it in the return store.
+
+- 0x28 (`OP_PUSH_RETURN`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `...`
+
+    _Final Stack_: `..., return`
+
+    Pushes the return store value onto the stack.
+
+- 0x29 (`OP_STRUCT`)
+
+    _Arguments_: `fields` (unsigned byte)
+
+    _Initial Stack_: `..., arg0, arg1, ..., argn`
+
+    _Final Stack_: `..., struct`
+
+    Pops the given number of field values off the stack and pushes a struct of them.
+
+- 0x2a (`OP_GET_FIELD`)
+
+    _Arguments_: `index` (unsigned byte)
+
+    _Initial Stack_: `..., struct`
+
+    _Final Stack_: `..., field`
+
+    Pops a struct value off the stack and pushes its field at the given index. If the popped value
+    isn't a struct or the index is too large this emits an error.
+
+- 0x2b (`OP_EXTRACT_FIELD`)
+
+    _Arguments_: `offset` (unsigned byte), `index` (unsigned byte)
+
+    _Initial Stack_: `..., struct, ...`
+
+    _Final Stack_: `..., struct, ..., field`
+
+    Peeks down the stack by the given offset and pushes the field of the peeked struct value at the
+    given index. If the peeked value is not a struct or the index is too large this emits an error.
+
+- 0x2c (`OP_SET_FIELD`)
+
+    _Arguments_: `index` (unsigned byte)
+
+    _Initial Stack_: `..., struct, value`
+
+    _Final Stack_: `..., struct`
+
+    Pops a value off the stack and sets the field at the given index of the struct below to it. If
+    the value below isn't a struct or the index is too large this emits an error.
+
+- 0x2d (`OP_REF_LOCAL`)
+
+    _Arguments_: `index` (unsigned byte)
+
+    _Initial Stack_: `...`
+
+    _Final Stack_: `..., upvalue`
+
+    Pushes an upvalue referencing the local at the given index (i.e. the value on the stack offset
+    from the FP by the index). If the index is above the top of the stack this emits an error.
+
+- 0x2e (`OP_DEREF`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `..., upvalue`
+
+    _Final Stack_: `..., value`
+
+    Pops an upvalue and pushes its referenced value.
+
+- 0x2f (`OP_SET_REF`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `..., upvalue, value`
+
+    _Final Stack_: `...`
+
+    Pops a value then an upvalue and sets the upvalues reference to the popped value.
 
 ## Examples
 

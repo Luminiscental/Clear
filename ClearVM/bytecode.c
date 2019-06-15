@@ -200,8 +200,8 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
     size_t index = 0;
 
-    size_t constantCount = *(uint32_t *)code;
-    index = index + sizeof(uint32_t);
+    size_t constantCount = *(uint8_t *)code;
+    index = index + sizeof(uint8_t);
 
     for (size_t i = 0; i < constantCount; i++) {
 
