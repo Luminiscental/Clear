@@ -70,6 +70,8 @@ class TokenType(enum.Enum):
     LEFT_PAREN = enum.auto()
     RIGHT_PAREN = enum.auto()
     QUESTION_MARK = enum.auto()
+    PLUS = enum.auto()
+    MINUS = enum.auto()
     # Special
     ERROR = enum.auto()
 
@@ -180,6 +182,8 @@ def tokenize_source(source: str) -> List[Token]:
         (r"\(", TokenType.LEFT_PAREN),
         (r"\)", TokenType.RIGHT_PAREN),
         (r"\?", TokenType.QUESTION_MARK),
+        (r"\+", TokenType.PLUS),
+        (r"-", TokenType.MINUS),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 

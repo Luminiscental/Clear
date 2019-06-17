@@ -1,6 +1,6 @@
 
 func hello((func(int) int?)? f, MyType x) void {
-    print "hello";
+    print -"hello" + "a";
 }
 
-val x MyType? = "hello";
+val x MyType? = "bc.s";

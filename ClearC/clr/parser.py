@@ -2,7 +2,10 @@
 Contains functions and definitions for parsing a list of tokens into a parse tree.
 """
 
-from typing import List, Optional, Union, Tuple
+from typing import List, Optional, Union, Tuple, Callable, DefaultDict
+
+import enum
+import collections
 
 import clr.lexer as lexer
 
@@ -33,6 +36,13 @@ class Parser:
         Returns the current token, or None if there are no more tokens to parse.
         """
         return None if self.done() else self.tokens[self.current]
+
+    def backtrack(self) -> None:
+        """
+        Moves back to the previous token if there is one.
+        """
+        if self.current > 0:
+            self.current -= 1
 
     def advance(self) -> Optional[lexer.Token]:
         """
@@ -111,6 +121,13 @@ class ParseTree:
         return ParseTree(decls)
 
 
+def parse_tokens(tokens: List[lexer.Token]) -> ParseTree:
+    """
+    Parses a ParseTree from a list of tokens.
+    """
+    return ParseTree.parse(Parser(tokens))
+
+
 class ParseDecl:
     """
     Parse node for a generic declaration.
@@ -146,7 +163,7 @@ class ParseValueDecl:
         self,
         ident: Union[lexer.Token, ParseError],
         val_type: Optional["ParseType"],
-        expr: "ParseExpr",
+        expr: Union["ParseExpr", ParseError],
         errors: List[ParseError],
     ):
         self.errors = errors
@@ -178,7 +195,9 @@ class ParseValueDecl:
                     )
                 )
 
-        expr = ParseExpr.parse(parser)
+        expr = pratt_parse(parser, PRATT_TABLE)
+        if isinstance(expr, ParseError):
+            errors.append(expr)
 
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
@@ -341,7 +360,9 @@ class ParsePrintStmt:
     ParsePrintStmt : "print" ParseExpr ";" ;
     """
 
-    def __init__(self, expr: "ParseExpr", errors: List[ParseError]) -> None:
+    def __init__(
+        self, expr: Union["ParseExpr", ParseError], errors: List[ParseError]
+    ) -> None:
         self.errors = errors
         self.expr = expr
 
@@ -352,7 +373,9 @@ class ParsePrintStmt:
         consumed.
         """
         errors = []
-        expr = ParseExpr.parse(parser)
+        expr = pratt_parse(parser, PRATT_TABLE)
+        if isinstance(expr, ParseError):
+            errors.append(expr)
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
                 ParseError("missing ';' to end print statement", parser.curr_region())
@@ -412,7 +435,7 @@ class ParseIfStmt:
 
     def __init__(
         self,
-        pairs: List[Tuple["ParseExpr", ParseBlockStmt]],
+        pairs: List[Tuple[Union["ParseExpr", ParseError], ParseBlockStmt]],
         fallback: Optional[ParseBlockStmt],
         errors: List[ParseError],
     ) -> None:
@@ -434,7 +457,9 @@ class ParseIfStmt:
                 errors.append(
                     ParseError("missing '(' to start condition", parser.curr_region())
                 )
-            cond = ParseExpr.parse(parser)
+            cond = pratt_parse(parser, PRATT_TABLE)
+            if isinstance(cond, ParseError):
+                errors.append(cond)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
                     ParseError("missing ')' to end condition", parser.curr_region())
@@ -464,7 +489,7 @@ class ParseWhileStmt:
 
     def __init__(
         self,
-        cond: Optional["ParseExpr"],
+        cond: Optional[Union["ParseExpr", ParseError]],
         block: ParseBlockStmt,
         errors: List[ParseError],
     ) -> None:
@@ -481,7 +506,9 @@ class ParseWhileStmt:
         errors = []
         cond = None
         if parser.match(lexer.TokenType.LEFT_PAREN):
-            cond = ParseExpr.parse(parser)
+            cond = pratt_parse(parser, PRATT_TABLE)
+            if isinstance(cond, ParseError):
+                errors.append(cond)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
                     ParseError("missing ')' to end condition", parser.curr_region())
@@ -497,7 +524,9 @@ class ParseReturnStmt:
     ParseReturnStmt : "return" ParseExpr? ";" ;
     """
 
-    def __init__(self, expr: Optional["ParseExpr"], errors: List[ParseError]) -> None:
+    def __init__(
+        self, expr: Optional[Union["ParseExpr", ParseError]], errors: List[ParseError]
+    ) -> None:
         self.errors = errors
         self.expr = expr
 
@@ -510,7 +539,9 @@ class ParseReturnStmt:
         errors = []
         expr = None
         if not parser.match(lexer.TokenType.SEMICOLON):
-            expr = ParseExpr.parse(parser)
+            expr = pratt_parse(parser, PRATT_TABLE)
+            if isinstance(expr, ParseError):
+                errors.append(expr)
             if not parser.match(lexer.TokenType.SEMICOLON):
                 errors.append(
                     ParseError(
@@ -527,7 +558,9 @@ class ParseExprStmt:
     ParseExprStmt : ParseExpr ";" ;
     """
 
-    def __init__(self, expr: "ParseExpr", errors: List[ParseError]) -> None:
+    def __init__(
+        self, expr: Union["ParseExpr", ParseError], errors: List[ParseError]
+    ) -> None:
         self.errors = errors
         self.expr = expr
 
@@ -537,7 +570,9 @@ class ParseExprStmt:
         Parses a ParseExprStmt from a Parser.
         """
         errors = []
-        expr = ParseExpr.parse(parser)
+        expr = pratt_parse(parser, PRATT_TABLE)
+        if isinstance(expr, ParseError):
+            errors.append(expr)
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
                 ParseError(
@@ -669,32 +704,120 @@ class ParseAtomType:
         return ParseAtomType(ident, errors)
 
 
-class ParseExpr:
+ParseExpr = Union["ParseUnaryExpr", "ParseBinaryExpr", "ParseAtomExpr"]
+
+
+class ParseUnaryExpr:
     """
-    Parse node for an expression.
+    Prefix expression for a unary operator.
+    """
+
+    def __init__(self, parser: Parser) -> None:
+        self.operator = parser.prev()
+        self.target = pratt_parse(parser, PRATT_TABLE)
+
+
+class ParseBinaryExpr:
+    """
+    Infix expression for a binary operator.
+    """
+
+    def __init__(self, parser: Parser, lhs: ParseExpr) -> None:
+        self.left = lhs
+        self.operator = parser.prev()
+        self.right = pratt_parse(parser, PRATT_TABLE)
+
+
+class ParseAtomExpr:
+    """
+    Prefix expression for an atomic value expression.
+    """
+
+    def __init__(self, parser: Parser) -> None:
+        self.token = parser.prev()
+
+
+@enum.unique
+class Precedence(enum.Enum):
+    """
+    Enumerates the different precedences of infix expressions. The values respect the ordering.
+    """
+
+    NONE = 0
+    TERM = 1
+    CALL = 2
+
+
+class PrattRule:
+    """
+    Represents a rule for parsing a token within an expression.
     """
 
     def __init__(
-        self, token: Union[lexer.Token, ParseError], errors: List[ParseError]
+        self,
+        prefix: Optional[Callable[[Parser], ParseExpr]] = None,
+        infix: Optional[Callable[[Parser, ParseExpr], ParseExpr]] = None,
+        precedence: Precedence = Precedence.NONE,
     ) -> None:
-        # FIXME
-        self.errors = errors
-        self.token = token
+        self.prefix = prefix
+        self.infix = infix
+        self.precedence = precedence
 
-    @staticmethod
-    def parse(parser: Parser) -> "ParseExpr":
-        """
-        Parse a ParseExpr from a Parser.
-        """
+
+PRATT_TABLE: DefaultDict[lexer.TokenType, PrattRule] = collections.defaultdict(
+    PrattRule,
+    {
+        lexer.TokenType.MINUS: PrattRule(
+            prefix=ParseUnaryExpr, infix=ParseBinaryExpr, precedence=Precedence.TERM
+        ),
+        lexer.TokenType.PLUS: PrattRule(
+            infix=ParseBinaryExpr, precedence=Precedence.TERM
+        ),
+        lexer.TokenType.STR_LITERAL: PrattRule(prefix=ParseAtomExpr),
+        lexer.TokenType.NUM_LITERAL: PrattRule(prefix=ParseAtomExpr),
+        lexer.TokenType.INT_LITERAL: PrattRule(prefix=ParseAtomExpr),
+        lexer.TokenType.IDENTIFIER: PrattRule(prefix=ParseAtomExpr),
+    },
+)
+
+
+def pratt_parse(
+    parser: Parser, table: DefaultDict[lexer.TokenType, PrattRule]
+) -> Union[ParseExpr, ParseError]:
+    """
+    Given a table of pratt rules parses an expression from a parser.
+    """
+    start_token = parser.advance()
+    if not start_token:
+        return ParseError("expected expression", parser.curr_region())
+    if start_token.kind not in table:
+        return ParseError("unexpected token", start_token.lexeme)
+    prefix_rule = table[start_token.kind]
+    if not prefix_rule.prefix:
+        return ParseError("unexpected token for prefix expression", start_token.lexeme)
+    expr = prefix_rule.prefix(parser)
+
+    def next_rule() -> Optional[Union[PrattRule, ParseError]]:
         token = parser.advance()
-        if token:
-            return ParseExpr(token, [])
-        err = ParseError("expected expression before EOF", parser.curr_region())
-        return ParseExpr(err, [err])
+        if not token or token.kind not in table:
+            parser.backtrack()
+            return None
+        return table[token.kind]
 
-
-def parse_tokens(tokens: List[lexer.Token]) -> ParseTree:
-    """
-    Parses a ParseTree from a list of tokens.
-    """
-    return ParseTree.parse(Parser(tokens))
+    infix_rule = next_rule()
+    if not infix_rule:
+        return expr
+    if isinstance(infix_rule, ParseError):
+        return infix_rule
+    while infix_rule.precedence.value >= prefix_rule.precedence.value:
+        if not infix_rule.infix:
+            return ParseError(
+                "unexpected token for infix expression", parser.prev().lexeme
+            )
+        expr = infix_rule.infix(parser, expr)
+        infix_rule = next_rule()
+        if not infix_rule:
+            return expr
+        if isinstance(infix_rule, ParseError):
+            return infix_rule
+    return expr
