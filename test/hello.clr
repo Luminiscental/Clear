@@ -6,7 +6,7 @@ func hello((func(int) int?)? f, MyType x) void {
     } else if ("hello" + -1) {
         return "hello";
     } else {
-        while (?true {
+        while (true) {
             print n;
         }
         return hello;
@@ -15,6 +15,6 @@ func hello((func(int) int?)? f, MyType x) void {
 
 {
     val x = 3;
-
+}
 
 val x MyType? = "bc.s" / 6;

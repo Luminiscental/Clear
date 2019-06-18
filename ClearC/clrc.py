@@ -36,12 +36,14 @@ def main() -> None:
 
     tokens = lexer.tokenize_source(source)
     parsetree, errors = parser.parse_tokens(tokens)
-    print("Errors:")
-    print("--------")
-    for err in errors:
-        print(err.display())
-    print("--------")
-    print()
+    if errors:
+        print("Errors:")
+        print("--------")
+        for err in errors:
+            print(err.display())
+        print("--------")
+        sys.exit(1)
+
     print("Parse tree:")
     print("--------")
     print(parsetree.pprint())
