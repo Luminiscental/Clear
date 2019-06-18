@@ -61,6 +61,8 @@ class TokenType(enum.Enum):
     RETURN = enum.auto()
     PRINT = enum.auto()
     VOID = enum.auto()
+    OR = enum.auto()
+    AND = enum.auto()
     # Symbols
     EQUALS = enum.auto()
     COMMA = enum.auto()
@@ -72,6 +74,8 @@ class TokenType(enum.Enum):
     QUESTION_MARK = enum.auto()
     PLUS = enum.auto()
     MINUS = enum.auto()
+    STAR = enum.auto()
+    SLASH = enum.auto()
     # Special
     ERROR = enum.auto()
 
@@ -184,6 +188,8 @@ def tokenize_source(source: str) -> List[Token]:
         (r"\?", TokenType.QUESTION_MARK),
         (r"\+", TokenType.PLUS),
         (r"-", TokenType.MINUS),
+        (r"\*", TokenType.STAR),
+        (r"/", TokenType.SLASH),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 
@@ -200,6 +206,8 @@ def tokenize_source(source: str) -> List[Token]:
             "while": TokenType.WHILE,
             "return": TokenType.RETURN,
             "print": TokenType.PRINT,
+            "or": TokenType.OR,
+            "and": TokenType.AND,
         }
 
         if token.kind == TokenType.IDENTIFIER:

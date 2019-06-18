@@ -1,6 +1,20 @@
 
 func hello((func(int) int?)? f, MyType x) void {
-    print -"hello" + "a";
+    print -"hello" + "a" * 3 - 2i / 4i;
+    if (true or false) {
+        return -1;
+    } else if ("hello" + -1) {
+        return "hello";
+    } else {
+        while (true) {
+            print n;
+        }
+        return hello;
+    }
 }
 
-val x MyType? = "bc.s";
+{
+    val x = 3;
+}
+
+val x MyType? = "bc.s" / 6;

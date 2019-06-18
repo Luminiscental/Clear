@@ -36,6 +36,10 @@ def main() -> None:
 
     tokens = lexer.tokenize_source(source)
     parsetree = parser.parse_tokens(tokens)
+    print("Parse tree:")
+    print("--------")
+    print(parsetree.pprint())
+    print("--------")
 
     constants: List[bytecode.Constant] = []
     instructions: List[bytecode.Instruction] = []
