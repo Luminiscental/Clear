@@ -1,20 +1,10 @@
 
-func hello((func(int) int?)? f, MyType x) void {
-    print -"hello" + "a" * 3 - 2i / 4i;
-    if (true or false) {
-        return -1;
-    } else if ("hello" + -1) {
-        return "hello";
-    } else {
-        while (true) {
-            print n;
-        }
-        return hello;
-    }
+func hello(str name) void {
+    print "Hello " + name;
 }
 
-{
-    val x = 3;
-}
+val me = "<I really don't know>";
+val you = "lily";
 
-val x MyType? = "bc.s" / 6;
+//hello(me);
+//hello(you);

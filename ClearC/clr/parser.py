@@ -11,6 +11,7 @@ from typing import (
     DefaultDict,
     Iterable,
     NamedTuple,
+    TypeVar,
 )
 
 import enum
@@ -196,7 +197,7 @@ class ParseValueDecl(ParseNode):
         self,
         ident: Union[lexer.Token, ParseError],
         val_type: Optional["ParseType"],
-        expr: Union["ParseExpr", ParseError],
+        expr: "ParseExpr",
     ):
         self.ident = ident
         self.val_type = val_type
@@ -205,10 +206,7 @@ class ParseValueDecl(ParseNode):
     def pprint(self) -> str:
         ident_str = "<error>" if isinstance(self.ident, ParseError) else str(self.ident)
         type_str = self.val_type.pprint() if self.val_type else ""
-        init_str = (
-            "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
-        )
-        return f"val {ident_str} {type_str} = {init_str};"
+        return f"val {ident_str} {type_str} = {self.expr.pprint()};"
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseValueDecl", List[ParseError]]:
@@ -235,9 +233,8 @@ class ParseValueDecl(ParseNode):
                     )
                 )
 
-        expr = pratt_parse(parser, PRATT_TABLE)
-        if isinstance(expr, ParseError):
-            errors.append(expr)
+        expr, errs = pratt_parse(parser, PRATT_TABLE)
+        errors.extend(errs)
 
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
@@ -257,7 +254,7 @@ class ParseFuncDecl(ParseNode):
     def __init__(
         self,
         ident: Union[lexer.Token, ParseError],
-        params: "ParseParams",
+        params: List[Tuple["ParseType", Union[lexer.Token, ParseError]]],
         return_type: "ParseType",
         block: "ParseBlockStmt",
     ) -> None:
@@ -282,7 +279,20 @@ class ParseFuncDecl(ParseNode):
         else:
             ident = ParseError("missing function name", parser.curr_region())
             errors.append(ident)
-        params, errs = ParseParams.parse(parser)
+
+        def parse_param(
+            parser: Parser
+        ) -> Tuple["ParseType", Union[lexer.Token, ParseError]]:
+            param_type, errs = ParseType.parse(parser)
+            errors.extend(errs)
+            if parser.match(lexer.TokenType.IDENTIFIER):
+                return param_type, parser.prev()
+            return (
+                param_type,
+                ParseError("missing parameter name", parser.curr_region()),
+            )
+
+        params, errs = parse_tuple(parser, parse_param)
         errors.extend(errs)
         return_type, errs = ParseType.parse(parser)
         errors.extend(errs)
@@ -291,6 +301,16 @@ class ParseFuncDecl(ParseNode):
         return ParseFuncDecl(ident, params, return_type, block), errors
 
 
+T = TypeVar("T")  # pylint: disable=invalid-name
+
+# TODO: add
+def parse_tuple(
+    parser: Parser, parse_func: Callable[[Parser], T]
+) -> Tuple[List[T], List[ParseError]]:
+    return [], []
+
+
+# TODO: remove
 class ParseParams(ParseNode):
     """
     Parse node for a parameter list.
@@ -423,14 +443,11 @@ class ParsePrintStmt(ParseNode):
     ParsePrintStmt : "print" ParseExpr ";" ;
     """
 
-    def __init__(self, expr: Union["ParseExpr", ParseError]) -> None:
+    def __init__(self, expr: "ParseExpr") -> None:
         self.expr = expr
 
     def pprint(self) -> str:
-        expr_str = (
-            "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
-        )
-        return f"print {expr_str};"
+        return f"print {self.expr.pprint()};"
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParsePrintStmt", List[ParseError]]:
@@ -439,9 +456,8 @@ class ParsePrintStmt(ParseNode):
         consumed.
         """
         errors = []
-        expr = pratt_parse(parser, PRATT_TABLE)
-        if isinstance(expr, ParseError):
-            errors.append(expr)
+        expr, errs = pratt_parse(parser, PRATT_TABLE)
+        errors.extend(errs)
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
                 ParseError("missing ';' to end print statement", parser.curr_region())
@@ -506,7 +522,7 @@ class ParseIfStmt(ParseNode):
 
     def __init__(
         self,
-        pairs: List[Tuple[Union["ParseExpr", ParseError], ParseBlockStmt]],
+        pairs: List[Tuple["ParseExpr", ParseBlockStmt]],
         fallback: Optional[ParseBlockStmt],
     ) -> None:
         self.pairs = pairs
@@ -516,13 +532,8 @@ class ParseIfStmt(ParseNode):
         def conds() -> Iterable[str]:
             first = True
             for cond_expr, cond_block in self.pairs:
-                expr_str = (
-                    "<error>"
-                    if isinstance(cond_expr, ParseError)
-                    else cond_expr.pprint()
-                )
                 else_str = "else" if not first else ""
-                yield f"{else_str} if ({expr_str}) {cond_block.pprint()}"
+                yield f"{else_str} if ({cond_expr.pprint()}) {cond_block.pprint()}"
                 first = False
 
         conds_str = " ".join(conds())
@@ -543,9 +554,8 @@ class ParseIfStmt(ParseNode):
                 errors.append(
                     ParseError("missing '(' to start condition", parser.curr_region())
                 )
-            cond = pratt_parse(parser, PRATT_TABLE)
-            if isinstance(cond, ParseError):
-                errors.append(cond)
+            cond, errs = pratt_parse(parser, PRATT_TABLE)
+            errors.extend(errs)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
                     ParseError("missing ')' to end condition", parser.curr_region())
@@ -575,19 +585,12 @@ class ParseWhileStmt(ParseNode):
     ParseWhileStmt : "while" ( "(" ParseExpr ")" )? ParseBlockStmt ;
     """
 
-    def __init__(
-        self, cond: Optional[Union["ParseExpr", ParseError]], block: ParseBlockStmt
-    ) -> None:
+    def __init__(self, cond: Optional["ParseExpr"], block: ParseBlockStmt) -> None:
         self.cond = cond
         self.block = block
 
     def pprint(self) -> str:
-        if not self.cond:
-            cond_str = ""
-        elif isinstance(self.cond, ParseError):
-            cond_str = "(<error>) "
-        else:
-            cond_str = f"({self.cond.pprint()}) "
+        cond_str = f"({self.cond.pprint()}) " if self.cond else ""
         return f"while {cond_str}{self.block.pprint()}"
 
     @staticmethod
@@ -599,9 +602,8 @@ class ParseWhileStmt(ParseNode):
         errors = []
         cond = None
         if parser.match(lexer.TokenType.LEFT_PAREN):
-            cond = pratt_parse(parser, PRATT_TABLE)
-            if isinstance(cond, ParseError):
-                errors.append(cond)
+            cond, errs = pratt_parse(parser, PRATT_TABLE)
+            errors.extend(errs)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
                     ParseError("missing ')' to end condition", parser.curr_region())
@@ -618,16 +620,13 @@ class ParseReturnStmt(ParseNode):
     ParseReturnStmt : "return" ParseExpr? ";" ;
     """
 
-    def __init__(self, expr: Optional[Union["ParseExpr", ParseError]]) -> None:
+    def __init__(self, expr: Optional["ParseExpr"]) -> None:
         self.expr = expr
 
     def pprint(self) -> str:
         if not self.expr:
             return "return;"
-        expr_str = (
-            "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
-        )
-        return f"return {expr_str};"
+        return f"return {self.expr.pprint()};"
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseReturnStmt", List[ParseError]]:
@@ -638,9 +637,8 @@ class ParseReturnStmt(ParseNode):
         errors = []
         expr = None
         if not parser.match(lexer.TokenType.SEMICOLON):
-            expr = pratt_parse(parser, PRATT_TABLE)
-            if isinstance(expr, ParseError):
-                errors.append(expr)
+            expr, errs = pratt_parse(parser, PRATT_TABLE)
+            errors.extend(errs)
             if not parser.match(lexer.TokenType.SEMICOLON):
                 errors.append(
                     ParseError(
@@ -657,14 +655,11 @@ class ParseExprStmt(ParseNode):
     ParseExprStmt : ParseExpr ";" ;
     """
 
-    def __init__(self, expr: Union["ParseExpr", ParseError]) -> None:
+    def __init__(self, expr: "ParseExpr") -> None:
         self.expr = expr
 
     def pprint(self) -> str:
-        expr_str = (
-            "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
-        )
-        return f"{expr_str};"
+        return f"{self.expr.pprint()};"
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseExprStmt", List[ParseError]]:
@@ -672,9 +667,8 @@ class ParseExprStmt(ParseNode):
         Parses a ParseExprStmt from a Parser.
         """
         errors = []
-        expr = pratt_parse(parser, PRATT_TABLE)
-        if isinstance(expr, ParseError):
-            errors.append(expr)
+        expr, errs = pratt_parse(parser, PRATT_TABLE)
+        errors.extend(errs)
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
                 ParseError(
@@ -757,33 +751,12 @@ class ParseFuncType(ParseNode):
                 ParseError("missing '(' to begin parameter types", parser.curr_region())
             )
 
-        opener = parser.prev()
+        def parse_param(parser: Parser) -> ParseType:
+            param_type, errs = ParseType.parse(parser)
+            errors.extend(errs)
+            return param_type
 
-        if not parser.match(lexer.TokenType.RIGHT_PAREN):
-
-            def parse_param() -> None:
-                param_type, errs = ParseType.parse(parser)
-                errors.extend(errs)
-                params.append(param_type)
-
-            parse_param()
-            while not parser.match(lexer.TokenType.RIGHT_PAREN):
-                before = parser.current
-                if parser.done():
-                    errors.append(
-                        ParseError("missing ')' for parameter types", opener.lexeme)
-                    )
-                    break
-                if not parser.match(lexer.TokenType.COMMA):
-                    errors.append(
-                        ParseError(
-                            "missing ',' to delimit parameter types",
-                            parser.curr_region(),
-                        )
-                    )
-                parse_param()
-                if parser.current == before:
-                    break
+        params = parse_tuple(parser, parse_param)
 
         return_type, errs = ParseType.parse(parser)
         errors.extend(errs)
@@ -819,7 +792,19 @@ class ParseAtomType(ParseNode):
         return ParseAtomType(token), errors
 
 
-ParseExpr = Union["ParseUnaryExpr", "ParseBinaryExpr", "ParseAtomExpr"]
+class ParseExpr(ParseNode):
+    """
+    Parse node for an expression.
+    """
+
+    def __init__(
+        self,
+        expr: Union["ParseUnaryExpr", "ParseBinaryExpr", "ParseAtomExpr", ParseError],
+    ) -> None:
+        self.expr = expr
+
+    def pprint(self) -> str:
+        return "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
 
 
 class ParseUnaryExpr(ParseNode):
@@ -827,15 +812,21 @@ class ParseUnaryExpr(ParseNode):
     Prefix expression for a unary operator.
     """
 
-    def __init__(self, parser: Parser) -> None:
-        self.operator = parser.prev()
-        self.target = pratt_parse(parser, PRATT_TABLE, precedence=Precedence.UNARY)
+    def __init__(self, operator: lexer.Token, target: ParseExpr) -> None:
+        self.operator = operator
+        self.target = target
+
+    @staticmethod
+    def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
+        """
+        Parse a unary expression from a Parser given that the operator has already been consumed.
+        """
+        operator = parser.prev()
+        target, errs = pratt_parse(parser, PRATT_TABLE, precedence=Precedence.UNARY)
+        return ParseExpr(ParseUnaryExpr(operator, target)), errs
 
     def pprint(self) -> str:
-        target_str = (
-            "<error>" if isinstance(self.target, ParseError) else self.target.pprint()
-        )
-        return f"{self.operator}({target_str})"
+        return f"{self.operator}({self.target.pprint()})"
 
 
 class ParseBinaryExpr(ParseNode):
@@ -843,17 +834,55 @@ class ParseBinaryExpr(ParseNode):
     Infix expression for a binary operator.
     """
 
-    def __init__(self, parser: Parser, lhs: ParseExpr) -> None:
-        self.left = lhs
-        self.operator = parser.prev()
-        prec = PRATT_TABLE[self.operator.kind].precedence
-        self.right = pratt_parse(parser, PRATT_TABLE, prec.next())
+    def __init__(
+        self, left: ParseExpr, operator: lexer.Token, right: ParseExpr
+    ) -> None:
+        self.left = left
+        self.operator = operator
+        self.right = right
+
+    @staticmethod
+    def finish(parser: Parser, lhs: ParseExpr) -> Tuple["ParseExpr", List[ParseError]]:
+        """
+        Parse the right hand side of a binary expression from a Parser given that the operator has
+        already been consumed.
+        """
+        left = lhs
+        operator = parser.prev()
+        prec = PRATT_TABLE[operator.kind].precedence
+        right, errs = pratt_parse(parser, PRATT_TABLE, prec.next())
+        return ParseExpr(ParseBinaryExpr(left, operator, right)), errs
 
     def pprint(self) -> str:
-        right_str = (
-            "<error>" if isinstance(self.right, ParseError) else self.right.pprint()
+        return f"({self.left.pprint()}){self.operator}({self.right.pprint()})"
+
+
+class ParseCallExpr(ParseNode):
+    """
+    Infix expression for a function call.
+    """
+
+    def __init__(self, function: ParseExpr, args: List[ParseExpr]) -> None:
+        self.function = function
+        self.args = args
+
+    def pprint(self) -> str:
+        args_str = ", ".join(arg.pprint() for arg in self.args)
+        return f"{self.function.pprint()}({args_str})"
+
+    @staticmethod
+    def finish(
+        parser: Parser, lhs: ParseExpr
+    ) -> Tuple["ParseCallExpr", List[ParseError]]:
+        """
+        Parse the call part of a function call expression given that the open parenthesis has
+        already been consumed.
+        """
+        function = lhs
+        args, errs = parse_tuple(
+            parser, lambda parser: pratt_parse(parser, PRATT_TABLE)
         )
-        return f"({self.left.pprint()}){self.operator}({right_str})"
+        return ParseCallExpr(function, args), errs
 
 
 class ParseAtomExpr(ParseNode):
@@ -861,8 +890,17 @@ class ParseAtomExpr(ParseNode):
     Prefix expression for an atomic value expression.
     """
 
-    def __init__(self, parser: Parser) -> None:
-        self.token = parser.prev()
+    def __init__(self, token: lexer.Token) -> None:
+        self.token = token
+
+    @staticmethod
+    def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
+        """
+        Parse an atomic value expression from a Parser given that the token has already been
+        consumed.
+        """
+        token = parser.prev()
+        return ParseExpr(ParseAtomExpr(token)), []
 
     def pprint(self) -> str:
         return str(self.token)
@@ -917,13 +955,17 @@ class Precedence(enum.Enum):
         return Precedence(min(next_value, Precedence.MAX.value))
 
 
+PrefixRule = Callable[[Parser], Tuple[ParseExpr, List[ParseError]]]
+InfixRule = Callable[[Parser, ParseExpr], Tuple[ParseExpr, List[ParseError]]]
+
+
 class PrattRule(NamedTuple):
     """
     Represents a rule for parsing a token within an expression.
     """
 
-    prefix: Optional[Callable[[Parser], ParseExpr]] = None
-    infix: Optional[Callable[[Parser, ParseExpr], ParseExpr]] = None
+    prefix: Optional[PrefixRule] = None
+    infix: Optional[InfixRule] = None
     precedence: Precedence = Precedence.NONE
 
 
@@ -931,43 +973,48 @@ PRATT_TABLE: DefaultDict[lexer.TokenType, PrattRule] = collections.defaultdict(
     PrattRule,
     {
         lexer.TokenType.MINUS: PrattRule(
-            prefix=ParseUnaryExpr, infix=ParseBinaryExpr, precedence=Precedence.TERM
+            prefix=ParseUnaryExpr.finish,
+            infix=ParseBinaryExpr.finish,
+            precedence=Precedence.TERM,
         ),
         lexer.TokenType.PLUS: PrattRule(
-            infix=ParseBinaryExpr, precedence=Precedence.TERM
+            infix=ParseBinaryExpr.finish, precedence=Precedence.TERM
         ),
         lexer.TokenType.STAR: PrattRule(
-            infix=ParseBinaryExpr, precedence=Precedence.FACTOR
+            infix=ParseBinaryExpr.finish, precedence=Precedence.FACTOR
         ),
         lexer.TokenType.SLASH: PrattRule(
-            infix=ParseBinaryExpr, precedence=Precedence.FACTOR
+            infix=ParseBinaryExpr.finish, precedence=Precedence.FACTOR
         ),
-        lexer.TokenType.OR: PrattRule(infix=ParseBinaryExpr, precedence=Precedence.OR),
+        lexer.TokenType.OR: PrattRule(
+            infix=ParseBinaryExpr.finish, precedence=Precedence.OR
+        ),
         lexer.TokenType.AND: PrattRule(
-            infix=ParseBinaryExpr, precedence=Precedence.AND
+            infix=ParseBinaryExpr.finish, precedence=Precedence.AND
         ),
-        lexer.TokenType.STR_LITERAL: PrattRule(prefix=ParseAtomExpr),
-        lexer.TokenType.NUM_LITERAL: PrattRule(prefix=ParseAtomExpr),
-        lexer.TokenType.INT_LITERAL: PrattRule(prefix=ParseAtomExpr),
-        lexer.TokenType.IDENTIFIER: PrattRule(prefix=ParseAtomExpr),
+        lexer.TokenType.STR_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
+        lexer.TokenType.NUM_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
+        lexer.TokenType.INT_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
+        lexer.TokenType.IDENTIFIER: PrattRule(prefix=ParseAtomExpr.finish),
     },
 )
 
 
 def pratt_prefix(
     parser: Parser, table: DefaultDict[lexer.TokenType, PrattRule]
-) -> Union[ParseExpr, ParseError]:
+) -> Tuple[ParseExpr, List[ParseError]]:
     """
     Parses a prefix expression from a Parser using a pratt table.
     """
     start_token = parser.advance()
     if not start_token:
-        return ParseError("unexpected EOF; expected expression", parser.curr_region())
+        err = ParseError("unexpected EOF; expected expression", parser.curr_region())
+        return ParseExpr(err), [err]
     rule = table[start_token.kind]
     if not rule.prefix:
-        return ParseError("unexpected token; expected expression", start_token.lexeme)
-    expr = rule.prefix(parser)
-    return expr
+        err = ParseError("unexpected token; expected expression", start_token.lexeme)
+        return ParseExpr(err), [err]
+    return rule.prefix(parser)
 
 
 def pratt_infix(
@@ -975,11 +1022,12 @@ def pratt_infix(
     table: DefaultDict[lexer.TokenType, PrattRule],
     expr: ParseExpr,
     precedence: Precedence,
-) -> Optional[Union[ParseExpr, ParseError]]:
+) -> Optional[Tuple[ParseExpr, List[ParseError]]]:
     """
     Given an initial expression and precedence parses an infix expression from a Parser using a
-    pratt table if there are no infix extensions bound by the precedence returns None.
+    pratt table. If there are no infix extensions bound by the precedence returns None.
     """
+    errors = []
     # See if there's an infix token
     # If not, there's no expression to parse
     token = parser.curr()
@@ -993,7 +1041,8 @@ def pratt_infix(
         # Advance past the infix token and run its rule
         parser.advance()
         if rule.infix:  # Should always be true but mypy can't tell
-            expr = rule.infix(parser, expr)
+            expr, errs = rule.infix(parser, expr)
+            errors.extend(errs)
         # See if there's another infix token
         # If not, the expression is finished
         token = parser.curr()
@@ -1002,19 +1051,19 @@ def pratt_infix(
         rule = table[token.kind]
         if not rule.infix:
             break
-    return expr
+    return expr, errors
 
 
 def pratt_parse(
     parser: Parser,
     table: DefaultDict[lexer.TokenType, PrattRule],
     precedence: Precedence = Precedence.ASSIGNMENT,
-) -> Union[ParseExpr, ParseError]:
+) -> Tuple[ParseExpr, List[ParseError]]:
     """
     Parses an expression bound by a given precedence from a Parser using a pratt table.
     """
-    prefix_parse = pratt_prefix(parser, table)
-    if isinstance(prefix_parse, ParseError):
-        return prefix_parse
-    infix_parse = pratt_infix(parser, table, prefix_parse, precedence)
-    return infix_parse or prefix_parse
+    prefix_expr, errs = pratt_prefix(parser, table)
+    infix_parse = pratt_infix(parser, table, prefix_expr, precedence)
+    if infix_parse:
+        return infix_parse[0], errs + infix_parse[1]
+    return prefix_expr, errs

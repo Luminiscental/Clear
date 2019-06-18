@@ -158,11 +158,11 @@ class Lexer:
         it can't consume.
         """
         while not self.done():
+            if skip_rules and any(self.skip(pattern) for pattern in skip_rules):
+                continue
             if consume_rules and any(
                 self.consume(pattern, kind) for pattern, kind in consume_rules
             ):
-                continue
-            if skip_rules and any(self.skip(pattern) for pattern in skip_rules):
                 continue
             if not fallback or not self.consume(fallback[0], fallback[1]):
                 break
