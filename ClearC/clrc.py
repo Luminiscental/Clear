@@ -35,7 +35,13 @@ def main() -> None:
         sys.exit(1)
 
     tokens = lexer.tokenize_source(source)
-    parsetree = parser.parse_tokens(tokens)
+    parsetree, errors = parser.parse_tokens(tokens)
+    print("Errors:")
+    print("--------")
+    for err in errors:
+        print(err.display())
+    print("--------")
+    print()
     print("Parse tree:")
     print("--------")
     print(parsetree.pprint())
