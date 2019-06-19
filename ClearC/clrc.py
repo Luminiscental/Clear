@@ -13,6 +13,7 @@ import clr.lexer as lexer
 import clr.parser as parser
 import clr.ast as ast
 import clr.printer as printer
+import clr.resolver as resolver
 
 
 def main() -> None:
@@ -47,11 +48,16 @@ def main() -> None:
         sys.exit(1)
 
     tree = parsetree.to_ast()
+    if isinstance(tree, ast.AstError):  # Shouldn't happen if there are no parse errors
+        print("Ast failed to form")
+        sys.exit(1)
 
     print("Ast:")
     print("--------")
     printer.pprint(tree)
     print("--------")
+
+    resolver.resolve_names(tree)
 
     constants: List[bytecode.Constant] = []
     instructions: List[bytecode.Instruction] = []

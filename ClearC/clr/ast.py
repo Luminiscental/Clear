@@ -2,9 +2,10 @@
 Module containing definitions for a Clear ast and a base class for ast visitors.
 """
 
-from typing import Union, List, Optional, Tuple
+from typing import Union, List, Optional, Tuple, Dict
 
 
+# TODO: Maybe pass instead of making these abstract because while it helps avoid bugs it makes things painfully verbose.
 class AstVisitor:
     """
     Base class for an ast visitor.
@@ -119,6 +120,71 @@ class AstVisitor:
         raise NotImplementedError()
 
 
+class BlockVisitor(AstVisitor):
+    """
+    Ast visitor that propogates to all blocks for a convenient base class.
+    """
+
+    def func_decl(self, node: "AstFuncDecl") -> None:
+        node.block.accept(self)
+
+    def block_stmt(self, node: "AstBlockStmt") -> None:
+        for decl in node.decls:
+            decl.accept(self)
+
+    def if_stmt(self, node: "AstIfStmt") -> None:
+        node.if_part[1].accept(self)
+        for _, block in node.elif_parts:
+            block.accept(self)
+        if node.else_part:
+            node.else_part.accept(self)
+
+    def while_stmt(self, node: "AstWhileStmt") -> None:
+        node.block.accept(self)
+
+    def value_decl(self, node: "AstValueDecl") -> None:
+        raise NotImplementedError()
+
+    def print_stmt(self, node: "AstPrintStmt") -> None:
+        raise NotImplementedError()
+
+    def return_stmt(self, node: "AstReturnStmt") -> None:
+        raise NotImplementedError()
+
+    def expr_stmt(self, node: "AstExprStmt") -> None:
+        raise NotImplementedError()
+
+    def unary_expr(self, node: "AstUnaryExpr") -> None:
+        raise NotImplementedError()
+
+    def binary_expr(self, node: "AstBinaryExpr") -> None:
+        raise NotImplementedError()
+
+    def int_expr(self, node: "AstIntExpr") -> None:
+        raise NotImplementedError()
+
+    def num_expr(self, node: "AstNumExpr") -> None:
+        raise NotImplementedError()
+
+    def str_expr(self, node: "AstStrExpr") -> None:
+        raise NotImplementedError()
+
+    def ident_expr(self, node: "AstIdentExpr") -> None:
+        raise NotImplementedError()
+
+    def call_expr(self, node: "AstCallExpr") -> None:
+        raise NotImplementedError()
+
+    def atom_type(self, node: "AstAtomType") -> None:
+        raise NotImplementedError()
+
+    def func_type(self, node: "AstFuncType") -> None:
+        raise NotImplementedError()
+
+    def optional_type(self, node: "AstOptionalType") -> None:
+        raise NotImplementedError()
+
+
 class AstNode:
     """
     Base class for an ast node that can accept a visitor.
@@ -164,6 +230,8 @@ class Ast(AstNode):
 
     def __init__(self, decls: List[AstDecl]) -> None:
         self.decls = decls
+        # Annotations:
+        self.names: Dict[str, AstDecl] = {}
 
     def accept(self, visitor: AstVisitor) -> None:
         for decl in self.decls:
@@ -298,6 +366,8 @@ class AstBlockStmt(AstNode):
 
     def __init__(self, decls: List[AstDecl]) -> None:
         self.decls = decls
+        # Annotations:
+        self.names: Dict[str, AstDecl] = {}
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)

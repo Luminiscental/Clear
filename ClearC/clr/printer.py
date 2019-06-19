@@ -44,6 +44,7 @@ class AstPrinter(ast.AstVisitor):
             self._append(" ")
         self._append("= ")
         node.val_init.accept(self)
+        self._append(";")
         self._startline()
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:

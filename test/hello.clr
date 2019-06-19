@@ -15,6 +15,9 @@ hello(you, printer);
 
 if (true) {
     val x int? = 2;
+    {
+        val x = -1i;
+    }
 } else if (false) {
     val y func() str?? = "";
 } else {
