@@ -4,12 +4,13 @@ Module for name resolution visitors / functions.
 
 from typing import List, Union
 
+import clr.lexer as lexer
 import clr.ast as ast
 
 
-class NameTracker(ast.BlockVisitor):
+class ScopeVisitor(ast.BlockVisitor):
     """
-    Ast visitor to annotate what names are in scope.
+    Ast visitor to keep track of the current scope.
     """
 
     def __init__(self, tree: ast.Ast):
@@ -27,57 +28,66 @@ class NameTracker(ast.BlockVisitor):
     def _pop_scope(self) -> None:
         self.scopes.pop()
 
-    def value_decl(self, node: ast.AstValueDecl) -> None:
-        self._get_scope().names[node.ident] = node
-
-    def func_decl(self, node: ast.AstFuncDecl) -> None:
-        self._get_scope().names[node.ident] = node
-        super().func_decl(node)
-
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
         self._push_scope(node)
         super().block_stmt(node)
         self._pop_scope()
 
-    def print_stmt(self, node: ast.AstPrintStmt) -> None:
-        pass
 
-    def return_stmt(self, node: ast.AstReturnStmt) -> None:
-        pass
+class NameTracker(ScopeVisitor):
+    """
+    Ast visitor to annotate what names are in scope.
+    """
 
-    def expr_stmt(self, node: ast.AstExprStmt) -> None:
-        pass
+    def _push_scope(self, node: ast.AstBlockStmt) -> None:
+        parent = self._get_scope()
+        super()._push_scope(node)
+        self._get_scope().names = parent.names
 
-    def unary_expr(self, node: ast.AstUnaryExpr) -> None:
-        pass
+    def value_decl(self, node: ast.AstValueDecl) -> None:
+        self._get_scope().names[node.ident] = node
 
-    def binary_expr(self, node: ast.AstBinaryExpr) -> None:
-        pass
+    def func_decl(self, node: ast.AstFuncDecl) -> None:
+        self._get_scope().names[node.ident] = node
+        for _, param_name in node.params:
+            # TODO: Do something more sensible here
+            self._get_scope().names[param_name] = node
+        super().func_decl(node)
 
-    def int_expr(self, node: ast.AstIntExpr) -> None:
-        pass
 
-    def num_expr(self, node: ast.AstNumExpr) -> None:
-        pass
+class NameResolver(ScopeVisitor, ast.DeepVisitor):
+    """
+    Ast visitor to annotate what declarations identifiers reference.
+    """
 
-    def str_expr(self, node: ast.AstStrExpr) -> None:
-        pass
+    def __init__(self, tree: ast.Ast) -> None:
+        super().__init__(tree)
+        self.errors: List[str] = []
+
+    def _resolve_name(
+        self, name: str, node: Union[ast.AstIdentExpr, ast.AstAtomType]
+    ) -> None:
+        if name not in self._get_scope().names:
+            # TODO: store regions so these errors can be more friendly
+            self.errors.append(f"reference to undeclared name {name}")
+        else:
+            node.ref = self._get_scope().names[name]
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        pass
-
-    def call_expr(self, node: ast.AstCallExpr) -> None:
-        pass
+        self._resolve_name(node.name, node)
 
     def atom_type(self, node: ast.AstAtomType) -> None:
-        pass
-
-    def func_type(self, node: ast.AstFuncType) -> None:
-        pass
-
-    def optional_type(self, node: ast.AstOptionalType) -> None:
-        pass
+        if node.token not in ["void", "int", "str", "num", "bool"]:
+            self._resolve_name(node.token, node)
 
 
-def resolve_names(tree: ast.Ast) -> None:
-    tree.accept(NameTracker(tree))
+def resolve_names(tree: ast.Ast) -> List[str]:
+    """
+    Annotates scope nodes with the names they contain, and identifier nodes with the declarations
+    they reference, returning a list of any resolve errors.
+    """
+    tracker = NameTracker(tree)
+    tree.accept(tracker)
+    resolver = NameResolver(tree)
+    tree.accept(resolver)
+    return resolver.errors

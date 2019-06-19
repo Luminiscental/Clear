@@ -38,17 +38,17 @@ def main() -> None:
         sys.exit(1)
 
     tokens = lexer.tokenize_source(source)
-    parsetree, errors = parser.parse_tokens(tokens)
-    if errors:
-        print("Errors:")
+    ptree, parse_errors = parser.parse_tokens(tokens)
+    if parse_errors:
+        print("Parse Errors:")
         print("--------")
-        for err in errors:
-            print(err.display())
+        for parse_error in parse_errors:
+            print(parse_error.display())
         print("--------")
         sys.exit(1)
 
-    tree = parsetree.to_ast()
-    if isinstance(tree, ast.AstError):  # Shouldn't happen if there are no parse errors
+    tree = ptree.to_ast()
+    if isinstance(tree, ast.AstError):  # Shouldn't happen since we exit on parse errors
         print("Ast failed to form")
         sys.exit(1)
 
@@ -57,7 +57,14 @@ def main() -> None:
     printer.pprint(tree)
     print("--------")
 
-    resolver.resolve_names(tree)
+    resolve_errors = resolver.resolve_names(tree)
+    if resolve_errors:
+        print("Resolve Errors:")
+        print("--------")
+        for resolve_error in resolve_errors:
+            print(resolve_error)
+        print("--------")
+        sys.exit(1)
 
     constants: List[bytecode.Constant] = []
     instructions: List[bytecode.Instruction] = []
