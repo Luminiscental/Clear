@@ -6,5 +6,5 @@ func hello(str name) void {
 val me = "<I really don't know>";
 val you = "lily";
 
-//hello(me);
-//hello(you);
+hello(me);
+hello(you);

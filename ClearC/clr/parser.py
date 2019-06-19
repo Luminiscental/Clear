@@ -265,7 +265,18 @@ class ParseFuncDecl(ParseNode):
 
     def pprint(self) -> str:
         ident_str = "<error>" if isinstance(self.ident, ParseError) else str(self.ident)
-        return f"func {ident_str}{self.params.pprint()} {self.return_type.pprint()} {self.block.pprint()}"
+
+        def param_gen() -> Iterable[str]:
+            for param_type, param_ident in self.params:
+                ident_str = (
+                    "<error>"
+                    if isinstance(param_ident, ParseError)
+                    else str(param_ident)
+                )
+                yield f"{param_type.pprint()} {ident_str}"
+
+        param_str = ", ".join(param_gen())
+        return f"func {ident_str}({param_str}) {self.return_type.pprint()} {self.block.pprint()}"
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseFuncDecl", List[ParseError]]:
@@ -292,6 +303,10 @@ class ParseFuncDecl(ParseNode):
                 ParseError("missing parameter name", parser.curr_region()),
             )
 
+        if not parser.match(lexer.TokenType.LEFT_PAREN):
+            errors.append(
+                ParseError("missing '(' to begin parameters", parser.curr_region())
+            )
         params, errs = parse_tuple(parser, parse_param)
         errors.extend(errs)
         return_type, errs = ParseType.parse(parser)
@@ -303,84 +318,27 @@ class ParseFuncDecl(ParseNode):
 
 T = TypeVar("T")  # pylint: disable=invalid-name
 
-# TODO: add
+
 def parse_tuple(
     parser: Parser, parse_func: Callable[[Parser], T]
 ) -> Tuple[List[T], List[ParseError]]:
-    return [], []
-
-
-# TODO: remove
-class ParseParams(ParseNode):
     """
-    Parse node for a parameter list.
-
-    ParseParams : "(" ( ParseType identifier ( "," ParseType identifier )* )? ")" ;
+    Given that the opening '(' has already been consumed, parse the elements of a tuple (a,b,...)
+    form into a list using a parameter function to parse each element.
     """
-
-    def __init__(self, pairs: List[Tuple["ParseType", Union[lexer.Token, ParseError]]]):
-        self.pairs = pairs
-
-    def pprint(self) -> str:
-        def pairs() -> Iterable[str]:
-            for param_type, param_ident in self.pairs:
-                ident_str = (
-                    "<error>"
-                    if isinstance(param_ident, ParseError)
-                    else str(param_ident)
-                )
-                yield f"{param_type.pprint()} {ident_str}"
-
-        inner_str = ", ".join(pairs())
-        return f"({inner_str})"
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseParams", List[ParseError]]:
-        """
-        Parses a ParseParams from a Parser.
-        """
-        errors = []
-        pairs: List[Tuple["ParseType", Union[lexer.Token, ParseError]]] = []
-
-        if not parser.match(lexer.TokenType.LEFT_PAREN):
-            errors.append(
-                ParseError("missing '(' to start parameter list", parser.curr_region())
-            )
-
-        opener = parser.prev()
-
-        if parser.match(lexer.TokenType.RIGHT_PAREN):
-            return ParseParams(pairs), errors
-
-        def parse_pair() -> None:
-            param_type, errs = ParseType.parse(parser)
-            errors.extend(errs)
-            if parser.match(lexer.TokenType.IDENTIFIER):
-                param_ident: Union[lexer.Token, ParseError] = parser.prev()
-            else:
-                param_ident = ParseError("missing parameter name", parser.curr_region())
-                errors.append(param_ident)
-            pairs.append((param_type, param_ident))
-
-        parse_pair()
-        while not parser.match(lexer.TokenType.RIGHT_PAREN):
-            before = parser.current
-            if parser.done():
-                errors.append(
-                    ParseError("missing ')' to finish parameters", opener.lexeme)
-                )
-                break
-            if not parser.match(lexer.TokenType.COMMA):
-                errors.append(
-                    ParseError(
-                        "missing ',' to delimit parameters", parser.curr_region()
-                    )
-                )
-            parse_pair()
-            if parser.current == before:
-                break
-
-        return ParseParams(pairs), errors
+    opener = parser.prev()
+    if parser.match(lexer.TokenType.RIGHT_PAREN):
+        return [], []
+    errors = []
+    pairs = [parse_func(parser)]
+    while not parser.match(lexer.TokenType.RIGHT_PAREN):
+        if parser.done():
+            errors.append(ParseError("unclosed '('", opener.lexeme))
+            break
+        if not parser.match(lexer.TokenType.COMMA):
+            errors.append(ParseError("missing ',' delimiter", parser.curr_region()))
+        pairs.append(parse_func(parser))
+    return pairs, errors
 
 
 class ParseStmt(ParseNode):
@@ -744,7 +702,6 @@ class ParseFuncType(ParseNode):
         consumed.
         """
         errors = []
-        params: List[ParseType] = []
 
         if not parser.match(lexer.TokenType.LEFT_PAREN):
             errors.append(
@@ -756,7 +713,8 @@ class ParseFuncType(ParseNode):
             errors.extend(errs)
             return param_type
 
-        params = parse_tuple(parser, parse_param)
+        params, errs = parse_tuple(parser, parse_param)
+        errors.extend(errs)
 
         return_type, errs = ParseType.parse(parser)
         errors.extend(errs)
@@ -799,7 +757,13 @@ class ParseExpr(ParseNode):
 
     def __init__(
         self,
-        expr: Union["ParseUnaryExpr", "ParseBinaryExpr", "ParseAtomExpr", ParseError],
+        expr: Union[
+            "ParseUnaryExpr",
+            "ParseBinaryExpr",
+            "ParseAtomExpr",
+            "ParseCallExpr",
+            ParseError,
+        ],
     ) -> None:
         self.expr = expr
 
@@ -871,18 +835,22 @@ class ParseCallExpr(ParseNode):
         return f"{self.function.pprint()}({args_str})"
 
     @staticmethod
-    def finish(
-        parser: Parser, lhs: ParseExpr
-    ) -> Tuple["ParseCallExpr", List[ParseError]]:
+    def finish(parser: Parser, lhs: ParseExpr) -> Tuple["ParseExpr", List[ParseError]]:
         """
         Parse the call part of a function call expression given that the open parenthesis has
         already been consumed.
         """
         function = lhs
-        args, errs = parse_tuple(
-            parser, lambda parser: pratt_parse(parser, PRATT_TABLE)
-        )
-        return ParseCallExpr(function, args), errs
+        errors = []
+
+        def parse_arg(parser: Parser) -> ParseExpr:
+            parse, errs = pratt_parse(parser, PRATT_TABLE)
+            errors.extend(errs)
+            return parse
+
+        args, errs = parse_tuple(parser, parse_arg)
+        errors.extend(errs)
+        return ParseExpr(ParseCallExpr(function, args)), errors
 
 
 class ParseAtomExpr(ParseNode):
@@ -972,6 +940,9 @@ class PrattRule(NamedTuple):
 PRATT_TABLE: DefaultDict[lexer.TokenType, PrattRule] = collections.defaultdict(
     PrattRule,
     {
+        lexer.TokenType.LEFT_PAREN: PrattRule(
+            infix=ParseCallExpr.finish, precedence=Precedence.CALL
+        ),
         lexer.TokenType.MINUS: PrattRule(
             prefix=ParseUnaryExpr.finish,
             infix=ParseBinaryExpr.finish,
