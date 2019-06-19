@@ -11,6 +11,8 @@ import sys
 import clr.bytecode as bytecode
 import clr.lexer as lexer
 import clr.parser as parser
+import clr.ast as ast
+import clr.astprinter as astprinter
 
 
 def main() -> None:
@@ -44,7 +46,12 @@ def main() -> None:
         print("--------")
         sys.exit(1)
 
-    ast = parsetree.to_ast()
+    tree = parsetree.to_ast()
+
+    print("Ast:")
+    print("--------")
+    astprinter.pprint(tree)
+    print("--------")
 
     constants: List[bytecode.Constant] = []
     instructions: List[bytecode.Instruction] = []

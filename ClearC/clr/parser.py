@@ -962,6 +962,8 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
             return ast.AstNumExpr(str(self.token))
         if self.token.kind == lexer.TokenType.STR_LITERAL:
             return ast.AstStrExpr(str(self.token))
+        if self.token.kind == lexer.TokenType.IDENTIFIER:
+            return ast.AstIdentExpr(str(self.token))
         return ast.AstError()
 
     @staticmethod

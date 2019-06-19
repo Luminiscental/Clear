@@ -88,6 +88,12 @@ class AstVisitor:
         """
         raise NotImplementedError()
 
+    def ident_expr(self, node: "AstIdentExpr") -> None:
+        """
+        Visit an identifier expression.
+        """
+        raise NotImplementedError()
+
     def call_expr(self, node: "AstCallExpr") -> None:
         """
         Visit a function call expression node.
@@ -126,7 +132,7 @@ class AstNode:
 
 
 AstType = Union["AstAtomType", "AstFuncType", "AstOptionalType"]
-AstAtomExpr = Union["AstIntExpr", "AstNumExpr", "AstStrExpr"]
+AstAtomExpr = Union["AstIntExpr", "AstNumExpr", "AstStrExpr", "AstIdentExpr"]
 AstExpr = Union["AstUnaryExpr", "AstBinaryExpr", "AstAtomExpr", "AstCallExpr"]
 AstStmt = Union[
     "AstPrintStmt",
@@ -525,6 +531,18 @@ class AstStrExpr(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.str_expr(self)
+
+
+class AstIdentExpr(AstNode):
+    """
+    Ast node for an identifier expression.
+    """
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.ident_expr(self)
 
 
 class AstCallExpr(AstNode):
