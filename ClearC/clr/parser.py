@@ -12,12 +12,16 @@ from typing import (
     Iterable,
     NamedTuple,
     TypeVar,
+    Generic,
 )
 
 import enum
 import collections
 
 import clr.lexer as lexer
+import clr.ast as ast
+
+T = TypeVar("T")  # pylint: disable=invalid-name
 
 
 class Parser:
@@ -103,7 +107,7 @@ class ParseError:
         return f"{self.message}: {self.region}"
 
 
-class ParseNode:
+class ParseNode(Generic[T]):
     """
     Base class for nodes of the parse tree.
     """
@@ -111,6 +115,12 @@ class ParseNode:
     def pprint(self) -> str:
         """
         Pretty prints the node back as a part of valid Clear code.
+        """
+        raise NotImplementedError()
+
+    def to_ast(self) -> Union[T, ast.AstError]:
+        """
+        Convert the parse node to an ast node.
         """
         raise NotImplementedError()
 
@@ -122,7 +132,7 @@ def indent(orig: str) -> str:
     return "\n".join(f"    {line}" for line in orig.splitlines())
 
 
-class ParseTree(ParseNode):
+class ParseTree(ParseNode[ast.Ast]):
     """
     The root node of the parse tree, contains a list of declarations.
 
@@ -134,6 +144,9 @@ class ParseTree(ParseNode):
 
     def pprint(self) -> str:
         return "\n".join(decl.pprint() for decl in self.decls)
+
+    def to_ast(self) -> Union[ast.Ast, ast.AstError]:
+        return ast.Ast.make([decl.to_ast() for decl in self.decls])
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseTree", List[ParseError]]:
@@ -156,7 +169,7 @@ def parse_tokens(tokens: List[lexer.Token]) -> Tuple[ParseTree, List[ParseError]
     return ParseTree.parse(Parser(tokens))
 
 
-class ParseDecl(ParseNode):
+class ParseDecl(ParseNode[ast.AstDecl]):
     """
     Parse node for a generic declaration.
 
@@ -170,6 +183,9 @@ class ParseDecl(ParseNode):
 
     def pprint(self) -> str:
         return self.decl.pprint()
+
+    def to_ast(self) -> Union[ast.AstDecl, ast.AstError]:
+        return self.decl.to_ast()
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseDecl", List[ParseError]]:
@@ -186,7 +202,7 @@ class ParseDecl(ParseNode):
         return ParseDecl(stmt_decl), errs
 
 
-class ParseValueDecl(ParseNode):
+class ParseValueDecl(ParseNode[ast.AstValueDecl]):
     """
     Parse node for a value declaration.
 
@@ -207,6 +223,16 @@ class ParseValueDecl(ParseNode):
         ident_str = "<error>" if isinstance(self.ident, ParseError) else str(self.ident)
         type_str = self.val_type.pprint() if self.val_type else ""
         return f"val {ident_str} {type_str} = {self.expr.pprint()};"
+
+    def to_ast(self) -> Union[ast.AstValueDecl, ast.AstError]:
+        # TODO: ParseIdent class to reduce duplication of this boilerplate stuff
+        if isinstance(self.ident, ParseError):
+            return ast.AstError()
+        return ast.AstValueDecl.make(
+            self.ident,
+            self.val_type.to_ast() if self.val_type else None,
+            self.expr.to_ast(),
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseValueDecl", List[ParseError]]:
@@ -244,7 +270,7 @@ class ParseValueDecl(ParseNode):
         return ParseValueDecl(ident, val_type, expr), errors
 
 
-class ParseFuncDecl(ParseNode):
+class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
     """
     Parse node for a function declaration.
 
@@ -277,6 +303,18 @@ class ParseFuncDecl(ParseNode):
 
         param_str = ", ".join(param_gen())
         return f"func {ident_str}({param_str}) {self.return_type.pprint()} {self.block.pprint()}"
+
+    def to_ast(self) -> Union[ast.AstFuncDecl, ast.AstError]:
+        if isinstance(self.ident, ParseError):
+            return ast.AstError()
+        params = []
+        for param_type, param_ident in self.params:
+            if isinstance(param_ident, ParseError):
+                return ast.AstError()
+            params.append((param_type.to_ast(), param_ident))
+        return ast.AstFuncDecl.make(
+            self.ident, params, self.return_type.to_ast(), self.block.to_ast()
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseFuncDecl", List[ParseError]]:
@@ -316,9 +354,6 @@ class ParseFuncDecl(ParseNode):
         return ParseFuncDecl(ident, params, return_type, block), errors
 
 
-T = TypeVar("T")  # pylint: disable=invalid-name
-
-
 def parse_tuple(
     parser: Parser, parse_func: Callable[[Parser], T]
 ) -> Tuple[List[T], List[ParseError]]:
@@ -341,7 +376,7 @@ def parse_tuple(
     return pairs, errors
 
 
-class ParseStmt(ParseNode):
+class ParseStmt(ParseNode[ast.AstStmt]):
     """
     Parse node for a generic statement.
 
@@ -370,6 +405,9 @@ class ParseStmt(ParseNode):
     def pprint(self) -> str:
         return self.stmt.pprint()
 
+    def to_ast(self) -> Union[ast.AstStmt, ast.AstError]:
+        return self.stmt.to_ast()
+
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseStmt", List[ParseError]]:
         """
@@ -394,18 +432,21 @@ class ParseStmt(ParseNode):
         return ParseStmt(expr_stmt), errs
 
 
-class ParsePrintStmt(ParseNode):
+class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
     """
     Parse node for a print statement.
 
-    ParsePrintStmt : "print" ParseExpr ";" ;
+    ParsePrintStmt : "print" ParseExpr? ";" ;
     """
 
-    def __init__(self, expr: "ParseExpr") -> None:
+    def __init__(self, expr: Optional["ParseExpr"]) -> None:
         self.expr = expr
 
     def pprint(self) -> str:
-        return f"print {self.expr.pprint()};"
+        return f"print {self.expr.pprint()};" if self.expr else "print;"
+
+    def to_ast(self) -> Union[ast.AstPrintStmt, ast.AstError]:
+        return ast.AstPrintStmt.make(self.expr.to_ast() if self.expr else None)
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParsePrintStmt", List[ParseError]]:
@@ -413,6 +454,8 @@ class ParsePrintStmt(ParseNode):
         Parses a ParsePrintStmt from a Parser, given that the "print" keyword has already been
         consumed.
         """
+        if parser.match(lexer.TokenType.SEMICOLON):
+            return ParsePrintStmt(None), []
         errors = []
         expr, errs = pratt_parse(parser, PRATT_TABLE)
         errors.extend(errs)
@@ -423,7 +466,7 @@ class ParsePrintStmt(ParseNode):
         return ParsePrintStmt(expr), errors
 
 
-class ParseBlockStmt(ParseNode):
+class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
     """
     Parse node for a block statement.
 
@@ -436,6 +479,9 @@ class ParseBlockStmt(ParseNode):
     def pprint(self) -> str:
         inner_str = indent("\n".join(decl.pprint() for decl in self.decls))
         return f"{{\n{inner_str}\n}}"
+
+    def to_ast(self) -> Union[ast.AstBlockStmt, ast.AstError]:
+        return ast.AstBlockStmt.make([decl.to_ast() for decl in self.decls])
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseBlockStmt", List[ParseError]]:
@@ -468,7 +514,7 @@ class ParseBlockStmt(ParseNode):
         return ParseBlockStmt(decls), errors
 
 
-class ParseIfStmt(ParseNode):
+class ParseIfStmt(ParseNode[ast.AstIfStmt]):
     """
     Parse node for an if statement.
 
@@ -497,6 +543,16 @@ class ParseIfStmt(ParseNode):
         conds_str = " ".join(conds())
         else_str = f"else {self.fallback.pprint()}" if self.fallback else ""
         return f"{conds_str} {else_str}"
+
+    def to_ast(self) -> Union[ast.AstIfStmt, ast.AstError]:
+        cond_pairs = [(pair[0].to_ast(), pair[1].to_ast()) for pair in self.pairs]
+        if not cond_pairs:  # There should be at least an if condition
+            return ast.AstError()
+        return ast.AstIfStmt.make(
+            cond_pairs[0],
+            cond_pairs[1:],
+            self.fallback.to_ast() if self.fallback else None,
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseIfStmt", List[ParseError]]:
@@ -536,7 +592,7 @@ class ParseIfStmt(ParseNode):
         return ParseIfStmt(pairs, fallback), errors
 
 
-class ParseWhileStmt(ParseNode):
+class ParseWhileStmt(ParseNode[ast.AstWhileStmt]):
     """
     Parse node for a while statement.
 
@@ -550,6 +606,11 @@ class ParseWhileStmt(ParseNode):
     def pprint(self) -> str:
         cond_str = f"({self.cond.pprint()}) " if self.cond else ""
         return f"while {cond_str}{self.block.pprint()}"
+
+    def to_ast(self) -> Union[ast.AstWhileStmt, ast.AstError]:
+        return ast.AstWhileStmt.make(
+            self.cond.to_ast() if self.cond else None, self.block.to_ast()
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseWhileStmt", List[ParseError]]:
@@ -571,7 +632,7 @@ class ParseWhileStmt(ParseNode):
         return ParseWhileStmt(cond, block), errors
 
 
-class ParseReturnStmt(ParseNode):
+class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
     """
     Parse node for a return statement.
 
@@ -585,6 +646,9 @@ class ParseReturnStmt(ParseNode):
         if not self.expr:
             return "return;"
         return f"return {self.expr.pprint()};"
+
+    def to_ast(self) -> Union[ast.AstReturnStmt, ast.AstError]:
+        return ast.AstReturnStmt.make(self.expr.to_ast() if self.expr else None)
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseReturnStmt", List[ParseError]]:
@@ -606,7 +670,7 @@ class ParseReturnStmt(ParseNode):
         return ParseReturnStmt(expr), errors
 
 
-class ParseExprStmt(ParseNode):
+class ParseExprStmt(ParseNode[ast.AstExprStmt]):
     """
     Parse node for an expression statement.
 
@@ -618,6 +682,9 @@ class ParseExprStmt(ParseNode):
 
     def pprint(self) -> str:
         return f"{self.expr.pprint()};"
+
+    def to_ast(self) -> Union[ast.AstExprStmt, ast.AstError]:
+        return ast.AstExprStmt.make(self.expr.to_ast())
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseExprStmt", List[ParseError]]:
@@ -636,7 +703,7 @@ class ParseExprStmt(ParseNode):
         return ParseExprStmt(expr), errors
 
 
-class ParseType(ParseNode):
+class ParseType(ParseNode[ast.AstType]):
     """
     Parse node for a type.
 
@@ -651,6 +718,13 @@ class ParseType(ParseNode):
         if self.optional:
             return f"({self.type_node.pprint()})?"
         return self.type_node.pprint()
+
+    def to_ast(self) -> Union[ast.AstType, ast.AstError]:
+        return (
+            ast.AstOptionalType.make(self.type_node.to_ast())
+            if self.optional
+            else self.type_node.to_ast()
+        )
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseType", List[ParseError]]:
@@ -680,7 +754,7 @@ class ParseType(ParseNode):
         return result, errors
 
 
-class ParseFuncType(ParseNode):
+class ParseFuncType(ParseNode[ast.AstFuncType]):
     """
     Parse node for a function type.
 
@@ -694,6 +768,11 @@ class ParseFuncType(ParseNode):
     def pprint(self) -> str:
         params_str = ", ".join(param.pprint() for param in self.params)
         return f"func({params_str}) {self.return_type.pprint()}"
+
+    def to_ast(self) -> Union[ast.AstFuncType, ast.AstError]:
+        return ast.AstFuncType.make(
+            [param.to_ast() for param in self.params], self.return_type.to_ast()
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseFuncType", List[ParseError]]:
@@ -721,7 +800,7 @@ class ParseFuncType(ParseNode):
         return ParseFuncType(params, return_type), errors
 
 
-class ParseAtomType(ParseNode):
+class ParseAtomType(ParseNode[ast.AstAtomType]):
     """
     Parse node for an atomic type.
 
@@ -733,6 +812,11 @@ class ParseAtomType(ParseNode):
 
     def pprint(self) -> str:
         return "<error>" if isinstance(self.token, ParseError) else str(self.token)
+
+    def to_ast(self) -> Union[ast.AstAtomType, ast.AstError]:
+        if isinstance(self.token, ParseError):
+            return ast.AstError()
+        return ast.AstAtomType(self.token)
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseAtomType", List[ParseError]]:
@@ -750,7 +834,7 @@ class ParseAtomType(ParseNode):
         return ParseAtomType(token), errors
 
 
-class ParseExpr(ParseNode):
+class ParseExpr(ParseNode[ast.AstExpr]):
     """
     Parse node for an expression.
     """
@@ -770,8 +854,13 @@ class ParseExpr(ParseNode):
     def pprint(self) -> str:
         return "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
 
+    def to_ast(self) -> Union[ast.AstExpr, ast.AstError]:
+        if isinstance(self.expr, ParseError):
+            return ast.AstError()
+        return self.expr.to_ast()
 
-class ParseUnaryExpr(ParseNode):
+
+class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
     """
     Prefix expression for a unary operator.
     """
@@ -779,6 +868,12 @@ class ParseUnaryExpr(ParseNode):
     def __init__(self, operator: lexer.Token, target: ParseExpr) -> None:
         self.operator = operator
         self.target = target
+
+    def pprint(self) -> str:
+        return f"{self.operator}({self.target.pprint()})"
+
+    def to_ast(self) -> Union[ast.AstUnaryExpr, ast.AstError]:
+        return ast.AstUnaryExpr.make(self.operator, self.target.to_ast())
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
@@ -789,11 +884,8 @@ class ParseUnaryExpr(ParseNode):
         target, errs = pratt_parse(parser, PRATT_TABLE, precedence=Precedence.UNARY)
         return ParseExpr(ParseUnaryExpr(operator, target)), errs
 
-    def pprint(self) -> str:
-        return f"{self.operator}({self.target.pprint()})"
 
-
-class ParseBinaryExpr(ParseNode):
+class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
     """
     Infix expression for a binary operator.
     """
@@ -804,6 +896,14 @@ class ParseBinaryExpr(ParseNode):
         self.left = left
         self.operator = operator
         self.right = right
+
+    def pprint(self) -> str:
+        return f"({self.left.pprint()}){self.operator}({self.right.pprint()})"
+
+    def to_ast(self) -> Union[ast.AstBinaryExpr, ast.AstError]:
+        return ast.AstBinaryExpr.make(
+            self.operator, self.left.to_ast(), self.right.to_ast()
+        )
 
     @staticmethod
     def finish(parser: Parser, lhs: ParseExpr) -> Tuple["ParseExpr", List[ParseError]]:
@@ -817,11 +917,8 @@ class ParseBinaryExpr(ParseNode):
         right, errs = pratt_parse(parser, PRATT_TABLE, prec.next())
         return ParseExpr(ParseBinaryExpr(left, operator, right)), errs
 
-    def pprint(self) -> str:
-        return f"({self.left.pprint()}){self.operator}({self.right.pprint()})"
 
-
-class ParseCallExpr(ParseNode):
+class ParseCallExpr(ParseNode[ast.AstCallExpr]):
     """
     Infix expression for a function call.
     """
@@ -833,6 +930,11 @@ class ParseCallExpr(ParseNode):
     def pprint(self) -> str:
         args_str = ", ".join(arg.pprint() for arg in self.args)
         return f"{self.function.pprint()}({args_str})"
+
+    def to_ast(self) -> Union[ast.AstCallExpr, ast.AstError]:
+        return ast.AstCallExpr.make(
+            self.function.to_ast(), [arg.to_ast() for arg in self.args]
+        )
 
     @staticmethod
     def finish(parser: Parser, lhs: ParseExpr) -> Tuple["ParseExpr", List[ParseError]]:
@@ -853,13 +955,19 @@ class ParseCallExpr(ParseNode):
         return ParseExpr(ParseCallExpr(function, args)), errors
 
 
-class ParseAtomExpr(ParseNode):
+class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
     """
     Prefix expression for an atomic value expression.
     """
 
     def __init__(self, token: lexer.Token) -> None:
         self.token = token
+
+    def pprint(self) -> str:
+        return str(self.token)
+
+    def to_ast(self) -> Union[ast.AstAtomExpr, ast.AstError]:
+        return ast.AstAtomExpr(self.token)
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
@@ -869,9 +977,6 @@ class ParseAtomExpr(ParseNode):
         """
         token = parser.prev()
         return ParseExpr(ParseAtomExpr(token)), []
-
-    def pprint(self) -> str:
-        return str(self.token)
 
 
 Comparison = Union[bool, "NotImplemented"]

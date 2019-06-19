@@ -44,10 +44,7 @@ def main() -> None:
         print("--------")
         sys.exit(1)
 
-    print("Parse tree:")
-    print("--------")
-    print(parsetree.pprint())
-    print("--------")
+    ast = parsetree.to_ast()
 
     constants: List[bytecode.Constant] = []
     instructions: List[bytecode.Instruction] = []
