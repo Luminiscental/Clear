@@ -9,7 +9,6 @@ from typing import (
     Tuple,
     Callable,
     DefaultDict,
-    Iterable,
     NamedTuple,
     TypeVar,
     Generic,
@@ -102,8 +101,7 @@ class ParseError:
         """
         Returns a string of information about the error.
         """
-        # TODO:
-        # Line number, highlight region in context, formatting, e.t.c.
+        # TODO:Line number, highlight region in context, formatting, e.t.c.
         return f"{self.message}: {self.region}"
 
 
@@ -111,12 +109,6 @@ class ParseNode(Generic[T]):
     """
     Base class for nodes of the parse tree.
     """
-
-    def pprint(self) -> str:
-        """
-        Pretty prints the node back as a part of valid Clear code.
-        """
-        raise NotImplementedError()
 
     def to_ast(self) -> Union[T, ast.AstError]:
         """
@@ -141,9 +133,6 @@ class ParseTree(ParseNode[ast.Ast]):
 
     def __init__(self, decls: List["ParseDecl"]) -> None:
         self.decls = decls
-
-    def pprint(self) -> str:
-        return "\n".join(decl.pprint() for decl in self.decls)
 
     def to_ast(self) -> Union[ast.Ast, ast.AstError]:
         return ast.Ast.make([decl.to_ast() for decl in self.decls])
@@ -177,9 +166,6 @@ class ParseToken(ParseNode[str]):
     def __init__(self, token: Union[lexer.Token, ParseError]) -> None:
         self.token = token
 
-    def pprint(self) -> str:
-        return "<error>" if isinstance(self.token, ParseError) else str(self.token)
-
     def to_ast(self) -> Union[str, ast.AstError]:
         if isinstance(self.token, ParseError):
             return ast.AstError()
@@ -210,9 +196,6 @@ class ParseDecl(ParseNode[ast.AstDecl]):
         self, decl: Union["ParseValueDecl", "ParseFuncDecl", "ParseStmt"]
     ) -> None:
         self.decl = decl
-
-    def pprint(self) -> str:
-        return self.decl.pprint()
 
     def to_ast(self) -> Union[ast.AstDecl, ast.AstError]:
         return self.decl.to_ast()
@@ -245,10 +228,6 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
         self.ident = ident
         self.val_type = val_type
         self.expr = expr
-
-    def pprint(self) -> str:
-        type_str = f"{self.val_type.pprint()} " if self.val_type else ""
-        return f"val {self.ident.pprint()} {type_str}= {self.expr.pprint()};"
 
     def to_ast(self) -> Union[ast.AstValueDecl, ast.AstError]:
         return ast.AstValueDecl.make(
@@ -305,14 +284,6 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
         self.params = params
         self.return_type = return_type
         self.block = block
-
-    def pprint(self) -> str:
-        def param_gen() -> Iterable[str]:
-            for param_type, param_ident in self.params:
-                yield f"{param_type.pprint()} {param_ident.pprint()}"
-
-        param_str = ", ".join(param_gen())
-        return f"func {self.ident.pprint()}({param_str}) {self.return_type.pprint()} {self.block.pprint()}"
 
     def to_ast(self) -> Union[ast.AstFuncDecl, ast.AstError]:
         params = []
@@ -398,9 +369,6 @@ class ParseStmt(ParseNode[ast.AstStmt]):
     ) -> None:
         self.stmt = stmt
 
-    def pprint(self) -> str:
-        return self.stmt.pprint()
-
     def to_ast(self) -> Union[ast.AstStmt, ast.AstError]:
         return self.stmt.to_ast()
 
@@ -438,9 +406,6 @@ class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
     def __init__(self, expr: Optional["ParseExpr"]) -> None:
         self.expr = expr
 
-    def pprint(self) -> str:
-        return f"print {self.expr.pprint()};" if self.expr else "print;"
-
     def to_ast(self) -> Union[ast.AstPrintStmt, ast.AstError]:
         return ast.AstPrintStmt.make(self.expr.to_ast() if self.expr else None)
 
@@ -471,10 +436,6 @@ class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
 
     def __init__(self, decls: List[ParseDecl]) -> None:
         self.decls = decls
-
-    def pprint(self) -> str:
-        inner_str = indent("\n".join(decl.pprint() for decl in self.decls))
-        return f"{{\n{inner_str}\n}}"
 
     def to_ast(self) -> Union[ast.AstBlockStmt, ast.AstError]:
         return ast.AstBlockStmt.make([decl.to_ast() for decl in self.decls])
@@ -527,18 +488,6 @@ class ParseIfStmt(ParseNode[ast.AstIfStmt]):
     ) -> None:
         self.pairs = pairs
         self.fallback = fallback
-
-    def pprint(self) -> str:
-        def conds() -> Iterable[str]:
-            first = True
-            for cond_expr, cond_block in self.pairs:
-                else_str = "else" if not first else ""
-                yield f"{else_str} if ({cond_expr.pprint()}) {cond_block.pprint()}"
-                first = False
-
-        conds_str = " ".join(conds())
-        else_str = f"else {self.fallback.pprint()}" if self.fallback else ""
-        return f"{conds_str} {else_str}"
 
     def to_ast(self) -> Union[ast.AstIfStmt, ast.AstError]:
         cond_pairs = [(pair[0].to_ast(), pair[1].to_ast()) for pair in self.pairs]
@@ -599,10 +548,6 @@ class ParseWhileStmt(ParseNode[ast.AstWhileStmt]):
         self.cond = cond
         self.block = block
 
-    def pprint(self) -> str:
-        cond_str = f"({self.cond.pprint()}) " if self.cond else ""
-        return f"while {cond_str}{self.block.pprint()}"
-
     def to_ast(self) -> Union[ast.AstWhileStmt, ast.AstError]:
         return ast.AstWhileStmt.make(
             self.cond.to_ast() if self.cond else None, self.block.to_ast()
@@ -638,11 +583,6 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
     def __init__(self, expr: Optional["ParseExpr"]) -> None:
         self.expr = expr
 
-    def pprint(self) -> str:
-        if not self.expr:
-            return "return;"
-        return f"return {self.expr.pprint()};"
-
     def to_ast(self) -> Union[ast.AstReturnStmt, ast.AstError]:
         return ast.AstReturnStmt.make(self.expr.to_ast() if self.expr else None)
 
@@ -676,9 +616,6 @@ class ParseExprStmt(ParseNode[ast.AstExprStmt]):
     def __init__(self, expr: "ParseExpr") -> None:
         self.expr = expr
 
-    def pprint(self) -> str:
-        return f"{self.expr.pprint()};"
-
     def to_ast(self) -> Union[ast.AstExprStmt, ast.AstError]:
         return ast.AstExprStmt.make(self.expr.to_ast())
 
@@ -709,11 +646,6 @@ class ParseType(ParseNode[ast.AstType]):
     def __init__(self, type_node: Union["ParseFuncType", "ParseAtomType"]) -> None:
         self.type_node = type_node
         self.optional = False
-
-    def pprint(self) -> str:
-        if self.optional:
-            return f"({self.type_node.pprint()})?"
-        return self.type_node.pprint()
 
     def to_ast(self) -> Union[ast.AstType, ast.AstError]:
         return (
@@ -761,10 +693,6 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
         self.params = params
         self.return_type = return_type
 
-    def pprint(self) -> str:
-        params_str = ", ".join(param.pprint() for param in self.params)
-        return f"func({params_str}) {self.return_type.pprint()}"
-
     def to_ast(self) -> Union[ast.AstFuncType, ast.AstError]:
         return ast.AstFuncType.make(
             [param.to_ast() for param in self.params], self.return_type.to_ast()
@@ -806,9 +734,6 @@ class ParseAtomType(ParseNode[ast.AstAtomType]):
     def __init__(self, token: ParseToken) -> None:
         self.token = token
 
-    def pprint(self) -> str:
-        return self.token.pprint()
-
     def to_ast(self) -> Union[ast.AstAtomType, ast.AstError]:
         return ast.AstAtomType.make(self.token.to_ast())
 
@@ -840,9 +765,6 @@ class ParseExpr(ParseNode[ast.AstExpr]):
     ) -> None:
         self.expr = expr
 
-    def pprint(self) -> str:
-        return "<error>" if isinstance(self.expr, ParseError) else self.expr.pprint()
-
     def to_ast(self) -> Union[ast.AstExpr, ast.AstError]:
         if isinstance(self.expr, ParseError):
             return ast.AstError()
@@ -857,9 +779,6 @@ class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
     def __init__(self, operator: lexer.Token, target: ParseExpr) -> None:
         self.operator = operator
         self.target = target
-
-    def pprint(self) -> str:
-        return f"{self.operator}({self.target.pprint()})"
 
     def to_ast(self) -> Union[ast.AstUnaryExpr, ast.AstError]:
         return ast.AstUnaryExpr.make(str(self.operator), self.target.to_ast())
@@ -885,9 +804,6 @@ class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
         self.left = left
         self.operator = operator
         self.right = right
-
-    def pprint(self) -> str:
-        return f"({self.left.pprint()}){self.operator}({self.right.pprint()})"
 
     def to_ast(self) -> Union[ast.AstBinaryExpr, ast.AstError]:
         return ast.AstBinaryExpr.make(
@@ -915,10 +831,6 @@ class ParseCallExpr(ParseNode[ast.AstCallExpr]):
     def __init__(self, function: ParseExpr, args: List[ParseExpr]) -> None:
         self.function = function
         self.args = args
-
-    def pprint(self) -> str:
-        args_str = ", ".join(arg.pprint() for arg in self.args)
-        return f"{self.function.pprint()}({args_str})"
 
     def to_ast(self) -> Union[ast.AstCallExpr, ast.AstError]:
         return ast.AstCallExpr.make(
@@ -952,9 +864,6 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
     def __init__(self, token: lexer.Token) -> None:
         self.token = token
 
-    def pprint(self) -> str:
-        return str(self.token)
-
     def to_ast(self) -> Union[ast.AstAtomExpr, ast.AstError]:
         if self.token.kind == lexer.TokenType.INT_LITERAL:
             return ast.AstIntExpr(str(self.token))
@@ -972,6 +881,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         Parse an atomic value expression from a Parser given that the token has already been
         consumed.
         """
+        # TODO: Sanitize for size and precision with num/int literals
         token = parser.prev()
         return ParseExpr(ParseAtomExpr(token)), []
 

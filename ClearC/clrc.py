@@ -12,7 +12,7 @@ import clr.bytecode as bytecode
 import clr.lexer as lexer
 import clr.parser as parser
 import clr.ast as ast
-import clr.astprinter as astprinter
+import clr.printer as printer
 
 
 def main() -> None:
@@ -50,7 +50,7 @@ def main() -> None:
 
     print("Ast:")
     print("--------")
-    astprinter.pprint(tree)
+    printer.pprint(tree)
     print("--------")
 
     constants: List[bytecode.Constant] = []
