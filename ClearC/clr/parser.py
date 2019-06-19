@@ -169,6 +169,36 @@ def parse_tokens(tokens: List[lexer.Token]) -> Tuple[ParseTree, List[ParseError]
     return ParseTree.parse(Parser(tokens))
 
 
+class ParseToken(ParseNode[str]):
+    """
+    Parse node for an identifier token to wrap errors of missing tokens.
+    """
+
+    def __init__(self, token: Union[lexer.Token, ParseError]) -> None:
+        self.token = token
+
+    def pprint(self) -> str:
+        return "<error>" if isinstance(self.token, ParseError) else str(self.token)
+
+    def to_ast(self) -> Union[str, ast.AstError]:
+        if isinstance(self.token, ParseError):
+            return ast.AstError()
+        return str(self.token)
+
+    @staticmethod
+    def parse(
+        parser: Parser, types: List[lexer.TokenType]
+    ) -> Tuple["ParseToken", List[ParseError]]:
+        """
+        Parses a ParseIdent from a Parser.
+        """
+        for token_type in types:
+            if parser.match(token_type):
+                return ParseToken(parser.prev()), []
+        err = ParseError("missing identifier", parser.curr_region())
+        return ParseToken(err), [err]
+
+
 class ParseDecl(ParseNode[ast.AstDecl]):
     """
     Parse node for a generic declaration.
@@ -210,26 +240,19 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
     """
 
     def __init__(
-        self,
-        ident: Union[lexer.Token, ParseError],
-        val_type: Optional["ParseType"],
-        expr: "ParseExpr",
+        self, ident: ParseToken, val_type: Optional["ParseType"], expr: "ParseExpr"
     ):
         self.ident = ident
         self.val_type = val_type
         self.expr = expr
 
     def pprint(self) -> str:
-        ident_str = "<error>" if isinstance(self.ident, ParseError) else str(self.ident)
-        type_str = self.val_type.pprint() if self.val_type else ""
-        return f"val {ident_str} {type_str} = {self.expr.pprint()};"
+        type_str = f"{self.val_type.pprint()} " if self.val_type else ""
+        return f"val {self.ident.pprint()} {type_str}= {self.expr.pprint()};"
 
     def to_ast(self) -> Union[ast.AstValueDecl, ast.AstError]:
-        # TODO: ParseIdent class to reduce duplication of this boilerplate stuff
-        if isinstance(self.ident, ParseError):
-            return ast.AstError()
         return ast.AstValueDecl.make(
-            self.ident,
+            self.ident.to_ast(),
             self.val_type.to_ast() if self.val_type else None,
             self.expr.to_ast(),
         )
@@ -240,13 +263,7 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
         Parses a ParseValueDecl from a Parser, given that the "val" keyword has already been
         consumed.
         """
-        errors = []
-
-        if parser.match(lexer.TokenType.IDENTIFIER):
-            ident: Union[lexer.Token, ParseError] = parser.prev()
-        else:
-            ident = ParseError("missing value name", parser.curr_region())
-            errors.append(ident)
+        ident, errors = ParseToken.parse(parser, [lexer.TokenType.IDENTIFIER])
 
         val_type = None
         if not parser.match(lexer.TokenType.EQUALS):
@@ -279,8 +296,8 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
 
     def __init__(
         self,
-        ident: Union[lexer.Token, ParseError],
-        params: List[Tuple["ParseType", Union[lexer.Token, ParseError]]],
+        ident: ParseToken,
+        params: List[Tuple["ParseType", ParseToken]],
         return_type: "ParseType",
         block: "ParseBlockStmt",
     ) -> None:
@@ -290,30 +307,19 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
         self.block = block
 
     def pprint(self) -> str:
-        ident_str = "<error>" if isinstance(self.ident, ParseError) else str(self.ident)
-
         def param_gen() -> Iterable[str]:
             for param_type, param_ident in self.params:
-                ident_str = (
-                    "<error>"
-                    if isinstance(param_ident, ParseError)
-                    else str(param_ident)
-                )
-                yield f"{param_type.pprint()} {ident_str}"
+                yield f"{param_type.pprint()} {param_ident.pprint()}"
 
         param_str = ", ".join(param_gen())
-        return f"func {ident_str}({param_str}) {self.return_type.pprint()} {self.block.pprint()}"
+        return f"func {self.ident.pprint()}({param_str}) {self.return_type.pprint()} {self.block.pprint()}"
 
     def to_ast(self) -> Union[ast.AstFuncDecl, ast.AstError]:
-        if isinstance(self.ident, ParseError):
-            return ast.AstError()
         params = []
         for param_type, param_ident in self.params:
-            if isinstance(param_ident, ParseError):
-                return ast.AstError()
-            params.append((param_type.to_ast(), param_ident))
+            params.append((param_type.to_ast(), param_ident.to_ast()))
         return ast.AstFuncDecl.make(
-            self.ident, params, self.return_type.to_ast(), self.block.to_ast()
+            self.ident.to_ast(), params, self.return_type.to_ast(), self.block.to_ast()
         )
 
     @staticmethod
@@ -322,24 +328,14 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
         Parses a ParseFuncDecl from a Parser, given that the "func" keyword has already been
         consumed.
         """
-        errors = []
-        if parser.match(lexer.TokenType.IDENTIFIER):
-            ident: Union[lexer.Token, ParseError] = parser.prev()
-        else:
-            ident = ParseError("missing function name", parser.curr_region())
-            errors.append(ident)
+        ident, errors = ParseToken.parse(parser, [lexer.TokenType.IDENTIFIER])
 
-        def parse_param(
-            parser: Parser
-        ) -> Tuple["ParseType", Union[lexer.Token, ParseError]]:
+        def parse_param(parser: Parser) -> Tuple["ParseType", ParseToken]:
             param_type, errs = ParseType.parse(parser)
             errors.extend(errs)
-            if parser.match(lexer.TokenType.IDENTIFIER):
-                return param_type, parser.prev()
-            return (
-                param_type,
-                ParseError("missing parameter name", parser.curr_region()),
-            )
+            param_ident, errs = ParseToken.parse(parser, [lexer.TokenType.IDENTIFIER])
+            errors.extend(errs)
+            return param_type, param_ident
 
         if not parser.match(lexer.TokenType.LEFT_PAREN):
             errors.append(
@@ -807,30 +803,23 @@ class ParseAtomType(ParseNode[ast.AstAtomType]):
     ParseAtomType : identifier | "void" ;
     """
 
-    def __init__(self, token: Union[lexer.Token, ParseError]) -> None:
+    def __init__(self, token: ParseToken) -> None:
         self.token = token
 
     def pprint(self) -> str:
-        return "<error>" if isinstance(self.token, ParseError) else str(self.token)
+        return self.token.pprint()
 
     def to_ast(self) -> Union[ast.AstAtomType, ast.AstError]:
-        if isinstance(self.token, ParseError):
-            return ast.AstError()
-        return ast.AstAtomType(self.token)
+        return ast.AstAtomType.make(self.token.to_ast())
 
     @staticmethod
     def parse(parser: Parser) -> Tuple["ParseAtomType", List[ParseError]]:
         """
         Parse a ParseAtomType from a Parser.
         """
-        errors = []
-        if parser.match(lexer.TokenType.IDENTIFIER):
-            token: Union[lexer.Token, ParseError] = parser.prev()
-        elif parser.match(lexer.TokenType.VOID):
-            token = parser.prev()
-        else:
-            token = ParseError("expected type", parser.curr_region())
-            errors.append(token)
+        token, errors = ParseToken.parse(
+            parser, [lexer.TokenType.IDENTIFIER, lexer.TokenType.VOID]
+        )
         return ParseAtomType(token), errors
 
 
@@ -873,7 +862,7 @@ class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
         return f"{self.operator}({self.target.pprint()})"
 
     def to_ast(self) -> Union[ast.AstUnaryExpr, ast.AstError]:
-        return ast.AstUnaryExpr.make(self.operator, self.target.to_ast())
+        return ast.AstUnaryExpr.make(str(self.operator), self.target.to_ast())
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
@@ -902,7 +891,7 @@ class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
 
     def to_ast(self) -> Union[ast.AstBinaryExpr, ast.AstError]:
         return ast.AstBinaryExpr.make(
-            self.operator, self.left.to_ast(), self.right.to_ast()
+            str(self.operator), self.left.to_ast(), self.right.to_ast()
         )
 
     @staticmethod
@@ -967,7 +956,13 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         return str(self.token)
 
     def to_ast(self) -> Union[ast.AstAtomExpr, ast.AstError]:
-        return ast.AstAtomExpr(self.token)
+        if self.token.kind == lexer.TokenType.INT_LITERAL:
+            return ast.AstIntExpr(str(self.token))
+        if self.token.kind == lexer.TokenType.NUM_LITERAL:
+            return ast.AstNumExpr(str(self.token))
+        if self.token.kind == lexer.TokenType.STR_LITERAL:
+            return ast.AstStrExpr(str(self.token))
+        return ast.AstError()
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:

@@ -1,11 +1,8 @@
 """
-Module containing definitions for a Clear ast, functions for converting a parse tree to an ast,
-and a base class for ast visitors.
+Module containing definitions for a Clear ast and a base class for ast visitors.
 """
 
 from typing import Union, List, Optional, Tuple
-
-import clr.lexer as lexer
 
 
 class AstVisitor:
@@ -73,9 +70,21 @@ class AstVisitor:
         """
         raise NotImplementedError()
 
-    def atom_expr(self, node: "AstAtomExpr") -> None:
+    def int_expr(self, node: "AstIntExpr") -> None:
         """
-        Visit an atomic value expression node.
+        Visit an int literal.
+        """
+        raise NotImplementedError()
+
+    def num_expr(self, node: "AstNumExpr") -> None:
+        """
+        Visit a num literal.
+        """
+        raise NotImplementedError()
+
+    def str_expr(self, node: "AstStrExpr") -> None:
+        """
+        Visit a str literal.
         """
         raise NotImplementedError()
 
@@ -117,6 +126,7 @@ class AstNode:
 
 
 AstType = Union["AstAtomType", "AstFuncType", "AstOptionalType"]
+AstAtomExpr = Union["AstIntExpr", "AstNumExpr", "AstStrExpr"]
 AstExpr = Union["AstUnaryExpr", "AstBinaryExpr", "AstAtomExpr", "AstCallExpr"]
 AstStmt = Union[
     "AstPrintStmt",
@@ -171,9 +181,7 @@ class AstValueDecl(AstNode):
     Ast node for a value declaration.
     """
 
-    def __init__(
-        self, ident: lexer.Token, val_type: Optional[AstType], val_init: AstExpr
-    ):
+    def __init__(self, ident: str, val_type: Optional[AstType], val_init: AstExpr):
         self.ident = ident
         self.val_type = val_type
         self.val_init = val_init
@@ -183,7 +191,7 @@ class AstValueDecl(AstNode):
 
     @staticmethod
     def make(
-        ident: lexer.Token,
+        ident: Union[str, AstError],
         val_type: Optional[Union[AstType, AstError]],
         val_init: Union[AstExpr, AstError],
     ) -> Union["AstValueDecl", AstError]:
@@ -191,6 +199,8 @@ class AstValueDecl(AstNode):
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
+        if isinstance(ident, AstError):
+            return ident
         pure_type = None
         if val_type:
             if isinstance(val_type, AstError):
@@ -209,8 +219,8 @@ class AstFuncDecl(AstNode):
 
     def __init__(
         self,
-        ident: lexer.Token,
-        params: List[Tuple[AstType, lexer.Token]],
+        ident: str,
+        params: List[Tuple[AstType, str]],
         return_type: AstType,
         block: "AstBlockStmt",
     ) -> None:
@@ -224,8 +234,8 @@ class AstFuncDecl(AstNode):
 
     @staticmethod
     def make(
-        ident: lexer.Token,
-        params: List[Tuple[Union[AstType, AstError], lexer.Token]],
+        ident: Union[str, AstError],
+        params: List[Tuple[Union[AstType, AstError], Union[str, AstError]]],
         return_type: Union[AstType, AstError],
         block: Union["AstBlockStmt", AstError],
     ) -> Union["AstFuncDecl", AstError]:
@@ -233,10 +243,14 @@ class AstFuncDecl(AstNode):
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
+        if isinstance(ident, AstError):
+            return ident
         pure_params = []
         for param_type, param_ident in params:
             if isinstance(param_type, AstError):
                 return param_type
+            if isinstance(param_ident, AstError):
+                return param_ident
             pure_params.append((param_type, param_ident))
         if isinstance(return_type, AstError):
             return return_type
@@ -341,8 +355,10 @@ class AstIfStmt(AstNode):
         if else_part:
             if isinstance(else_part, AstError):
                 return else_part
-            return AstIfStmt((if_cond, if_block), pure_elifs, else_part)
-        return AstIfStmt((if_cond, if_block), pure_elifs, None)
+            pure_else: Optional[AstBlockStmt] = else_part
+        else:
+            pure_else = None
+        return AstIfStmt((if_cond, if_block), pure_elifs, pure_else)
 
 
 class AstWhileStmt(AstNode):
@@ -427,7 +443,7 @@ class AstUnaryExpr(AstNode):
     Ast node for a unary expression.
     """
 
-    def __init__(self, operator: lexer.Token, target: AstExpr) -> None:
+    def __init__(self, operator: str, target: AstExpr) -> None:
         self.operator = operator
         self.target = target
 
@@ -436,7 +452,7 @@ class AstUnaryExpr(AstNode):
 
     @staticmethod
     def make(
-        operator: lexer.Token, target: Union[AstExpr, AstError]
+        operator: str, target: Union[AstExpr, AstError]
     ) -> Union["AstUnaryExpr", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -452,7 +468,7 @@ class AstBinaryExpr(AstNode):
     Ast node for a binary expression.
     """
 
-    def __init__(self, operator: lexer.Token, left: AstExpr, right: AstExpr) -> None:
+    def __init__(self, operator: str, left: AstExpr, right: AstExpr) -> None:
         self.operator = operator
         self.left = left
         self.right = right
@@ -462,9 +478,7 @@ class AstBinaryExpr(AstNode):
 
     @staticmethod
     def make(
-        operator: lexer.Token,
-        left: Union[AstExpr, AstError],
-        right: Union[AstExpr, AstError],
+        operator: str, left: Union[AstExpr, AstError], right: Union[AstExpr, AstError]
     ) -> Union["AstBinaryExpr", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -477,16 +491,40 @@ class AstBinaryExpr(AstNode):
         return AstBinaryExpr(operator, left, right)
 
 
-class AstAtomExpr(AstNode):
+class AstIntExpr(AstNode):
     """
-    Ast node for an atomic value expression.
+    Ast node for an int literal.
     """
 
-    def __init__(self, token: lexer.Token) -> None:
-        self.token = token
+    def __init__(self, literal: str) -> None:
+        self.literal = literal
 
     def accept(self, visitor: AstVisitor) -> None:
-        visitor.atom_expr(self)
+        visitor.int_expr(self)
+
+
+class AstNumExpr(AstNode):
+    """
+    Ast node for a num literal.
+    """
+
+    def __init__(self, literal: str) -> None:
+        self.literal = literal
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.num_expr(self)
+
+
+class AstStrExpr(AstNode):
+    """
+    Ast node for a str literal.
+    """
+
+    def __init__(self, literal: str) -> None:
+        self.literal = literal
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.str_expr(self)
 
 
 class AstCallExpr(AstNode):
@@ -524,11 +562,21 @@ class AstAtomType(AstNode):
     Ast node for an atomic type.
     """
 
-    def __init__(self, token: lexer.Token) -> None:
+    def __init__(self, token: str) -> None:
         self.token = token
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.atom_type(self)
+
+    @staticmethod
+    def make(token: Union[str, AstError]) -> Union["AstAtomType", AstError]:
+        """
+        Makes the node or returns an error given its contents with any contained node possibly
+        being an error.
+        """
+        if isinstance(token, AstError):
+            return token
+        return AstAtomType(token)
 
 
 class AstFuncType(AstNode):
