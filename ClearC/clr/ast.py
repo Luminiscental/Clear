@@ -4,6 +4,78 @@ Module containing definitions for a Clear ast and a base class for ast visitors.
 
 from typing import Union, List, Optional, Tuple, Dict
 
+TypeAnnot = Union["BuiltinTypeAnnot", "FuncTypeAnnot", "OptionalTypeAnnot", None]
+
+Comparison = Union[bool, "NotImplemented"]
+
+
+class BuiltinTypeAnnot:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def __str__(self) -> str:
+        return self.name
+
+    def __eq__(self, other: object) -> Comparison:
+        if isinstance(other, BuiltinTypeAnnot):
+            return self.name == other.name
+        if isinstance(other, FuncTypeAnnot):
+            return False
+        if isinstance(other, OptionalTypeAnnot):
+            return False
+        if other is None:
+            return False
+        return NotImplemented
+
+    def __ne__(self, other: object) -> Comparison:
+        return not self == other
+
+
+class FuncTypeAnnot:
+    def __init__(self, params: List[TypeAnnot], return_type: TypeAnnot) -> None:
+        self.params = params
+        self.return_type = return_type
+
+    def __str__(self) -> str:
+        param_str = ", ".join(str(param) for param in self.params)
+        return f"func({param_str}) {self.return_type}"
+
+    def __eq__(self, other: object) -> Comparison:
+        if isinstance(other, BuiltinTypeAnnot):
+            return False
+        if isinstance(other, FuncTypeAnnot):
+            return self.params == other.params and self.return_type == other.return_type
+        if isinstance(other, OptionalTypeAnnot):
+            return False
+        if other is None:
+            return False
+        return NotImplemented
+
+    def __ne__(self, other: object) -> Comparison:
+        return not self == other
+
+
+class OptionalTypeAnnot:
+    def __init__(self, target: TypeAnnot) -> None:
+        self.target = target
+
+    def __str__(self) -> str:
+        return f"({self.target})?"
+
+    def __eq__(self, other: object) -> Comparison:
+        if isinstance(other, BuiltinTypeAnnot):
+            return False
+        if isinstance(other, FuncTypeAnnot):
+            return False
+        if isinstance(other, OptionalTypeAnnot):
+            return self.target == other.target
+        if other is None:
+            return False
+        return NotImplemented
+
+    def __ne__(self, other: object) -> Comparison:
+        return not self == other
+
 
 class AstVisitor:
     """
@@ -203,6 +275,9 @@ class AstNode:
     Base class for an ast node that can accept a visitor.
     """
 
+    def __init__(self) -> None:
+        self.type_annot: TypeAnnot = None
+
     def accept(self, visitor: AstVisitor) -> None:
         """
         Accept a visitor to this node, calling the relevant method of the visitor.
@@ -224,7 +299,7 @@ AstStmt = Union[
 AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 # TODO: Store code regions in the ast
-class AstError(AstNode, Exception):
+class AstError(Exception, AstNode):
     """
     Ast node to represent an error creating the tree.
     """
@@ -233,6 +308,7 @@ class AstError(AstNode, Exception):
         super().__init__("incomplete parse")
 
     def accept(self, visitor: AstVisitor) -> None:
+        # TODO: Do something more reasonable here, maybe visitor.error(self)
         raise self
 
 
@@ -242,6 +318,7 @@ class Ast(AstNode):
     """
 
     def __init__(self, decls: List[AstDecl]) -> None:
+        super().__init__()
         self.decls = decls
         # Annotations:
         self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
@@ -269,6 +346,7 @@ class AstValueDecl(AstNode):
     """
 
     def __init__(self, ident: str, val_type: Optional[AstType], val_init: AstExpr):
+        super().__init__()
         self.ident = ident
         self.val_type = val_type
         self.val_init = val_init
@@ -305,6 +383,7 @@ class AstParam(AstNode):
     """
 
     def __init__(self, param_type: AstType, param_name: str) -> None:
+        super().__init__()
         self.param_type = param_type
         self.param_name = param_name
 
@@ -338,6 +417,7 @@ class AstFuncDecl(AstNode):
         return_type: AstType,
         block: "AstBlockStmt",
     ) -> None:
+        super().__init__()
         self.ident = ident
         self.params = params
         self.return_type = return_type
@@ -378,6 +458,7 @@ class AstPrintStmt(AstNode):
     """
 
     def __init__(self, expr: Optional[AstExpr]) -> None:
+        super().__init__()
         self.expr = expr
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -404,6 +485,7 @@ class AstBlockStmt(AstNode):
     """
 
     def __init__(self, decls: List[AstDecl]) -> None:
+        super().__init__()
         self.decls = decls
         # Annotations:
         self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
@@ -436,6 +518,7 @@ class AstIfStmt(AstNode):
         elif_parts: List[Tuple[AstExpr, AstBlockStmt]],
         else_part: Optional[AstBlockStmt],
     ) -> None:
+        super().__init__()
         self.if_part = if_part
         self.elif_parts = elif_parts
         self.else_part = else_part
@@ -482,6 +565,7 @@ class AstWhileStmt(AstNode):
     """
 
     def __init__(self, cond: Optional[AstExpr], block: AstBlockStmt) -> None:
+        super().__init__()
         self.cond = cond
         self.block = block
 
@@ -511,6 +595,7 @@ class AstReturnStmt(AstNode):
     """
 
     def __init__(self, expr: Optional[AstExpr]) -> None:
+        super().__init__()
         self.expr = expr
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -537,6 +622,7 @@ class AstExprStmt(AstNode):
     """
 
     def __init__(self, expr: AstExpr) -> None:
+        super().__init__()
         self.expr = expr
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -559,6 +645,7 @@ class AstUnaryExpr(AstNode):
     """
 
     def __init__(self, operator: str, target: AstExpr) -> None:
+        super().__init__()
         self.operator = operator
         self.target = target
 
@@ -584,6 +671,7 @@ class AstBinaryExpr(AstNode):
     """
 
     def __init__(self, operator: str, left: AstExpr, right: AstExpr) -> None:
+        super().__init__()
         self.operator = operator
         self.left = left
         self.right = right
@@ -612,6 +700,7 @@ class AstIntExpr(AstNode):
     """
 
     def __init__(self, literal: str) -> None:
+        super().__init__()
         self.literal = literal
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -624,6 +713,7 @@ class AstNumExpr(AstNode):
     """
 
     def __init__(self, literal: str) -> None:
+        super().__init__()
         self.literal = literal
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -636,6 +726,7 @@ class AstStrExpr(AstNode):
     """
 
     def __init__(self, literal: str) -> None:
+        super().__init__()
         self.literal = literal
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -648,6 +739,7 @@ class AstIdentExpr(AstNode):
     """
 
     def __init__(self, name: str) -> None:
+        super().__init__()
         self.name = name
         # Annotations:
         self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
@@ -662,6 +754,7 @@ class AstCallExpr(AstNode):
     """
 
     def __init__(self, function: AstExpr, args: List[AstExpr]) -> None:
+        super().__init__()
         self.function = function
         self.args = args
 
@@ -692,6 +785,7 @@ class AstAtomType(AstNode):
     """
 
     def __init__(self, token: str) -> None:
+        super().__init__()
         self.token = token
         # Annotations:
         self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
@@ -716,6 +810,7 @@ class AstFuncType(AstNode):
     """
 
     def __init__(self, params: List[AstType], return_type: AstType) -> None:
+        super().__init__()
         self.params = params
         self.return_type = return_type
 
@@ -746,6 +841,7 @@ class AstOptionalType(AstNode):
     """
 
     def __init__(self, target: AstType) -> None:
+        super().__init__()
         self.target = target
 
     def accept(self, visitor: AstVisitor) -> None:

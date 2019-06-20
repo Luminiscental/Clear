@@ -14,6 +14,7 @@ import clr.parser as parser
 import clr.ast as ast
 import clr.printer as printer
 import clr.resolver as resolver
+import clr.typechecker as typechecker
 
 
 def main() -> None:
@@ -63,6 +64,15 @@ def main() -> None:
         print("--------")
         for resolve_error in resolve_errors:
             print(resolve_error)
+        print("--------")
+        sys.exit(1)
+
+    type_errors = typechecker.check_types(tree)
+    if type_errors:
+        print("Type Errors:")
+        print("--------")
+        for type_error in type_errors:
+            print(type_error)
         print("--------")
         sys.exit(1)
 

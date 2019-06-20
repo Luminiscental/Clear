@@ -1,25 +1,14 @@
 
-func hello(str name, func(str?) void user) void {
-    user("Hello " + name);
+func hello(str name) void {
+    print "Hello " + name;
 }
 
-val me = "<I really don't know>";
-val you = "lily";
-
-func printer(str? msg) void {
-    print msg or "<error>";
-}
-
-hello(me, printer);
-hello(you, printer);
+val x = 1 + 2 + 3;
 
 if (true) {
-    val x int? = 2;
-    {
-        val x = -1i;
-    }
-} else if (false) {
-    val y func() str?? = "";
-} else {
-    print "no";
+    val x = "goodbye";
+    hello(x);
+    print hello(x);
 }
+
+print x;
