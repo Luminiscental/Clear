@@ -6,8 +6,6 @@ from typing import List, Union
 
 import clr.ast as ast
 
-# TODO: Shadowing / scope popping not working
-
 
 class ScopeVisitor(ast.BlockVisitor):
     """
@@ -43,7 +41,7 @@ class NameTracker(ScopeVisitor):
     def _push_scope(self, node: ast.AstBlockStmt) -> None:
         parent = self._get_scope()
         super()._push_scope(node)
-        self._get_scope().names = parent.names
+        self._get_scope().names = dict(parent.names)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         self._get_scope().names[node.ident] = node
