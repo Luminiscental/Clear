@@ -48,21 +48,21 @@ class AstPrinter(ast.AstVisitor):
         self._startline()
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        def print_param(param_type: ast.AstType, param_name: str) -> None:
-            param_type.accept(self)
-            self._append(f" {param_name}")
-
         self._append(f"func {node.ident}(")
         if node.params:
-            print_param(*node.params[0])
-            for param_type, param_name in node.params[1:]:
+            node.params[0].accept(self)
+            for param in node.params[1:]:
                 self._append(", ")
-                print_param(param_type, param_name)
+                param.accept(self)
         self._append(") ")
         node.return_type.accept(self)
         self._append(" ")
         node.block.accept(self)
         self._startline()
+
+    def param(self, node: ast.AstParam) -> None:
+        node.param_type.accept(self)
+        self._append(f" {node.param_name}")
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         self._append("print")

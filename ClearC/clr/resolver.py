@@ -4,7 +4,6 @@ Module for name resolution visitors / functions.
 
 from typing import List, Union
 
-import clr.lexer as lexer
 import clr.ast as ast
 
 
@@ -49,9 +48,8 @@ class NameTracker(ScopeVisitor):
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         self._get_scope().names[node.ident] = node
-        for _, param_name in node.params:
-            # TODO: Do something more sensible here
-            self._get_scope().names[param_name] = node
+        for param in node.params:
+            self._get_scope().names[param.param_name] = param
         super().func_decl(node)
 
 

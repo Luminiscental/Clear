@@ -20,6 +20,11 @@ class AstVisitor:
         Visit a function declaration node.
         """
 
+    def param(self, node: "AstParam") -> None:
+        """
+        Visit a parameter declaration node.
+        """
+
     def print_stmt(self, node: "AstPrintStmt") -> None:
         """
         Visit a print statement node.
@@ -135,10 +140,13 @@ class DeepVisitor(AstVisitor):
             node.val_type.accept(self)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
-        for param_type, _ in node.params:
-            param_type.accept(self)
+        for param in node.params:
+            param.accept(self)
         node.return_type.accept(self)
         node.block.accept(self)
+
+    def param(self, node: "AstParam") -> None:
+        node.param_type.accept(self)
 
     def print_stmt(self, node: "AstPrintStmt") -> None:
         if node.expr:
@@ -236,7 +244,7 @@ class Ast(AstNode):
     def __init__(self, decls: List[AstDecl]) -> None:
         self.decls = decls
         # Annotations:
-        self.names: Dict[str, AstDecl] = {}
+        self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
 
     def accept(self, visitor: AstVisitor) -> None:
         for decl in self.decls:
@@ -291,6 +299,33 @@ class AstValueDecl(AstNode):
         return AstValueDecl(ident, pure_type, pure_init)
 
 
+class AstParam(AstNode):
+    """
+    Ast node for a parameter declaration.
+    """
+
+    def __init__(self, param_type: AstType, param_name: str) -> None:
+        self.param_type = param_type
+        self.param_name = param_name
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.param(self)
+
+    @staticmethod
+    def make(
+        param_type: Union[AstType, AstError], param_name: Union[str, AstError]
+    ) -> Union["AstParam", AstError]:
+        """
+        Makes the node or returns an error given its contents with any contained node possibly
+        being an error.
+        """
+        if isinstance(param_type, AstError):
+            return param_type
+        if isinstance(param_name, AstError):
+            return param_name
+        return AstParam(param_type, param_name)
+
+
 class AstFuncDecl(AstNode):
     """
     Ast node for a function declaration.
@@ -299,7 +334,7 @@ class AstFuncDecl(AstNode):
     def __init__(
         self,
         ident: str,
-        params: List[Tuple[AstType, str]],
+        params: List[AstParam],
         return_type: AstType,
         block: "AstBlockStmt",
     ) -> None:
@@ -326,11 +361,10 @@ class AstFuncDecl(AstNode):
             return ident
         pure_params = []
         for param_type, param_ident in params:
-            if isinstance(param_type, AstError):
-                return param_type
-            if isinstance(param_ident, AstError):
-                return param_ident
-            pure_params.append((param_type, param_ident))
+            param = AstParam.make(param_type, param_ident)
+            if isinstance(param, AstError):
+                return param
+            pure_params.append(param)
         if isinstance(return_type, AstError):
             return return_type
         if isinstance(block, AstError):
@@ -372,7 +406,7 @@ class AstBlockStmt(AstNode):
     def __init__(self, decls: List[AstDecl]) -> None:
         self.decls = decls
         # Annotations:
-        self.names: Dict[str, AstDecl] = {}
+        self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
@@ -616,7 +650,7 @@ class AstIdentExpr(AstNode):
     def __init__(self, name: str) -> None:
         self.name = name
         # Annotations:
-        self.ref: Optional[AstDecl] = None
+        self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
@@ -660,7 +694,7 @@ class AstAtomType(AstNode):
     def __init__(self, token: str) -> None:
         self.token = token
         # Annotations:
-        self.ref: Optional[AstDecl] = None
+        self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.atom_type(self)
