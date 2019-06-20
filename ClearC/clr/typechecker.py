@@ -23,6 +23,12 @@ class TypeChecker(ast.DeepVisitor):
         elif isinstance(type_annot, ast.BuiltinTypeAnnot):
             if type_annot.name not in ["int", "num", "str", "bool"]:
                 self._error(f"invalid type {type_annot} for value")
+        elif isinstance(type_annot, ast.OptionalTypeAnnot):
+            self._check_value_type(type_annot.target)
+        elif type_annot is None:
+            self._error(f"unresolved type for value")
+        else:
+            self._error(f"unknown type {type_annot}")
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
@@ -59,6 +65,8 @@ class TypeChecker(ast.DeepVisitor):
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
+        if node.expr:
+            print(f"printing {node.expr.type_annot}")
         # Check
         if node.expr and node.expr.type_annot != ast.BuiltinTypeAnnot("str"):
             self._error(f"invalid type {node.expr.type_annot} to print, expected str")
@@ -150,6 +158,11 @@ class TypeChecker(ast.DeepVisitor):
         self._check_value_type(node.ref.type_annot)
         # Propogate
         node.type_annot = node.ref.type_annot
+
+    def bool_expr(self, node: ast.AstBoolExpr) -> None:
+        super().bool_expr(node)
+        # Propogate
+        node.type_annot = ast.BuiltinTypeAnnot("bool")
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)

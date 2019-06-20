@@ -6,6 +6,8 @@ from typing import List, Union
 
 import clr.ast as ast
 
+# TODO: Shadowing / scope popping not working
+
 
 class ScopeVisitor(ast.BlockVisitor):
     """

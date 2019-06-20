@@ -147,6 +147,9 @@ class AstPrinter(ast.AstVisitor):
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         self._append(node.name)
 
+    def bool_expr(self, node: ast.AstBoolExpr) -> None:
+        self._append("true" if node.value else "false")
+
     def call_expr(self, node: ast.AstCallExpr) -> None:
         node.function.accept(self)
         self._append("(")

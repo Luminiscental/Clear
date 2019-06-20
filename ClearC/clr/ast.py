@@ -157,6 +157,11 @@ class AstVisitor:
         Visit an identifier expression.
         """
 
+    def bool_expr(self, node: "AstBoolExpr") -> None:
+        """
+        Visit a boolean expression.
+        """
+
     def call_expr(self, node: "AstCallExpr") -> None:
         """
         Visit a function call expression node.
@@ -286,7 +291,9 @@ class AstNode:
 
 
 AstType = Union["AstAtomType", "AstFuncType", "AstOptionalType"]
-AstAtomExpr = Union["AstIntExpr", "AstNumExpr", "AstStrExpr", "AstIdentExpr"]
+AstAtomExpr = Union[
+    "AstIntExpr", "AstNumExpr", "AstStrExpr", "AstIdentExpr", "AstBoolExpr"
+]
 AstExpr = Union["AstUnaryExpr", "AstBinaryExpr", "AstAtomExpr", "AstCallExpr"]
 AstStmt = Union[
     "AstPrintStmt",
@@ -746,6 +753,19 @@ class AstIdentExpr(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
+
+
+class AstBoolExpr(AstNode):
+    """
+    Ast node for a boolean expression.
+    """
+
+    def __init__(self, value: bool) -> None:
+        super().__init__()
+        self.value = value
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.bool_expr(self)
 
 
 class AstCallExpr(AstNode):

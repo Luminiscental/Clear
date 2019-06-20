@@ -866,14 +866,22 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
 
     def to_ast(self) -> Union[ast.AstAtomExpr, ast.AstError]:
         if self.token.kind == lexer.TokenType.INT_LITERAL:
-            return ast.AstIntExpr(str(self.token))
-        if self.token.kind == lexer.TokenType.NUM_LITERAL:
-            return ast.AstNumExpr(str(self.token))
-        if self.token.kind == lexer.TokenType.STR_LITERAL:
-            return ast.AstStrExpr(str(self.token))
-        if self.token.kind == lexer.TokenType.IDENTIFIER:
-            return ast.AstIdentExpr(str(self.token))
-        return ast.AstError()
+            result: Union[ast.AstAtomExpr, ast.AstError] = ast.AstIntExpr(
+                str(self.token)
+            )
+        elif self.token.kind == lexer.TokenType.NUM_LITERAL:
+            result = ast.AstNumExpr(str(self.token))
+        elif self.token.kind == lexer.TokenType.STR_LITERAL:
+            result = ast.AstStrExpr(str(self.token))
+        elif self.token.kind == lexer.TokenType.IDENTIFIER:
+            result = ast.AstIdentExpr(str(self.token))
+        elif self.token.kind == lexer.TokenType.TRUE:
+            result = ast.AstBoolExpr(True)
+        elif self.token.kind == lexer.TokenType.FALSE:
+            result = ast.AstBoolExpr(False)
+        else:
+            result = ast.AstError()
+        return result
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
@@ -979,6 +987,8 @@ PRATT_TABLE: DefaultDict[lexer.TokenType, PrattRule] = collections.defaultdict(
         lexer.TokenType.NUM_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
         lexer.TokenType.INT_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
         lexer.TokenType.IDENTIFIER: PrattRule(prefix=ParseAtomExpr.finish),
+        lexer.TokenType.TRUE: PrattRule(prefix=ParseAtomExpr.finish),
+        lexer.TokenType.FALSE: PrattRule(prefix=ParseAtomExpr.finish),
     },
 )
 

@@ -63,6 +63,8 @@ class TokenType(enum.Enum):
     VOID = enum.auto()
     OR = enum.auto()
     AND = enum.auto()
+    TRUE = enum.auto()
+    FALSE = enum.auto()
     # Symbols
     EQUALS = enum.auto()
     COMMA = enum.auto()
@@ -208,6 +210,8 @@ def tokenize_source(source: str) -> List[Token]:
             "print": TokenType.PRINT,
             "or": TokenType.OR,
             "and": TokenType.AND,
+            "true": TokenType.TRUE,
+            "false": TokenType.FALSE,
         }
 
         if token.kind == TokenType.IDENTIFIER:
