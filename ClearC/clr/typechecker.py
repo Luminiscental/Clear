@@ -14,7 +14,7 @@ def check_types(tree: ast.Ast) -> List[lexer.CompileError]:
     """
     checker = TypeChecker()
     tree.accept(checker)
-    return checker.errors
+    return checker.errors.get()
 
 
 ARITH_TYPES = [ast.BuiltinTypeAnnot("num"), ast.BuiltinTypeAnnot("int")]
@@ -28,12 +28,7 @@ class TypeChecker(ast.DeepVisitor):
     """
 
     def __init__(self) -> None:
-        self.errors: List[lexer.CompileError] = []
-
-    def _error(self, message: str) -> None:
-        self.errors.append(
-            lexer.CompileError(message=message, region=lexer.SourceView.all(""))
-        )
+        self.errors = lexer.ErrorTracker()
 
     def _check_value_type(self, type_annot: ast.TypeAnnot) -> None:
         if isinstance(type_annot, ast.FuncTypeAnnot):
@@ -42,13 +37,20 @@ class TypeChecker(ast.DeepVisitor):
             # return_type can be void so not checked
         elif isinstance(type_annot, ast.BuiltinTypeAnnot):
             if type_annot.name not in ["int", "num", "str", "bool"]:
-                self._error(f"invalid type {type_annot} for value")
+                self.errors.add(
+                    message=f"invalid type {type_annot} for value",
+                    region=lexer.SourceView.all(""),
+                )
         elif isinstance(type_annot, ast.OptionalTypeAnnot):
             self._check_value_type(type_annot.target)
         elif type_annot is None:
-            self._error(f"unresolved type for value")
+            self.errors.add(
+                message=f"unresolved type for value", region=lexer.SourceView.all("")
+            )
         else:
-            self._error(f"unknown type {type_annot}")
+            self.errors.add(
+                message=f"unknown type {type_annot}", region=lexer.SourceView.all("")
+            )
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
@@ -61,9 +63,10 @@ class TypeChecker(ast.DeepVisitor):
         self._check_value_type(node.type_annot)
         # TODO: Handle optional/nil better, not just equality checks
         if node.type_annot != node.val_init.type_annot:
-            self._error(
-                f"mismatched types for value declaration: "
-                f"expected {node.type_annot} but got {node.val_init.type_annot}"
+            self.errors.add(
+                message=f"mismatched types for value declaration: "
+                f"expected {node.type_annot} but got {node.val_init.type_annot}",
+                region=lexer.SourceView.all(""),
             )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
@@ -89,27 +92,33 @@ class TypeChecker(ast.DeepVisitor):
             print(f"printing {node.expr.type_annot}")
         # Check
         if node.expr and node.expr.type_annot != ast.BuiltinTypeAnnot("str"):
-            self._error(f"invalid type {node.expr.type_annot} to print, expected str")
+            self.errors.add(
+                message=f"invalid type {node.expr.type_annot} to print, expected str",
+                region=lexer.SourceView.all(""),
+            )
 
     def if_stmt(self, node: ast.AstIfStmt) -> None:
         super().if_stmt(node)
         # Check
         if node.if_part[0].type_annot != ast.BuiltinTypeAnnot("bool"):
-            self._error(
-                f"invalid type {node.if_part[0].type_annot} for condition, expected bool"
+            self.errors.add(
+                message=f"invalid type {node.if_part[0].type_annot} for condition, expected bool",
+                region=lexer.SourceView.all(""),
             )
         for cond, _ in node.elif_parts:
             if cond.type_annot != ast.BuiltinTypeAnnot("bool"):
-                self._error(
-                    f"invalid type {cond.type_annot} for condition, expected bool"
+                self.errors.add(
+                    message=f"invalid type {cond.type_annot} for condition, expected bool",
+                    region=lexer.SourceView.all(""),
                 )
 
     def while_stmt(self, node: ast.AstWhileStmt) -> None:
         super().while_stmt(node)
         # Check
         if node.cond and node.cond.type_annot != ast.BuiltinTypeAnnot("bool"):
-            self._error(
-                f"invalid type {node.cond.type_annot} for condition, expected bool"
+            self.errors.add(
+                message=f"invalid type {node.cond.type_annot} for condition, expected bool",
+                region=lexer.SourceView.all(""),
             )
 
     def return_stmt(self, node: ast.AstReturnStmt) -> None:
@@ -130,11 +139,15 @@ class TypeChecker(ast.DeepVisitor):
             node.type_annot = node.target.type_annot
             # Check
             if node.target.type_annot not in ARITH_TYPES:
-                self._error(
-                    f"invalid type {node.target.type_annot} for unary operator {node.operator}"
+                self.errors.add(
+                    message=f"invalid type {node.target.type_annot} for unary operator {node.operator}",
+                    region=lexer.SourceView.all(""),
                 )
         else:
-            self._error(f"unknown unary operator {node.operator}")
+            self.errors.add(
+                message=f"unknown unary operator {node.operator}",
+                region=lexer.SourceView.all(""),
+            )
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
@@ -143,16 +156,21 @@ class TypeChecker(ast.DeepVisitor):
             node.type_annot = node.left.type_annot
             # Check
             if node.left.type_annot != node.right.type_annot:
-                self._error(
-                    f"mismatched types for binary operator {node.operator}: "
-                    f"lhs is {node.left.type_annot} but rhs is {node.right.type_annot}"
+                self.errors.add(
+                    message=f"mismatched types for binary operator {node.operator}: "
+                    f"lhs is {node.left.type_annot} but rhs is {node.right.type_annot}",
+                    region=lexer.SourceView.all(""),
                 )
             if node.left.type_annot not in ARITH_TYPES:
-                self._error(
-                    f"invalid type {node.left.type_annot} for binary operator {node.operator}"
+                self.errors.add(
+                    message=f"invalid type {node.left.type_annot} for binary operator {node.operator}",
+                    region=lexer.SourceView.all(""),
                 )
         else:
-            self._error(f"unknown binary operator {node.operator}")
+            self.errors.add(
+                message=f"unknown binary operator {node.operator}",
+                region=lexer.SourceView.all(""),
+            )
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
         super().int_expr(node)
@@ -173,7 +191,10 @@ class TypeChecker(ast.DeepVisitor):
         super().ident_expr(node)
         # Check
         if not node.ref:
-            self._error(f"couldn't resolve identifier {node.name}")
+            self.errors.add(
+                message=f"couldn't resolve identifier {node.name}",
+                region=lexer.SourceView.all(""),
+            )
             return
         self._check_value_type(node.ref.type_annot)
         # Propogate
@@ -188,28 +209,32 @@ class TypeChecker(ast.DeepVisitor):
         super().call_expr(node)
         # Check
         if not isinstance(node.function.type_annot, ast.FuncTypeAnnot):
-            self._error(
-                f"invalid type {node.function.type_annot} to call, expected a function"
+            self.errors.add(
+                message=f"invalid type {node.function.type_annot} to call, expected a function",
+                region=lexer.SourceView.all(""),
             )
             return
         arg_count = len(node.args)
         param_count = len(node.function.type_annot.params)
         if arg_count > param_count:
-            self._error(
-                f"too many arguments to function: "
-                f"expected {param_count} but got {arg_count}"
+            self.errors.add(
+                message=f"too many arguments to function: "
+                f"expected {param_count} but got {arg_count}",
+                region=lexer.SourceView.all(""),
             )
         elif arg_count < param_count:
-            self._error(
-                f"too few arguments to function: "
-                f"expected {param_count} but got {arg_count}"
+            self.errors.add(
+                message=f"too few arguments to function: "
+                f"expected {param_count} but got {arg_count}",
+                region=lexer.SourceView.all(""),
             )
         else:
             for arg, param in zip(node.args, node.function.type_annot.params):
                 if arg.type_annot != param:
-                    self._error(
-                        f"mismatched type for argument: "
-                        f"expected {param} but got {arg.type_annot}"
+                    self.errors.add(
+                        message=f"mismatched type for argument: "
+                        f"expected {param} but got {arg.type_annot}",
+                        region=lexer.SourceView.all(""),
                     )
         # Allow void expression
         # Propogate

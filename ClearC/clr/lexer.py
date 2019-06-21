@@ -84,6 +84,27 @@ class CompileError(NamedTuple):
         return f"{self.message}: {self.region}"
 
 
+class ErrorTracker:
+    """
+    Wrapper class for keeping track of a list of errors.
+    """
+
+    def __init__(self) -> None:
+        self._errors: List[CompileError] = []
+
+    def add(self, message: str, region: "SourceView") -> None:
+        """
+        Add a new error.
+        """
+        self._errors.append(CompileError(message, region))
+
+    def get(self) -> List[CompileError]:
+        """
+        Gets the list of errors.
+        """
+        return self._errors
+
+
 class SourceView:
     """
     Represents a region within a Clear source string.

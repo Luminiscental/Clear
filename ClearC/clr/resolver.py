@@ -17,7 +17,7 @@ def resolve_names(tree: ast.Ast) -> List[lexer.CompileError]:
     tree.accept(tracker)
     resolver = NameResolver(tree)
     tree.accept(resolver)
-    return resolver.errors
+    return resolver.errors.get()
 
 
 class ScopeVisitor(ast.BlockVisitor):
@@ -73,16 +73,14 @@ class NameResolver(ScopeVisitor, ast.DeepVisitor):
 
     def __init__(self, tree: ast.Ast) -> None:
         super().__init__(tree)
-        self.errors: List[lexer.CompileError] = []
+        self.errors = lexer.ErrorTracker()
 
     def _resolve_name(
         self, name: str, node: Union[ast.AstIdentExpr, ast.AstAtomType]
     ) -> None:
         if name not in self._get_scope().names:
-            self.errors.append(
-                lexer.CompileError(
-                    message=f"reference to undeclared name {name}", region=node.region
-                )
+            self.errors.add(
+                message=f"reference to undeclared name {name}", region=node.region
             )
         else:
             node.ref = self._get_scope().names[name]
