@@ -582,11 +582,14 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
     ParseReturnStmt : "return" ParseExpr? ";" ;
     """
 
-    def __init__(self, expr: Optional["ParseExpr"]) -> None:
+    def __init__(self, expr: Optional["ParseExpr"], region: lexer.SourceView) -> None:
         self.expr = expr
+        self.region = region
 
     def to_ast(self) -> Union[ast.AstReturnStmt, ast.AstError]:
-        return ast.AstReturnStmt.make(self.expr.to_ast() if self.expr else None)
+        return ast.AstReturnStmt.make(
+            self.expr.to_ast() if self.expr else None, self.region
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseReturnStmt", List[lexer.CompileError]]:
@@ -594,6 +597,7 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
         Parses a ParseReturnStmt from a Parser, given that the "return" keyword has already been
         consumed.
         """
+        return_token = parser.prev()
         errors = []
         expr = None
         if not parser.match(lexer.TokenType.SEMICOLON):
@@ -605,7 +609,8 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
                         "missing ';' to end return statement", parser.curr_region()
                     )
                 )
-        return ParseReturnStmt(expr), errors
+        region = lexer.SourceView.range(return_token.lexeme, parser.prev().lexeme)
+        return ParseReturnStmt(expr, region), errors
 
 
 class ParseExprStmt(ParseNode[ast.AstExprStmt]):

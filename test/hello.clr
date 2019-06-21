@@ -1,5 +1,8 @@
 
 func hello(str name) void {
+    if (true) {
+        return;
+    }
     print "Hello " + name;
 }
 
@@ -9,5 +12,3 @@ if (true) {
     val x = "goodbye";
     hello(x);
 }
-
-val msg = hello(1 * hello("me") + "hello");

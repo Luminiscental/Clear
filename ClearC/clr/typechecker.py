@@ -64,6 +64,7 @@ class TypeChecker(ast.DeepVisitor):
 
     def __init__(self) -> None:
         self.errors = lexer.ErrorTracker()
+        self.expected_returns: List[ast.TypeAnnot] = []
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
@@ -89,7 +90,9 @@ class TypeChecker(ast.DeepVisitor):
                 )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        super().func_decl(node)
+        for param in node.params:
+            param.accept(self)
+        node.return_type.accept(self)
         if (
             not valid(node.return_type.type_annot)
             and node.return_type.type_annot != TYPE_VOID
@@ -101,6 +104,9 @@ class TypeChecker(ast.DeepVisitor):
         node.type_annot = ast.FuncTypeAnnot(
             [param.type_annot for param in node.params], node.return_type.type_annot
         )
+        self.expected_returns.append(node.type_annot.return_type)
+        node.block.accept(self)
+        self.expected_returns.pop()
 
     def param(self, node: ast.AstParam) -> None:
         super().param(node)
@@ -138,13 +144,30 @@ class TypeChecker(ast.DeepVisitor):
             self._check_cond(node.cond)
 
     def return_stmt(self, node: ast.AstReturnStmt) -> None:
+        # TODO: Make a pass that checks whether functions always return
         super().return_stmt(node)
-        # TODO: check against expected return type, probably with extra passes before this
-        if node.expr and not valid(node.expr.type_annot):
+        if not self.expected_returns:
             self.errors.add(
-                message=f"invalid type {node.expr.type_annot} to return",
-                region=node.expr.region,
+                message=f"return statement outside of function", region=node.region
             )
+        if node.expr:
+            if not valid(node.expr.type_annot):
+                self.errors.add(
+                    message=f"invalid type {node.expr.type_annot} to return",
+                    region=node.expr.region,
+                )
+            elif node.expr.type_annot != self.expected_returns[-1]:
+                self.errors.add(
+                    message=f"mismatched return type: "
+                    f"expected {self.expected_returns[-1]} but got {node.expr.type_annot}",
+                    region=node.expr.region,
+                )
+        else:
+            if self.expected_returns[-1] != TYPE_VOID:
+                self.errors.add(
+                    message=f"missing return value in non-void function",
+                    region=node.region,
+                )
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
@@ -153,6 +176,7 @@ class TypeChecker(ast.DeepVisitor):
                 f"invalid expression type {node.expr.type_annot}",
                 region=node.expr.region,
             )
+        # TODO: warnings, e.g. `if node.expr.type_annot != TYPE_VOID: warn("unused value")`
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)

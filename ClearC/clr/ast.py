@@ -616,16 +616,17 @@ class AstReturnStmt(AstNode):
     Ast node for a return statement.
     """
 
-    def __init__(self, expr: Optional[AstExpr]) -> None:
+    def __init__(self, expr: Optional[AstExpr], region: lexer.SourceView) -> None:
         super().__init__()
         self.expr = expr
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.return_stmt(self)
 
     @staticmethod
     def make(
-        expr: Optional[Union[AstExpr, AstError]]
+        expr: Optional[Union[AstExpr, AstError]], region: lexer.SourceView
     ) -> Union["AstReturnStmt", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -634,8 +635,8 @@ class AstReturnStmt(AstNode):
         if expr:
             if isinstance(expr, AstError):
                 return expr
-            return AstReturnStmt(expr)
-        return AstReturnStmt(None)
+            return AstReturnStmt(expr, region)
+        return AstReturnStmt(None, region)
 
 
 class AstExprStmt(AstNode):
