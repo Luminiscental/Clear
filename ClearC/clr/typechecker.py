@@ -63,7 +63,8 @@ class TypeChecker(ast.DeepVisitor):
             # TODO: Handle optional/nil better, not just equality checks
             if node.type_annot != node.val_init.type_annot:
                 self.errors.add(
-                    message=f"mismatched type for value initializer: expected {node.type_annot} but got {node.val_init.type_annot}",
+                    message=f"mismatched type for value initializer: "
+                    f"expected {node.type_annot} but got {node.val_init.type_annot}",
                     region=node.val_init.region,
                 )
         else:
@@ -144,7 +145,8 @@ class TypeChecker(ast.DeepVisitor):
         if str(node.operator) in ARITH_UNARY:
             if node.target.type_annot not in ARITH_TYPES:
                 self.errors.add(
-                    message=f"invalid type {node.target.type_annot} for unary operator {node.operator}",
+                    message=f"invalid type {node.target.type_annot} "
+                    f"for unary operator {node.operator}",
                     region=node.target.region,
                 )
             node.type_annot = node.target.type_annot
@@ -159,7 +161,8 @@ class TypeChecker(ast.DeepVisitor):
         if str(node.operator) in ARITH_BINARY:
             if node.left.type_annot != node.right.type_annot:
                 self.errors.add(
-                    message=f"mismatched types {node.left.type_annot} and {node.right.type_annot} for binary operator {node.operator}",
+                    message=f"mismatched types {node.left.type_annot} and {node.right.type_annot} "
+                    f"for binary operator {node.operator}",
                     region=node.region,
                 )
             else:
@@ -168,7 +171,8 @@ class TypeChecker(ast.DeepVisitor):
                     pass
                 elif node.left.type_annot not in ARITH_TYPES:
                     self.errors.add(
-                        message=f"invalid operand type {node.left.type_annot} for binary operator {node.operator}",
+                        message=f"invalid operand type {node.left.type_annot} "
+                        f"for binary operator {node.operator}",
                         region=node.region,
                     )
             node.type_annot = node.left.type_annot
@@ -216,7 +220,8 @@ class TypeChecker(ast.DeepVisitor):
         if arg_count != param_count:
             adjective = "few" if arg_count < param_count else "many"
             self.errors.add(
-                message=f"too {adjective} arguments to function: expected {param_count} but got {arg_count}",
+                message=f"too {adjective} arguments to function: "
+                f"expected {param_count} but got {arg_count}",
                 region=lexer.SourceView.range(
                     node.args[0].region, node.args[-1].region
                 ),
@@ -225,7 +230,8 @@ class TypeChecker(ast.DeepVisitor):
             for arg, param in zip(node.args, node.function.type_annot.params):
                 if arg.type_annot != param:
                     self.errors.add(
-                        message=f"mismatched type for argument: expected {param} but got {arg.type_annot}",
+                        message=f"mismatched type for argument: "
+                        f"expected {param} but got {arg.type_annot}",
                         region=arg.region,
                     )
         node.type_annot = node.function.type_annot.return_type
