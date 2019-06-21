@@ -4,7 +4,7 @@ Given a module name, it loads the .clr file, compiles it,
 and exports the assembled .clr.b.
 """
 
-from typing import List, Tuple
+from typing import List, Iterable, Sequence, Tuple
 
 import sys
 
@@ -43,7 +43,7 @@ def _read_source(filename: str) -> str:
         sys.exit(1)
 
 
-def _check_errors(error_name: str, errors: List[lexer.CompileError]) -> None:
+def _check_errors(error_name: str, errors: Iterable[lexer.CompileError]) -> None:
     if errors:
         print(f"{error_name} Errors:")
         print("--------")
@@ -54,7 +54,7 @@ def _check_errors(error_name: str, errors: List[lexer.CompileError]) -> None:
 
 
 def _assemble_code(
-    constants: List[bytecode.Constant], instructions: List[bytecode.Instruction]
+    constants: Sequence[bytecode.Constant], instructions: Sequence[bytecode.Instruction]
 ) -> bytearray:
     try:
         return bytecode.assemble_code(constants, instructions)
@@ -76,7 +76,9 @@ def main() -> None:
     source_file_name, dest_file_name = _get_filenames()
     source = _read_source(source_file_name)
 
-    tokens = lexer.tokenize_source(source)
+    tokens, lex_errors = lexer.tokenize_source(source)
+    _check_errors("Lex", lex_errors)
+
     ptree, parse_errors = parser.parse_tokens(tokens)
     _check_errors("Parse", parse_errors)
 

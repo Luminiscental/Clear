@@ -4,6 +4,7 @@ Contains functions and definitions for parsing a list of tokens into a parse tre
 
 from typing import (
     List,
+    Sequence,
     Optional,
     Union,
     Tuple,
@@ -23,7 +24,7 @@ import clr.ast as ast
 
 
 def parse_tokens(
-    tokens: List[lexer.Token]
+    tokens: Sequence[lexer.Token]
 ) -> Tuple["ParseTree", List[lexer.CompileError]]:
     """
     Parses a ParseTree from a list of tokens.
@@ -39,7 +40,7 @@ class Parser:
     A wrapper class for parsing a list of tokens.
     """
 
-    def __init__(self, tokens: List[lexer.Token]) -> None:
+    def __init__(self, tokens: Sequence[lexer.Token]) -> None:
         self.tokens = tokens
         self.current = 0
 

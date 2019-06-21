@@ -2,13 +2,51 @@
 Contains functions and definitions for lexing Clear code into a list of tokens.
 """
 
-from typing import List, Optional, Iterable, Tuple, NamedTuple
+from typing import List, Iterable, Optional, Tuple, NamedTuple
 
 import enum
 import re
 
 
-def tokenize_source(source: str) -> List["Token"]:
+# TODO: Doesn't really make sense to have this in the lexer module
+class CompileError(NamedTuple):
+    """
+    Class representing a compile error, has a message and a region of code.
+    """
+
+    message: str
+    region: "SourceView"
+
+    def display(self) -> str:
+        """
+        Returns a string representation of the error.
+        """
+        # TODO: Line number, context, e.t.c.
+        return f"{self.message}: {self.region}"
+
+
+class ErrorTracker:
+    """
+    Wrapper class for keeping track of a list of errors.
+    """
+
+    def __init__(self) -> None:
+        self._errors: List[CompileError] = []
+
+    def add(self, message: str, region: "SourceView") -> None:
+        """
+        Add a new error.
+        """
+        self._errors.append(CompileError(message, region))
+
+    def get(self) -> List[CompileError]:
+        """
+        Gets the list of errors.
+        """
+        return self._errors
+
+
+def tokenize_source(source: str) -> Tuple[List["Token"], List[CompileError]]:
     """
     Given a string of Clear source code, lexes it into a list of tokens.
     """
@@ -58,51 +96,26 @@ def tokenize_source(source: str) -> List["Token"]:
                 token.kind = keywords[lexeme]
         return token
 
-    return [keywordize(token) for token in lexer.tokens]
+    return (
+        list(
+            map(
+                keywordize,
+                filter(lambda token: token.kind != TokenType.ERROR, lexer.tokens),
+            )
+        ),
+        list(
+            map(
+                lambda token: CompileError(f"unexpected token {token}", token.lexeme),
+                filter(lambda token: token.kind == TokenType.ERROR, lexer.tokens),
+            )
+        ),
+    )
 
 
 class IncompatibleSourceError(Exception):
     """
     Custom exception for when source views expected to have the same source have different sources.
     """
-
-
-# TODO: Doesn't really make sense to have this in the lexer module
-class CompileError(NamedTuple):
-    """
-    Class representing a compile error, has a message and a region of code.
-    """
-
-    message: str
-    region: "SourceView"
-
-    def display(self) -> str:
-        """
-        Returns a string representation of the error.
-        """
-        # TODO: Line number, context, e.t.c.
-        return f"{self.message}: {self.region}"
-
-
-class ErrorTracker:
-    """
-    Wrapper class for keeping track of a list of errors.
-    """
-
-    def __init__(self) -> None:
-        self._errors: List[CompileError] = []
-
-    def add(self, message: str, region: "SourceView") -> None:
-        """
-        Add a new error.
-        """
-        self._errors.append(CompileError(message, region))
-
-    def get(self) -> List[CompileError]:
-        """
-        Gets the list of errors.
-        """
-        return self._errors
 
 
 class SourceView:
