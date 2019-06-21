@@ -8,6 +8,7 @@ from typing import (
     Union,
     Tuple,
     Callable,
+    Dict,
     DefaultDict,
     NamedTuple,
     TypeVar,
@@ -643,13 +644,18 @@ class ParseType(ParseNode[ast.AstType]):
     ParseType : ( "(" ParseType ")" | ParseFuncType | ParseAtomType ) ( "?" )? ;
     """
 
-    def __init__(self, type_node: Union["ParseFuncType", "ParseAtomType"]) -> None:
+    def __init__(
+        self,
+        type_node: Union["ParseFuncType", "ParseAtomType"],
+        region: lexer.SourceView,
+    ) -> None:
         self.type_node = type_node
         self.optional = False
+        self.region = region
 
     def to_ast(self) -> Union[ast.AstType, ast.AstError]:
         return (
-            ast.AstOptionalType.make(self.type_node.to_ast())
+            ast.AstOptionalType.make(self.type_node.to_ast(), self.region)
             if self.optional
             else self.type_node.to_ast()
         )
@@ -660,7 +666,9 @@ class ParseType(ParseNode[ast.AstType]):
         Parse a ParseType from a Parser.
         """
         errors = []
+
         if parser.match(lexer.TokenType.LEFT_PAREN):
+            start = parser.prev().lexeme
             result, errs = ParseType.parse(parser)
             errors.extend(errs)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
@@ -669,19 +677,32 @@ class ParseType(ParseNode[ast.AstType]):
                         "missing ')' to end type grouping", parser.curr_region()
                     )
                 )
-        elif parser.match(lexer.TokenType.FUNC):
+            end = parser.prev().lexeme
+            result.region = lexer.SourceView.range(start, end)
+            return result, errors
+
+        if parser.match(lexer.TokenType.FUNC):
+            start = parser.prev().lexeme
             func_type, errs = ParseFuncType.finish(parser)
             errors.extend(errs)
-            result = ParseType(func_type)
+            type_node: Union["ParseFuncType", "ParseAtomType"] = func_type
         else:
             atom_type, errs = ParseAtomType.parse(parser)
+            start = (
+                atom_type.token.token.lexeme
+                if isinstance(atom_type.token.token, lexer.Token)
+                else parser.prev().lexeme
+            )
             errors.extend(errs)
-            result = ParseType(atom_type)
+            type_node = atom_type
 
         if parser.match(lexer.TokenType.QUESTION_MARK):
             result.optional = True
 
-        return result, errors
+        end = parser.prev().lexeme
+        region = lexer.SourceView.range(start, end)
+
+        return ParseType(type_node, region), errors
 
 
 class ParseFuncType(ParseNode[ast.AstFuncType]):
@@ -691,13 +712,18 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
     ParseFuncType : "func" "(" ( ParseType ( "," ParseType )* )? ")" ParseType ;
     """
 
-    def __init__(self, params: List[ParseType], return_type: ParseType) -> None:
+    def __init__(
+        self, params: List[ParseType], return_type: ParseType, region: lexer.SourceView
+    ) -> None:
         self.params = params
         self.return_type = return_type
+        self.region = region
 
     def to_ast(self) -> Union[ast.AstFuncType, ast.AstError]:
         return ast.AstFuncType.make(
-            [param.to_ast() for param in self.params], self.return_type.to_ast()
+            [param.to_ast() for param in self.params],
+            self.return_type.to_ast(),
+            self.region,
         )
 
     @staticmethod
@@ -707,6 +733,7 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
         consumed.
         """
         errors = []
+        start = parser.prev().lexeme
 
         if not parser.match(lexer.TokenType.LEFT_PAREN):
             errors.append(
@@ -725,7 +752,11 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
 
         return_type, errs = ParseType.parse(parser)
         errors.extend(errs)
-        return ParseFuncType(params, return_type), errors
+
+        end = parser.prev().lexeme
+        region = lexer.SourceView.range(start, end)
+
+        return ParseFuncType(params, return_type, region), errors
 
 
 class ParseAtomType(ParseNode[ast.AstAtomType]):
@@ -766,8 +797,10 @@ class ParseExpr(ParseNode[ast.AstExpr]):
             "ParseCallExpr",
             lexer.CompileError,
         ],
+        region: lexer.SourceView,
     ) -> None:
         self.expr = expr
+        self.region = region
 
     def to_ast(self) -> Union[ast.AstExpr, ast.AstError]:
         if isinstance(self.expr, lexer.CompileError):
@@ -785,7 +818,11 @@ class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
         self.target = target
 
     def to_ast(self) -> Union[ast.AstUnaryExpr, ast.AstError]:
-        return ast.AstUnaryExpr.make(str(self.operator), self.target.to_ast())
+        return ast.AstUnaryExpr.make(
+            self.operator,
+            self.target.to_ast(),
+            lexer.SourceView.range(self.operator.lexeme, self.target.region),
+        )
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[lexer.CompileError]]:
@@ -794,7 +831,8 @@ class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
         """
         operator = parser.prev()
         target, errs = pratt_parse(parser, PRATT_TABLE, precedence=Precedence.UNARY)
-        return ParseExpr(ParseUnaryExpr(operator, target)), errs
+        region = lexer.SourceView.range(operator.lexeme, target.region)
+        return ParseExpr(ParseUnaryExpr(operator, target), region), errs
 
 
 class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
@@ -811,7 +849,10 @@ class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
 
     def to_ast(self) -> Union[ast.AstBinaryExpr, ast.AstError]:
         return ast.AstBinaryExpr.make(
-            str(self.operator), self.left.to_ast(), self.right.to_ast()
+            self.operator,
+            self.left.to_ast(),
+            self.right.to_ast(),
+            lexer.SourceView.range(self.left.region, self.right.region),
         )
 
     @staticmethod
@@ -826,7 +867,8 @@ class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
         operator = parser.prev()
         prec = PRATT_TABLE[operator.kind].precedence
         right, errs = pratt_parse(parser, PRATT_TABLE, prec.next())
-        return ParseExpr(ParseBinaryExpr(left, operator, right)), errs
+        region = lexer.SourceView.range(left.region, right.region)
+        return ParseExpr(ParseBinaryExpr(left, operator, right), region), errs
 
 
 class ParseCallExpr(ParseNode[ast.AstCallExpr]):
@@ -834,13 +876,16 @@ class ParseCallExpr(ParseNode[ast.AstCallExpr]):
     Infix expression for a function call.
     """
 
-    def __init__(self, function: ParseExpr, args: List[ParseExpr]) -> None:
+    def __init__(
+        self, function: ParseExpr, args: List[ParseExpr], region: lexer.SourceView
+    ) -> None:
         self.function = function
         self.args = args
+        self.region = region
 
     def to_ast(self) -> Union[ast.AstCallExpr, ast.AstError]:
         return ast.AstCallExpr.make(
-            self.function.to_ast(), [arg.to_ast() for arg in self.args]
+            self.function.to_ast(), [arg.to_ast() for arg in self.args], self.region
         )
 
     @staticmethod
@@ -861,7 +906,9 @@ class ParseCallExpr(ParseNode[ast.AstCallExpr]):
 
         args, errs = parse_tuple(parser, parse_arg)
         errors.extend(errs)
-        return ParseExpr(ParseCallExpr(function, args)), errors
+
+        region = lexer.SourceView.range(function.region, parser.prev().lexeme)
+        return ParseExpr(ParseCallExpr(function, args, region), region), errors
 
 
 class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
@@ -873,23 +920,17 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         self.token = token
 
     def to_ast(self) -> Union[ast.AstAtomExpr, ast.AstError]:
-        if self.token.kind == lexer.TokenType.INT_LITERAL:
-            result: Union[ast.AstAtomExpr, ast.AstError] = ast.AstIntExpr(
-                str(self.token)
-            )
-        elif self.token.kind == lexer.TokenType.NUM_LITERAL:
-            result = ast.AstNumExpr(str(self.token))
-        elif self.token.kind == lexer.TokenType.STR_LITERAL:
-            result = ast.AstStrExpr(str(self.token))
-        elif self.token.kind == lexer.TokenType.IDENTIFIER:
-            result = ast.AstIdentExpr(self.token)
-        elif self.token.kind == lexer.TokenType.TRUE:
-            result = ast.AstBoolExpr(True)
-        elif self.token.kind == lexer.TokenType.FALSE:
-            result = ast.AstBoolExpr(False)
-        else:
-            result = ast.AstError()
-        return result
+        token_exprs: Dict[lexer.TokenType, Callable[[lexer.Token], ast.AstAtomExpr]] = {
+            lexer.TokenType.INT_LITERAL: ast.AstIntExpr,
+            lexer.TokenType.NUM_LITERAL: ast.AstNumExpr,
+            lexer.TokenType.STR_LITERAL: ast.AstStrExpr,
+            lexer.TokenType.IDENTIFIER: ast.AstIdentExpr,
+            lexer.TokenType.TRUE: ast.AstBoolExpr,
+            lexer.TokenType.FALSE: ast.AstBoolExpr,
+        }
+        if self.token.kind in token_exprs:
+            return token_exprs[self.token.kind](self.token)
+        return ast.AstError()
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[lexer.CompileError]]:
@@ -899,7 +940,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         """
         # TODO: Sanitize for size and precision with num/int literals
         token = parser.prev()
-        return ParseExpr(ParseAtomExpr(token)), []
+        return ParseExpr(ParseAtomExpr(token), token.lexeme), []
 
 
 Comparison = Union[bool, "NotImplemented"]
@@ -1012,13 +1053,14 @@ def pratt_prefix(
         err = lexer.CompileError(
             "unexpected EOF; expected expression", parser.curr_region()
         )
-        return ParseExpr(err), [err]
+        # TODO: Do something more elegant with the region here
+        return ParseExpr(err, region=lexer.SourceView.all("<error>")), [err]
     rule = table[start_token.kind]
     if not rule.prefix:
         err = lexer.CompileError(
             "unexpected token; expected expression", start_token.lexeme
         )
-        return ParseExpr(err), [err]
+        return ParseExpr(err, region=lexer.SourceView.all("<error>")), [err]
     return rule.prefix(parser)
 
 
