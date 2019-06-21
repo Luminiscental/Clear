@@ -16,6 +16,8 @@ import clr.printer as printer
 import clr.resolver as resolver
 import clr.typechecker as typechecker
 
+DEBUG = True
+
 
 def _get_filenames() -> Tuple[str, str]:
     if len(sys.argv) < 2:
@@ -26,8 +28,9 @@ def _get_filenames() -> Tuple[str, str]:
 
     source_file_name = sys.argv[1] + ".clr"
     dest_file_name = source_file_name + ".b"
-    print(f"src: {source_file_name}")
-    print(f"dest: {dest_file_name}")
+    if DEBUG:
+        print(f"src: {source_file_name}")
+        print(f"dest: {dest_file_name}")
     return source_file_name, dest_file_name
 
 
@@ -82,16 +85,14 @@ def main() -> None:
         print("Ast failed to form")
         sys.exit(1)
 
-    print("Ast:")
-    print("--------")
-    printer.pprint(tree)
-    print("--------")
+    if DEBUG:
+        print("Ast:")
+        print("--------")
+        printer.pprint(tree)
+        print("--------")
 
-    resolve_errors = resolver.resolve_names(tree)
-    _check_errors("Resolve", resolve_errors)
-
-    type_errors = typechecker.check_types(tree)
-    _check_errors("Type", type_errors)
+    _check_errors("Resolve", resolver.resolve_names(tree))
+    _check_errors("Type", typechecker.check_types(tree))
 
     constants: List[bytecode.Constant] = []
     instructions: List[bytecode.Instruction] = []

@@ -8,5 +8,4 @@ val x = 1 + 2 + 3;
 if (true) {
     val x = "goodbye";
     hello(x);
-    hello(x);
 }
