@@ -4,12 +4,18 @@ Module containing definitions for a Clear ast and a base class for ast visitors.
 
 from typing import Union, List, Optional, Tuple, Dict
 
+import clr.lexer as lexer
+
 TypeAnnot = Union["BuiltinTypeAnnot", "FuncTypeAnnot", "OptionalTypeAnnot", None]
 
 Comparison = Union[bool, "NotImplemented"]
 
 
 class BuiltinTypeAnnot:
+    """
+    Type annotation for a built in type.
+    """
+
     def __init__(self, name: str) -> None:
         self.name = name
 
@@ -32,6 +38,10 @@ class BuiltinTypeAnnot:
 
 
 class FuncTypeAnnot:
+    """
+    Type annotation for a function type.
+    """
+
     def __init__(self, params: List[TypeAnnot], return_type: TypeAnnot) -> None:
         self.params = params
         self.return_type = return_type
@@ -56,6 +66,10 @@ class FuncTypeAnnot:
 
 
 class OptionalTypeAnnot:
+    """
+    Type annotation for an optional type.
+    """
+
     def __init__(self, target: TypeAnnot) -> None:
         self.target = target
 
@@ -305,7 +319,7 @@ AstStmt = Union[
 ]
 AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
-# TODO: Store code regions in the ast
+
 class AstError(Exception, AstNode):
     """
     Ast node to represent an error creating the tree.
@@ -363,7 +377,7 @@ class AstValueDecl(AstNode):
 
     @staticmethod
     def make(
-        ident: Union[str, AstError],
+        ident: Union[lexer.Token, AstError],
         val_type: Optional[Union[AstType, AstError]],
         val_init: Union[AstExpr, AstError],
     ) -> Union["AstValueDecl", AstError]:
@@ -381,7 +395,7 @@ class AstValueDecl(AstNode):
         if isinstance(val_init, AstError):
             return val_init
         pure_init = val_init
-        return AstValueDecl(ident, pure_type, pure_init)
+        return AstValueDecl(str(ident), pure_type, pure_init)
 
 
 class AstParam(AstNode):
@@ -399,7 +413,7 @@ class AstParam(AstNode):
 
     @staticmethod
     def make(
-        param_type: Union[AstType, AstError], param_name: Union[str, AstError]
+        param_type: Union[AstType, AstError], param_name: Union[lexer.Token, AstError]
     ) -> Union["AstParam", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -409,7 +423,7 @@ class AstParam(AstNode):
             return param_type
         if isinstance(param_name, AstError):
             return param_name
-        return AstParam(param_type, param_name)
+        return AstParam(param_type, str(param_name))
 
 
 class AstFuncDecl(AstNode):
@@ -435,8 +449,8 @@ class AstFuncDecl(AstNode):
 
     @staticmethod
     def make(
-        ident: Union[str, AstError],
-        params: List[Tuple[Union[AstType, AstError], Union[str, AstError]]],
+        ident: Union[lexer.Token, AstError],
+        params: List[Tuple[Union[AstType, AstError], Union[lexer.Token, AstError]]],
         return_type: Union[AstType, AstError],
         block: Union["AstBlockStmt", AstError],
     ) -> Union["AstFuncDecl", AstError]:
@@ -456,7 +470,7 @@ class AstFuncDecl(AstNode):
             return return_type
         if isinstance(block, AstError):
             return block
-        return AstFuncDecl(ident, pure_params, return_type, block)
+        return AstFuncDecl(str(ident), pure_params, return_type, block)
 
 
 class AstPrintStmt(AstNode):
@@ -745,9 +759,10 @@ class AstIdentExpr(AstNode):
     Ast node for an identifier expression.
     """
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, token: lexer.Token) -> None:
         super().__init__()
-        self.name = name
+        self.region = token.lexeme
+        self.name = str(token)
         # Annotations:
         self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
 
@@ -804,9 +819,10 @@ class AstAtomType(AstNode):
     Ast node for an atomic type.
     """
 
-    def __init__(self, token: str) -> None:
+    def __init__(self, token: lexer.Token) -> None:
         super().__init__()
-        self.token = token
+        self.region = token.lexeme
+        self.name = str(token)
         # Annotations:
         self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
 
@@ -814,7 +830,7 @@ class AstAtomType(AstNode):
         visitor.atom_type(self)
 
     @staticmethod
-    def make(token: Union[str, AstError]) -> Union["AstAtomType", AstError]:
+    def make(token: Union[lexer.Token, AstError]) -> Union["AstAtomType", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.

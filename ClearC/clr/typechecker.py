@@ -1,6 +1,21 @@
+"""
+Module defining an ast visitor to type check.
+"""
+
 from typing import List
 
+import clr.lexer as lexer
 import clr.ast as ast
+
+
+def check_types(tree: ast.Ast) -> List[lexer.CompileError]:
+    """
+    Run the type checker over an ast.
+    """
+    checker = TypeChecker()
+    tree.accept(checker)
+    return checker.errors
+
 
 ARITH_TYPES = [ast.BuiltinTypeAnnot("num"), ast.BuiltinTypeAnnot("int")]
 ARITH_UNARY = ["-"]
@@ -8,12 +23,17 @@ ARITH_BINARY = ["+", "-", "*", "/"]
 
 
 class TypeChecker(ast.DeepVisitor):
+    """
+    Ast visitor to annotate and check types.
+    """
+
     def __init__(self) -> None:
-        self.errors: List[str] = []
+        self.errors: List[lexer.CompileError] = []
 
     def _error(self, message: str) -> None:
-        # TODO: Improve error reporting, e.g. unwind to statement level or something
-        self.errors.append(message)
+        self.errors.append(
+            lexer.CompileError(message=message, region=lexer.SourceView.all(""))
+        )
 
     def _check_value_type(self, type_annot: ast.TypeAnnot) -> None:
         if isinstance(type_annot, ast.FuncTypeAnnot):
@@ -198,7 +218,7 @@ class TypeChecker(ast.DeepVisitor):
     def atom_type(self, node: ast.AstAtomType) -> None:
         super().atom_type(node)
         # Propogate
-        node.type_annot = ast.BuiltinTypeAnnot(node.token)
+        node.type_annot = ast.BuiltinTypeAnnot(node.name)
 
     def func_type(self, node: ast.AstFuncType) -> None:
         super().func_type(node)
@@ -210,9 +230,3 @@ class TypeChecker(ast.DeepVisitor):
     def optional_type(self, node: ast.AstOptionalType) -> None:
         super().optional_type(node)
         node.type_annot = ast.OptionalTypeAnnot(node.target.type_annot)
-
-
-def check_types(tree: ast.Ast) -> List[str]:
-    checker = TypeChecker()
-    tree.accept(checker)
-    return checker.errors

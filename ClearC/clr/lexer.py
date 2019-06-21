@@ -2,16 +2,86 @@
 Contains functions and definitions for lexing Clear code into a list of tokens.
 """
 
-from typing import List, Optional, Iterable, Tuple
+from typing import List, Optional, Iterable, Tuple, NamedTuple
 
 import enum
 import re
+
+
+def tokenize_source(source: str) -> List["Token"]:
+    """
+    Given a string of Clear source code, lexes it into a list of tokens.
+    """
+    skip_rules = [r"//.*", r"\s+"]
+    consume_rules = [
+        (r"[a-zA-Z_][a-zA-Z0-9_]*", TokenType.IDENTIFIER),
+        (r"[0-9]+i", TokenType.INT_LITERAL),
+        (r"[0-9]+(\.[0-9]+)?", TokenType.NUM_LITERAL),
+        (r"\".*?\"", TokenType.STR_LITERAL),
+        (r"=", TokenType.EQUALS),
+        (r",", TokenType.COMMA),
+        (r";", TokenType.SEMICOLON),
+        (r"{", TokenType.LEFT_BRACE),
+        (r"}", TokenType.RIGHT_BRACE),
+        (r"\(", TokenType.LEFT_PAREN),
+        (r"\)", TokenType.RIGHT_PAREN),
+        (r"\?", TokenType.QUESTION_MARK),
+        (r"\+", TokenType.PLUS),
+        (r"-", TokenType.MINUS),
+        (r"\*", TokenType.STAR),
+        (r"/", TokenType.SLASH),
+    ]
+    fallback_rule = (r".", TokenType.ERROR)
+
+    lexer = Lexer(source)
+    lexer.run(consume_rules, skip_rules, fallback_rule)
+
+    def keywordize(token: "Token") -> "Token":
+        keywords = {
+            "val": TokenType.VAL,
+            "func": TokenType.FUNC,
+            "void": TokenType.VOID,
+            "if": TokenType.IF,
+            "else": TokenType.ELSE,
+            "while": TokenType.WHILE,
+            "return": TokenType.RETURN,
+            "print": TokenType.PRINT,
+            "or": TokenType.OR,
+            "and": TokenType.AND,
+            "true": TokenType.TRUE,
+            "false": TokenType.FALSE,
+        }
+
+        if token.kind == TokenType.IDENTIFIER:
+            lexeme = str(token.lexeme)
+            if lexeme in keywords:
+                token.kind = keywords[lexeme]
+        return token
+
+    return [keywordize(token) for token in lexer.tokens]
 
 
 class IncompatibleSourceError(Exception):
     """
     Custom exception for when source views expected to have the same source have different sources.
     """
+
+
+# TODO: Doesn't really make sense to have this in the lexer module
+class CompileError(NamedTuple):
+    """
+    Class representing a compile error, has a message and a region of code.
+    """
+
+    message: str
+    region: "SourceView"
+
+    def display(self) -> str:
+        """
+        Returns a string representation of the error.
+        """
+        # TODO: Line number, context, e.t.c.
+        return f"{self.message}: {self.region}"
 
 
 class SourceView:
@@ -29,6 +99,13 @@ class SourceView:
 
     def __str__(self) -> str:
         return self.source[self.start : self.end + 1]
+
+    @staticmethod
+    def all(source: str) -> "SourceView":
+        """
+        Given a source string returns a view of the entire string.
+        """
+        return SourceView(source=source, start=0, end=len(source) - 1)
 
     @staticmethod
     def range(start: "SourceView", end: "SourceView") -> "SourceView":
@@ -168,56 +245,3 @@ class Lexer:
                 continue
             if not fallback or not self.consume(fallback[0], fallback[1]):
                 break
-
-
-def tokenize_source(source: str) -> List[Token]:
-    """
-    Given a string of Clear source code, lexes it into a list of tokens.
-    """
-    skip_rules = [r"//.*", r"\s+"]
-    consume_rules = [
-        (r"[a-zA-Z_][a-zA-Z0-9_]*", TokenType.IDENTIFIER),
-        (r"[0-9]+i", TokenType.INT_LITERAL),
-        (r"[0-9]+(\.[0-9]+)?", TokenType.NUM_LITERAL),
-        (r"\".*?\"", TokenType.STR_LITERAL),
-        (r"=", TokenType.EQUALS),
-        (r",", TokenType.COMMA),
-        (r";", TokenType.SEMICOLON),
-        (r"{", TokenType.LEFT_BRACE),
-        (r"}", TokenType.RIGHT_BRACE),
-        (r"\(", TokenType.LEFT_PAREN),
-        (r"\)", TokenType.RIGHT_PAREN),
-        (r"\?", TokenType.QUESTION_MARK),
-        (r"\+", TokenType.PLUS),
-        (r"-", TokenType.MINUS),
-        (r"\*", TokenType.STAR),
-        (r"/", TokenType.SLASH),
-    ]
-    fallback_rule = (r".", TokenType.ERROR)
-
-    lexer = Lexer(source)
-    lexer.run(consume_rules, skip_rules, fallback_rule)
-
-    def keywordize(token: Token) -> Token:
-        keywords = {
-            "val": TokenType.VAL,
-            "func": TokenType.FUNC,
-            "void": TokenType.VOID,
-            "if": TokenType.IF,
-            "else": TokenType.ELSE,
-            "while": TokenType.WHILE,
-            "return": TokenType.RETURN,
-            "print": TokenType.PRINT,
-            "or": TokenType.OR,
-            "and": TokenType.AND,
-            "true": TokenType.TRUE,
-            "false": TokenType.FALSE,
-        }
-
-        if token.kind == TokenType.IDENTIFIER:
-            lexeme = str(token.lexeme)
-            if lexeme in keywords:
-                token.kind = keywords[lexeme]
-        return token
-
-    return [keywordize(token) for token in lexer.tokens]

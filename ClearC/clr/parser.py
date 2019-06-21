@@ -20,6 +20,16 @@ import collections
 import clr.lexer as lexer
 import clr.ast as ast
 
+
+def parse_tokens(
+    tokens: List[lexer.Token]
+) -> Tuple["ParseTree", List[lexer.CompileError]]:
+    """
+    Parses a ParseTree from a list of tokens.
+    """
+    return ParseTree.parse(Parser(tokens))
+
+
 T = TypeVar("T")  # pylint: disable=invalid-name
 
 
@@ -88,23 +98,6 @@ class Parser:
         return self.prev().lexeme
 
 
-class ParseError:
-    """
-    Parse error class, contains a message and a region of source the error applies to.
-    """
-
-    def __init__(self, message: str, region: lexer.SourceView) -> None:
-        self.message = message
-        self.region = region
-
-    def display(self) -> str:
-        """
-        Returns a string of information about the error.
-        """
-        # TODO:Line number, highlight region in context, formatting, e.t.c.
-        return f"{self.message}: {self.region}"
-
-
 class ParseNode(Generic[T]):
     """
     Base class for nodes of the parse tree.
@@ -138,7 +131,7 @@ class ParseTree(ParseNode[ast.Ast]):
         return ast.Ast.make([decl.to_ast() for decl in self.decls])
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseTree", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseTree", List[lexer.CompileError]]:
         """
         Parses a ParseTree from a Parser.
         """
@@ -151,37 +144,30 @@ class ParseTree(ParseNode[ast.Ast]):
         return ParseTree(decls), errors
 
 
-def parse_tokens(tokens: List[lexer.Token]) -> Tuple[ParseTree, List[ParseError]]:
-    """
-    Parses a ParseTree from a list of tokens.
-    """
-    return ParseTree.parse(Parser(tokens))
-
-
-class ParseToken(ParseNode[str]):
+class ParseToken(ParseNode[lexer.Token]):
     """
     Parse node for an identifier token to wrap errors of missing tokens.
     """
 
-    def __init__(self, token: Union[lexer.Token, ParseError]) -> None:
+    def __init__(self, token: Union[lexer.Token, lexer.CompileError]) -> None:
         self.token = token
 
-    def to_ast(self) -> Union[str, ast.AstError]:
-        if isinstance(self.token, ParseError):
+    def to_ast(self) -> Union[lexer.Token, ast.AstError]:
+        if isinstance(self.token, lexer.CompileError):
             return ast.AstError()
-        return str(self.token)
+        return self.token
 
     @staticmethod
     def parse(
         parser: Parser, types: List[lexer.TokenType]
-    ) -> Tuple["ParseToken", List[ParseError]]:
+    ) -> Tuple["ParseToken", List[lexer.CompileError]]:
         """
         Parses a ParseIdent from a Parser.
         """
         for token_type in types:
             if parser.match(token_type):
                 return ParseToken(parser.prev()), []
-        err = ParseError("missing identifier", parser.curr_region())
+        err = lexer.CompileError("missing identifier", parser.curr_region())
         return ParseToken(err), [err]
 
 
@@ -201,7 +187,7 @@ class ParseDecl(ParseNode[ast.AstDecl]):
         return self.decl.to_ast()
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseDecl", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseDecl", List[lexer.CompileError]]:
         """
         Parses a ParseDecl from a Parser.
         """
@@ -237,7 +223,7 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
         )
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseValueDecl", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseValueDecl", List[lexer.CompileError]]:
         """
         Parses a ParseValueDecl from a Parser, given that the "val" keyword has already been
         consumed.
@@ -250,7 +236,7 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
             errors.extend(errs)
             if not parser.match(lexer.TokenType.EQUALS):
                 errors.append(
-                    ParseError(
+                    lexer.CompileError(
                         "missing '=' for value initializer", parser.curr_region()
                     )
                 )
@@ -260,7 +246,9 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
 
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
-                ParseError("missing ';' to end value initializer", parser.curr_region())
+                lexer.CompileError(
+                    "missing ';' to end value initializer", parser.curr_region()
+                )
             )
 
         return ParseValueDecl(ident, val_type, expr), errors
@@ -294,7 +282,7 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
         )
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseFuncDecl", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseFuncDecl", List[lexer.CompileError]]:
         """
         Parses a ParseFuncDecl from a Parser, given that the "func" keyword has already been
         consumed.
@@ -310,7 +298,9 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
 
         if not parser.match(lexer.TokenType.LEFT_PAREN):
             errors.append(
-                ParseError("missing '(' to begin parameters", parser.curr_region())
+                lexer.CompileError(
+                    "missing '(' to begin parameters", parser.curr_region()
+                )
             )
         params, errs = parse_tuple(parser, parse_param)
         errors.extend(errs)
@@ -323,7 +313,7 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
 
 def parse_tuple(
     parser: Parser, parse_func: Callable[[Parser], T]
-) -> Tuple[List[T], List[ParseError]]:
+) -> Tuple[List[T], List[lexer.CompileError]]:
     """
     Given that the opening '(' has already been consumed, parse the elements of a tuple (a,b,...)
     form into a list using a parameter function to parse each element.
@@ -335,10 +325,12 @@ def parse_tuple(
     pairs = [parse_func(parser)]
     while not parser.match(lexer.TokenType.RIGHT_PAREN):
         if parser.done():
-            errors.append(ParseError("unclosed '('", opener.lexeme))
+            errors.append(lexer.CompileError("unclosed '('", opener.lexeme))
             break
         if not parser.match(lexer.TokenType.COMMA):
-            errors.append(ParseError("missing ',' delimiter", parser.curr_region()))
+            errors.append(
+                lexer.CompileError("missing ',' delimiter", parser.curr_region())
+            )
         pairs.append(parse_func(parser))
     return pairs, errors
 
@@ -373,7 +365,7 @@ class ParseStmt(ParseNode[ast.AstStmt]):
         return self.stmt.to_ast()
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseStmt", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseStmt", List[lexer.CompileError]]:
         """
         Parses a ParseStmt from a Parser.
         """
@@ -410,7 +402,7 @@ class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
         return ast.AstPrintStmt.make(self.expr.to_ast() if self.expr else None)
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParsePrintStmt", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParsePrintStmt", List[lexer.CompileError]]:
         """
         Parses a ParsePrintStmt from a Parser, given that the "print" keyword has already been
         consumed.
@@ -422,7 +414,9 @@ class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
         errors.extend(errs)
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
-                ParseError("missing ';' to end print statement", parser.curr_region())
+                lexer.CompileError(
+                    "missing ';' to end print statement", parser.curr_region()
+                )
             )
         return ParsePrintStmt(expr), errors
 
@@ -441,7 +435,7 @@ class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
         return ast.AstBlockStmt.make([decl.to_ast() for decl in self.decls])
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseBlockStmt", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseBlockStmt", List[lexer.CompileError]]:
         """
         Parses a ParseBlockStmt from a Parser.
         """
@@ -450,11 +444,11 @@ class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
 
         return (
             ParseBlockStmt(decls=[]),
-            [ParseError("expected '{' to start block", parser.curr_region())],
+            [lexer.CompileError("expected '{' to start block", parser.curr_region())],
         )
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseBlockStmt", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseBlockStmt", List[lexer.CompileError]]:
         """
         Parses a ParseBlockStmt from a Parser, given that the open brace has already been consumed.
         """
@@ -463,7 +457,7 @@ class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
         open_brace = parser.prev()
         while not parser.match(lexer.TokenType.RIGHT_BRACE):
             if parser.done():
-                errors.append(ParseError("unclosed block", open_brace.lexeme))
+                errors.append(lexer.CompileError("unclosed block", open_brace.lexeme))
                 break
             decl, errs = ParseDecl.parse(parser)
             decls.append(decl)
@@ -500,7 +494,7 @@ class ParseIfStmt(ParseNode[ast.AstIfStmt]):
         )
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseIfStmt", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseIfStmt", List[lexer.CompileError]]:
         """
         Parses a ParseIfStmt from a Parser, given that the "if" keyword has already been consumed.
         """
@@ -511,13 +505,17 @@ class ParseIfStmt(ParseNode[ast.AstIfStmt]):
         def parse_cond() -> None:
             if not parser.match(lexer.TokenType.LEFT_PAREN):
                 errors.append(
-                    ParseError("missing '(' to start condition", parser.curr_region())
+                    lexer.CompileError(
+                        "missing '(' to start condition", parser.curr_region()
+                    )
                 )
             cond, errs = pratt_parse(parser, PRATT_TABLE)
             errors.extend(errs)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
-                    ParseError("missing ')' to end condition", parser.curr_region())
+                    lexer.CompileError(
+                        "missing ')' to end condition", parser.curr_region()
+                    )
                 )
             block, errs = ParseBlockStmt.parse(parser)
             errors.extend(errs)
@@ -554,7 +552,7 @@ class ParseWhileStmt(ParseNode[ast.AstWhileStmt]):
         )
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseWhileStmt", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseWhileStmt", List[lexer.CompileError]]:
         """
         Parses a ParseWhileStmt from a Parser, given that the "while" keyword has already been
         consumed.
@@ -566,7 +564,9 @@ class ParseWhileStmt(ParseNode[ast.AstWhileStmt]):
             errors.extend(errs)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
-                    ParseError("missing ')' to end condition", parser.curr_region())
+                    lexer.CompileError(
+                        "missing ')' to end condition", parser.curr_region()
+                    )
                 )
         block, errs = ParseBlockStmt.parse(parser)
         errors.extend(errs)
@@ -587,7 +587,7 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
         return ast.AstReturnStmt.make(self.expr.to_ast() if self.expr else None)
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseReturnStmt", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseReturnStmt", List[lexer.CompileError]]:
         """
         Parses a ParseReturnStmt from a Parser, given that the "return" keyword has already been
         consumed.
@@ -599,7 +599,7 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
             errors.extend(errs)
             if not parser.match(lexer.TokenType.SEMICOLON):
                 errors.append(
-                    ParseError(
+                    lexer.CompileError(
                         "missing ';' to end return statement", parser.curr_region()
                     )
                 )
@@ -620,7 +620,7 @@ class ParseExprStmt(ParseNode[ast.AstExprStmt]):
         return ast.AstExprStmt.make(self.expr.to_ast())
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseExprStmt", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseExprStmt", List[lexer.CompileError]]:
         """
         Parses a ParseExprStmt from a Parser.
         """
@@ -629,7 +629,7 @@ class ParseExprStmt(ParseNode[ast.AstExprStmt]):
         errors.extend(errs)
         if not parser.match(lexer.TokenType.SEMICOLON):
             errors.append(
-                ParseError(
+                lexer.CompileError(
                     "missing ';' to end expression statement", parser.curr_region()
                 )
             )
@@ -655,7 +655,7 @@ class ParseType(ParseNode[ast.AstType]):
         )
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseType", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseType", List[lexer.CompileError]]:
         """
         Parse a ParseType from a Parser.
         """
@@ -665,7 +665,9 @@ class ParseType(ParseNode[ast.AstType]):
             errors.extend(errs)
             if not parser.match(lexer.TokenType.RIGHT_PAREN):
                 errors.append(
-                    ParseError("missing ')' to end type grouping", parser.curr_region())
+                    lexer.CompileError(
+                        "missing ')' to end type grouping", parser.curr_region()
+                    )
                 )
         elif parser.match(lexer.TokenType.FUNC):
             func_type, errs = ParseFuncType.finish(parser)
@@ -699,7 +701,7 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
         )
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseFuncType", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseFuncType", List[lexer.CompileError]]:
         """
         Parse a ParseFuncType from a Parser given that the "func" keyword has already been
         consumed.
@@ -708,7 +710,9 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
 
         if not parser.match(lexer.TokenType.LEFT_PAREN):
             errors.append(
-                ParseError("missing '(' to begin parameter types", parser.curr_region())
+                lexer.CompileError(
+                    "missing '(' to begin parameter types", parser.curr_region()
+                )
             )
 
         def parse_param(parser: Parser) -> ParseType:
@@ -738,7 +742,7 @@ class ParseAtomType(ParseNode[ast.AstAtomType]):
         return ast.AstAtomType.make(self.token.to_ast())
 
     @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseAtomType", List[ParseError]]:
+    def parse(parser: Parser) -> Tuple["ParseAtomType", List[lexer.CompileError]]:
         """
         Parse a ParseAtomType from a Parser.
         """
@@ -760,13 +764,13 @@ class ParseExpr(ParseNode[ast.AstExpr]):
             "ParseBinaryExpr",
             "ParseAtomExpr",
             "ParseCallExpr",
-            ParseError,
+            lexer.CompileError,
         ],
     ) -> None:
         self.expr = expr
 
     def to_ast(self) -> Union[ast.AstExpr, ast.AstError]:
-        if isinstance(self.expr, ParseError):
+        if isinstance(self.expr, lexer.CompileError):
             return ast.AstError()
         return self.expr.to_ast()
 
@@ -784,7 +788,7 @@ class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
         return ast.AstUnaryExpr.make(str(self.operator), self.target.to_ast())
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseExpr", List[lexer.CompileError]]:
         """
         Parse a unary expression from a Parser given that the operator has already been consumed.
         """
@@ -811,7 +815,9 @@ class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
         )
 
     @staticmethod
-    def finish(parser: Parser, lhs: ParseExpr) -> Tuple["ParseExpr", List[ParseError]]:
+    def finish(
+        parser: Parser, lhs: ParseExpr
+    ) -> Tuple["ParseExpr", List[lexer.CompileError]]:
         """
         Parse the right hand side of a binary expression from a Parser given that the operator has
         already been consumed.
@@ -838,7 +844,9 @@ class ParseCallExpr(ParseNode[ast.AstCallExpr]):
         )
 
     @staticmethod
-    def finish(parser: Parser, lhs: ParseExpr) -> Tuple["ParseExpr", List[ParseError]]:
+    def finish(
+        parser: Parser, lhs: ParseExpr
+    ) -> Tuple["ParseExpr", List[lexer.CompileError]]:
         """
         Parse the call part of a function call expression given that the open parenthesis has
         already been consumed.
@@ -874,7 +882,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         elif self.token.kind == lexer.TokenType.STR_LITERAL:
             result = ast.AstStrExpr(str(self.token))
         elif self.token.kind == lexer.TokenType.IDENTIFIER:
-            result = ast.AstIdentExpr(str(self.token))
+            result = ast.AstIdentExpr(self.token)
         elif self.token.kind == lexer.TokenType.TRUE:
             result = ast.AstBoolExpr(True)
         elif self.token.kind == lexer.TokenType.FALSE:
@@ -884,7 +892,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         return result
 
     @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseExpr", List[ParseError]]:
+    def finish(parser: Parser) -> Tuple["ParseExpr", List[lexer.CompileError]]:
         """
         Parse an atomic value expression from a Parser given that the token has already been
         consumed.
@@ -943,8 +951,8 @@ class Precedence(enum.Enum):
         return Precedence(min(next_value, Precedence.MAX.value))
 
 
-PrefixRule = Callable[[Parser], Tuple[ParseExpr, List[ParseError]]]
-InfixRule = Callable[[Parser, ParseExpr], Tuple[ParseExpr, List[ParseError]]]
+PrefixRule = Callable[[Parser], Tuple[ParseExpr, List[lexer.CompileError]]]
+InfixRule = Callable[[Parser, ParseExpr], Tuple[ParseExpr, List[lexer.CompileError]]]
 
 
 class PrattRule(NamedTuple):
@@ -995,17 +1003,21 @@ PRATT_TABLE: DefaultDict[lexer.TokenType, PrattRule] = collections.defaultdict(
 
 def pratt_prefix(
     parser: Parser, table: DefaultDict[lexer.TokenType, PrattRule]
-) -> Tuple[ParseExpr, List[ParseError]]:
+) -> Tuple[ParseExpr, List[lexer.CompileError]]:
     """
     Parses a prefix expression from a Parser using a pratt table.
     """
     start_token = parser.advance()
     if not start_token:
-        err = ParseError("unexpected EOF; expected expression", parser.curr_region())
+        err = lexer.CompileError(
+            "unexpected EOF; expected expression", parser.curr_region()
+        )
         return ParseExpr(err), [err]
     rule = table[start_token.kind]
     if not rule.prefix:
-        err = ParseError("unexpected token; expected expression", start_token.lexeme)
+        err = lexer.CompileError(
+            "unexpected token; expected expression", start_token.lexeme
+        )
         return ParseExpr(err), [err]
     return rule.prefix(parser)
 
@@ -1015,7 +1027,7 @@ def pratt_infix(
     table: DefaultDict[lexer.TokenType, PrattRule],
     expr: ParseExpr,
     precedence: Precedence,
-) -> Optional[Tuple[ParseExpr, List[ParseError]]]:
+) -> Optional[Tuple[ParseExpr, List[lexer.CompileError]]]:
     """
     Given an initial expression and precedence parses an infix expression from a Parser using a
     pratt table. If there are no infix extensions bound by the precedence returns None.
@@ -1051,7 +1063,7 @@ def pratt_parse(
     parser: Parser,
     table: DefaultDict[lexer.TokenType, PrattRule],
     precedence: Precedence = Precedence.ASSIGNMENT,
-) -> Tuple[ParseExpr, List[ParseError]]:
+) -> Tuple[ParseExpr, List[lexer.CompileError]]:
     """
     Parses an expression bound by a given precedence from a Parser using a pratt table.
     """

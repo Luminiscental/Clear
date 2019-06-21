@@ -7,6 +7,13 @@ from typing import Callable
 import clr.ast as ast
 
 
+def pprint(node: ast.AstNode) -> None:
+    """
+    Pretty prints a given ast node.
+    """
+    node.accept(AstPrinter())
+
+
 class AstPrinter(ast.AstVisitor):
     """
     Ast visitor that pretty prints the nodes it visits.
@@ -161,7 +168,7 @@ class AstPrinter(ast.AstVisitor):
         self._append(")")
 
     def atom_type(self, node: ast.AstAtomType) -> None:
-        self._append(node.token)
+        self._append(node.name)
 
     def func_type(self, node: ast.AstFuncType) -> None:
         self._append("func")
@@ -178,10 +185,3 @@ class AstPrinter(ast.AstVisitor):
         self._append("(")
         node.target.accept(self)
         self._append(")?")
-
-
-def pprint(node: ast.AstNode) -> None:
-    """
-    Pretty prints a given ast node.
-    """
-    node.accept(AstPrinter())
