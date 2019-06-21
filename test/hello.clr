@@ -9,3 +9,5 @@ if (true) {
     val x = "goodbye";
     hello(x);
 }
+
+val msg = hello(1 * hello("me") + "hello");

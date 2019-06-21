@@ -28,6 +28,20 @@ ARITH_UNARY = ["-"]
 ARITH_BINARY = ["+", "-", "*", "/"]
 
 
+def guess_arith_binary(lhs: ast.TypeAnnot, rhs: ast.TypeAnnot) -> ast.TypeAnnot:
+    """
+    Guess the result type of an arithmetic binary operator given mismatched lhs and rhs types.
+    """
+    # If there's a str assume user wanted concatenation
+    if TYPE_STR in (lhs, rhs):
+        return TYPE_STR
+    # If there's a num assume user wanted num operation
+    if TYPE_NUM in (lhs, rhs):
+        return TYPE_NUM
+    # Fallback to int
+    return TYPE_INT
+
+
 def valid(type_annot: ast.TypeAnnot) -> bool:
     """
     Checks if a type annotation is a valid type for a value to have.
@@ -165,6 +179,10 @@ class TypeChecker(ast.DeepVisitor):
                     f"for binary operator {node.operator}",
                     region=node.region,
                 )
+                # Guess the result type for smoother chain errors
+                node.type_annot = guess_arith_binary(
+                    node.left.type_annot, node.right.type_annot
+                )
             else:
                 # Overloaded concat operator
                 if str(node.operator) == "+" and node.left.type_annot == TYPE_STR:
@@ -175,7 +193,7 @@ class TypeChecker(ast.DeepVisitor):
                         f"for binary operator {node.operator}",
                         region=node.region,
                     )
-            node.type_annot = node.left.type_annot
+                node.type_annot = node.left.type_annot
         else:
             self.errors.add(
                 message=f"unknown binary operator {node.operator}",
