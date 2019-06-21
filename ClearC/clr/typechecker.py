@@ -27,6 +27,8 @@ ARITH_TYPES = [TYPE_INT, TYPE_NUM]
 ARITH_UNARY = ["-"]
 ARITH_BINARY = ["+", "-", "*", "/"]
 
+COMP_BINARY = ["==", "!="]
+
 
 def guess_arith_binary(lhs: ast.TypeAnnot, rhs: ast.TypeAnnot) -> ast.TypeAnnot:
     """
@@ -46,6 +48,7 @@ def valid(type_annot: ast.TypeAnnot) -> bool:
     """
     Checks if a type annotation is a valid type for a value to have.
     """
+    # TODO: Replace None with an unresolved type class so error messages are clearer
     if isinstance(type_annot, ast.BuiltinTypeAnnot):
         return type_annot in [TYPE_STR, TYPE_BOOL, TYPE_INT, TYPE_NUM]
     if isinstance(type_annot, ast.FuncTypeAnnot):
@@ -65,8 +68,11 @@ class TypeChecker(ast.DeepVisitor):
     def __init__(self) -> None:
         self.errors = lexer.ErrorTracker()
         self.expected_returns: List[ast.TypeAnnot] = []
+        self.seen_refs: List[ast.AstIdentRef] = []
+        self.circ_deps: List[ast.AstIdentExpr] = []
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
+        self.seen_refs.append(node)
         super().value_decl(node)
         if node.val_type:
             if not valid(node.val_type.type_annot):
@@ -90,6 +96,7 @@ class TypeChecker(ast.DeepVisitor):
                 )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
+        self.seen_refs.append(node)
         for param in node.params:
             param.accept(self)
         node.return_type.accept(self)
@@ -109,6 +116,7 @@ class TypeChecker(ast.DeepVisitor):
         self.expected_returns.pop()
 
     def param(self, node: ast.AstParam) -> None:
+        self.seen_refs.append(node)
         super().param(node)
         node.type_annot = node.param_type.type_annot
         if not valid(node.type_annot):
@@ -218,6 +226,19 @@ class TypeChecker(ast.DeepVisitor):
                         region=node.region,
                     )
                 node.type_annot = node.left.type_annot
+        elif str(node.operator) in COMP_BINARY:
+
+            def check(side: ast.AstExpr) -> None:
+                if not valid(side.type_annot):
+                    self.errors.add(
+                        message=f"invalid type {side.type_annot} "
+                        f"for comparison operator {node.operator}",
+                        region=side.region,
+                    )
+
+            check(node.left)
+            check(node.right)
+            node.type_annot = TYPE_BOOL
         else:
             self.errors.add(
                 message=f"unknown binary operator {node.operator}",
@@ -239,10 +260,20 @@ class TypeChecker(ast.DeepVisitor):
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
         if node.ref:
+            if node.ref not in self.seen_refs:
+                node.ref.accept(self)
+            elif node.ref.type_annot is None and node not in self.circ_deps:
+                # TODO: Better errors here, e.g. point out the ref
+                self.circ_deps.append(node)
+                self.errors.add(
+                    message=f"circular dependency for value {node.name}",
+                    region=node.region,
+                )
             node.type_annot = node.ref.type_annot
         else:
             self.errors.add(
-                message=f"couldn't resolve identifier {node.name}", region=node.region
+                message=f"couldn't resolve identifier {node.name} ({node})",
+                region=node.region,
             )
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:

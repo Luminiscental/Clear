@@ -20,7 +20,7 @@ def resolve_names(tree: ast.Ast) -> List[lexer.CompileError]:
     return resolver.errors.get()
 
 
-class ScopeVisitor(ast.BlockVisitor):
+class ScopeVisitor(ast.DeepVisitor):
     """
     Ast visitor to keep track of the current scope.
     """
@@ -61,12 +61,16 @@ class NameTracker(ScopeVisitor):
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         self._get_scope().names[node.ident] = node
+        # Manually handle scopes so that the parameters are in the right scope
+        self._push_scope(node.block)
         for param in node.params:
             self._get_scope().names[param.param_name] = param
-        super().func_decl(node)
+        for decl in node.block.decls:
+            decl.accept(self)
+        self._pop_scope()
 
 
-class NameResolver(ScopeVisitor, ast.DeepVisitor):
+class NameResolver(ScopeVisitor):
     """
     Ast visitor to annotate what declarations identifiers reference.
     """

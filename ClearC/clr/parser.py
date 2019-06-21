@@ -1038,6 +1038,12 @@ PRATT_TABLE: DefaultDict[lexer.TokenType, PrattRule] = collections.defaultdict(
         lexer.TokenType.AND: PrattRule(
             infix=ParseBinaryExpr.finish, precedence=Precedence.AND
         ),
+        lexer.TokenType.DOUBLE_EQUALS: PrattRule(
+            infix=ParseBinaryExpr.finish, precedence=Precedence.EQUALITY
+        ),
+        lexer.TokenType.NOT_EQUALS: PrattRule(
+            infix=ParseBinaryExpr.finish, precedence=Precedence.EQUALITY
+        ),
         lexer.TokenType.STR_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
         lexer.TokenType.NUM_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
         lexer.TokenType.INT_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),

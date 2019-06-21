@@ -1,14 +1,7 @@
 
-func hello(str name) void {
-    if (true) {
-        return;
+func fac(int n) int {
+    if (n == 0i) {
+        return 1i;
     }
-    print "Hello " + name;
-}
-
-val x = 1 + 2 + 3;
-
-if (true) {
-    val x = "goodbye";
-    hello(x);
+    return n * fac(n - 1i);
 }

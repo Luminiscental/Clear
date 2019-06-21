@@ -56,6 +56,8 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[CompileError]]:
         (r"[0-9]+i", TokenType.INT_LITERAL),
         (r"[0-9]+(\.[0-9]+)?", TokenType.NUM_LITERAL),
         (r"\".*?\"", TokenType.STR_LITERAL),
+        (r"==", TokenType.DOUBLE_EQUALS),
+        (r"!=", TokenType.NOT_EQUALS),
         (r"=", TokenType.EQUALS),
         (r",", TokenType.COMMA),
         (r";", TokenType.SEMICOLON),
@@ -178,6 +180,8 @@ class TokenType(enum.Enum):
     FALSE = enum.auto()
     # Symbols
     EQUALS = enum.auto()
+    DOUBLE_EQUALS = enum.auto()
+    NOT_EQUALS = enum.auto()
     COMMA = enum.auto()
     SEMICOLON = enum.auto()
     LEFT_BRACE = enum.auto()

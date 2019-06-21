@@ -197,29 +197,6 @@ class AstVisitor:
         """
 
 
-class BlockVisitor(AstVisitor):
-    """
-    Ast visitor that propogates to all blocks for a convenient base class.
-    """
-
-    def func_decl(self, node: "AstFuncDecl") -> None:
-        node.block.accept(self)
-
-    def block_stmt(self, node: "AstBlockStmt") -> None:
-        for decl in node.decls:
-            decl.accept(self)
-
-    def if_stmt(self, node: "AstIfStmt") -> None:
-        node.if_part[1].accept(self)
-        for _, block in node.elif_parts:
-            block.accept(self)
-        if node.else_part:
-            node.else_part.accept(self)
-
-    def while_stmt(self, node: "AstWhileStmt") -> None:
-        node.block.accept(self)
-
-
 class DeepVisitor(AstVisitor):
     """
     Ast visitor that propogates to all nodes for a convenient base class.
@@ -774,6 +751,9 @@ class AstStrExpr(AstNode):
         visitor.str_expr(self)
 
 
+AstIdentRef = Union[AstFuncDecl, AstValueDecl, AstParam]
+
+
 class AstIdentExpr(AstNode):
     """
     Ast node for an identifier expression.
@@ -784,7 +764,7 @@ class AstIdentExpr(AstNode):
         self.region = token.lexeme
         self.name = str(token)
         # Annotations:
-        self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
+        self.ref: Optional[AstIdentRef] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
