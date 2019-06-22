@@ -48,7 +48,6 @@ def valid(type_annot: ast.TypeAnnot) -> bool:
     """
     Checks if a type annotation is a valid type for a value to have.
     """
-    # TODO: Replace None with an unresolved type class so error messages are clearer
     if isinstance(type_annot, ast.BuiltinTypeAnnot):
         return type_annot in [TYPE_STR, TYPE_BOOL, TYPE_INT, TYPE_NUM]
     if isinstance(type_annot, ast.FuncTypeAnnot):
