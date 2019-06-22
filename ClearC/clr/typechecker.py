@@ -2,10 +2,13 @@
 Module defining an ast visitor to type check.
 """
 
-from typing import List
+from typing import List, Optional, Callable, TypeVar
 
 import clr.errors as er
 import clr.ast as ast
+
+T = TypeVar("T")  # pylint: disable=invalid-name
+R = TypeVar("R")  # pylint: disable=invalid-name
 
 
 def check_types(tree: ast.Ast) -> List[er.CompileError]:
@@ -43,6 +46,43 @@ def guess_arith_binary(lhs: ast.TypeAnnot, rhs: ast.TypeAnnot) -> ast.TypeAnnot:
         return TYPE_NUM
     # Fallback to int
     return TYPE_INT
+
+
+def symmetrize(func: Callable[[T, T], Optional[R]]) -> Callable[[T, T], Optional[R]]:
+    """
+    Makes a function attempt both orders of arguments before returning None.
+    """
+
+    def result(lhs: T, rhs: T) -> Optional[R]:
+        return func(lhs, rhs) or func(rhs, lhs)
+
+    return result
+
+
+@symmetrize
+def union(lhs: ast.TypeAnnot, rhs: ast.TypeAnnot) -> Optional[ast.TypeAnnot]:
+    """
+    Returns the type that contains both the lhs and rhs type, if it exists.
+    """
+    if lhs == rhs:
+        return lhs
+    if lhs == TYPE_NIL:
+        if isinstance(rhs, ast.OptionalTypeAnnot):
+            return rhs
+        return ast.OptionalTypeAnnot(rhs)
+    if isinstance(lhs, ast.OptionalTypeAnnot) and rhs == lhs.target:
+        return lhs
+    return None
+
+
+def contains(inner: ast.TypeAnnot, outer: ast.TypeAnnot) -> bool:
+    """
+    Checks if the inner type is contained by the outer type (defers to union).
+    """
+    combined = union(outer, inner)
+    if combined is None:
+        return False
+    return combined == outer
 
 
 def valid(type_annot: ast.TypeAnnot) -> bool:
@@ -83,8 +123,7 @@ class TypeChecker(ast.DeepVisitor):
                     regions=[node.val_type.region],
                 )
             node.type_annot = node.val_type.type_annot
-            # TODO: Handle optional/nil better, not just equality checks
-            if node.type_annot != node.val_init.type_annot:
+            if not contains(node.val_init.type_annot, node.type_annot):
                 self.errors.add(
                     message=f"mismatched type for value initializer: "
                     f"expected {node.type_annot} but got {node.val_init.type_annot}",
@@ -171,7 +210,7 @@ class TypeChecker(ast.DeepVisitor):
                     message=f"invalid type {node.expr.type_annot} to return",
                     regions=[node.expr.region],
                 )
-            elif node.expr.type_annot != self.expected_returns[-1]:
+            elif not contains(node.expr.type_annot, self.expected_returns[-1]):
                 self.errors.add(
                     message=f"mismatched return type: "
                     f"expected {self.expected_returns[-1]} but got {node.expr.type_annot}",

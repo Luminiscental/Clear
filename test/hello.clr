@@ -1,12 +1,7 @@
 
 val a = fac(b);
 val b = 2i;
-val c bool = maybe2(false) == nil;
-
-val y = x;
-val x = y;
-
-print x;
+val c bool? = maybe2(false) == nil;
 
 func fac(int n) int {
     if (n == 0i) {
