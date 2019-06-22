@@ -3,8 +3,7 @@ val a = fac(b);
 val b = 2i;
 val c = maybe2(false);
 
-val x = y;
-val y = x;
+2i;
 
 func fac(int n) int {
     if (n == 0i) {

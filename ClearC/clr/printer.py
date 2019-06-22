@@ -20,6 +20,7 @@ class AstPrinter(ast.AstVisitor):
     """
 
     def __init__(self, printer: Callable[[str], None] = print) -> None:
+        # TODO: Handle indentation better, this is buggy and obtuse
         self.indent = 0
         self.printer = printer
         self.buffer = ""

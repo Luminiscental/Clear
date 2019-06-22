@@ -185,7 +185,12 @@ class TypeChecker(ast.DeepVisitor):
                 f"invalid expression type {node.expr.type_annot}",
                 regions=[node.expr.region],
             )
-        # TODO: warnings, e.g. `if node.expr.type_annot != TYPE_VOID: warn("unused value")`
+        if node.expr.type_annot != TYPE_VOID:
+            self.errors.add(
+                message=f"unused non-void value",
+                regions=[node.expr.region],
+                severity=er.Severity.WARNING,
+            )
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)

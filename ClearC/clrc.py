@@ -45,13 +45,18 @@ def _read_source(filename: str) -> str:
 
 
 def _check_errors(error_name: str, errors: Iterable[er.CompileError]) -> None:
-    if errors:
-        print(f"{error_name} Errors:")
+    def display(kind: str) -> None:
+        print(f"{error_name} {kind}:")
         print("--------")
         for error in errors:
             print(error.display())
         print("--------")
+
+    if any(error.severity == er.Severity.ERROR for error in errors):
+        display("Errors")
         sys.exit(1)
+    if any(error.severity == er.Severity.WARNING for error in errors):
+        display("Warnings")
 
 
 def _assemble_code(

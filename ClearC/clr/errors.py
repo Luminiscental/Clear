@@ -2,7 +2,41 @@
 Definitions for compile errors and tracking/displaying them.
 """
 
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Union
+
+import enum
+
+Comparison = Union[bool, "NotImplemented"]
+
+
+class Severity(enum.Enum):
+    """
+    Enumerates the possible error severities.
+    """
+
+    NONE = 0
+    WARNING = 1
+    ERROR = 2
+
+    def __lt__(self, other: object) -> Comparison:
+        if not isinstance(other, Severity):
+            return NotImplemented
+        return self.value < other.value
+
+    def __le__(self, other: object) -> Comparison:
+        if not isinstance(other, Severity):
+            return NotImplemented
+        return self.value <= other.value
+
+    def __gt__(self, other: object) -> Comparison:
+        if not isinstance(other, Severity):
+            return NotImplemented
+        return self.value > other.value
+
+    def __ge__(self, other: object) -> Comparison:
+        if not isinstance(other, Severity):
+            return NotImplemented
+        return self.value >= other.value
 
 
 class CompileError(NamedTuple):
@@ -12,6 +46,7 @@ class CompileError(NamedTuple):
 
     message: str
     regions: List["SourceView"]
+    severity: Severity = Severity.ERROR
 
     def display(self) -> str:
         """
@@ -29,11 +64,16 @@ class ErrorTracker:
     def __init__(self) -> None:
         self._errors: List[CompileError] = []
 
-    def add(self, message: str, regions: List["SourceView"]) -> None:
+    def add(
+        self,
+        message: str,
+        regions: List["SourceView"],
+        severity: Severity = Severity.ERROR,
+    ) -> None:
         """
         Add a new error.
         """
-        self._errors.append(CompileError(message, regions))
+        self._errors.append(CompileError(message, regions, severity))
 
     def get(self) -> List[CompileError]:
         """
