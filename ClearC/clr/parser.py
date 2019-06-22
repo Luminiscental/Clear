@@ -1086,8 +1086,7 @@ def pratt_prefix(
         err = er.CompileError(
             "unexpected EOF; expected expression", [parser.curr_region()]
         )
-        # TODO: Do something more elegant with the region here
-        return ParseExpr(err, region=er.SourceView.all("<error>")), [err]
+        return ParseExpr(err, parser.curr_region()), [err]
     rule = table[start_token.kind]
     if not rule.prefix:
         err = er.CompileError(
