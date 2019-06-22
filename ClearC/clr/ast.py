@@ -4,7 +4,8 @@ Module containing definitions for a Clear ast and a base class for ast visitors.
 
 from typing import Union, List, Optional, Tuple, Dict
 
-import clr.lexer as lexer
+import clr.errors as er
+import clr.lexer as lx
 
 TypeAnnot = Union["BuiltinTypeAnnot", "FuncTypeAnnot", "OptionalTypeAnnot", None]
 
@@ -343,20 +344,28 @@ class AstValueDecl(AstNode):
     Ast node for a value declaration.
     """
 
-    def __init__(self, ident: str, val_type: Optional[AstType], val_init: AstExpr):
+    def __init__(
+        self,
+        ident: str,
+        val_type: Optional[AstType],
+        val_init: AstExpr,
+        region: er.SourceView,
+    ):
         super().__init__()
         self.ident = ident
         self.val_type = val_type
         self.val_init = val_init
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.value_decl(self)
 
     @staticmethod
     def make(
-        ident: Union[lexer.Token, AstError],
+        ident: Union[lx.Token, AstError],
         val_type: Optional[Union[AstType, AstError]],
         val_init: Union[AstExpr, AstError],
+        region: er.SourceView,
     ) -> Union["AstValueDecl", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -372,7 +381,7 @@ class AstValueDecl(AstNode):
         if isinstance(val_init, AstError):
             return val_init
         pure_init = val_init
-        return AstValueDecl(str(ident), pure_type, pure_init)
+        return AstValueDecl(str(ident), pure_type, pure_init, region)
 
 
 class AstParam(AstNode):
@@ -380,18 +389,18 @@ class AstParam(AstNode):
     Ast node for a parameter declaration.
     """
 
-    def __init__(self, param_type: AstType, param_name: lexer.Token) -> None:
+    def __init__(self, param_type: AstType, param_name: lx.Token) -> None:
         super().__init__()
         self.param_type = param_type
         self.param_name = str(param_name)
-        self.region = lexer.SourceView.range(param_type.region, param_name.lexeme)
+        self.region = er.SourceView.range(param_type.region, param_name.lexeme)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.param(self)
 
     @staticmethod
     def make(
-        param_type: Union[AstType, AstError], param_name: Union[lexer.Token, AstError]
+        param_type: Union[AstType, AstError], param_name: Union[lx.Token, AstError]
     ) -> Union["AstParam", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -415,22 +424,25 @@ class AstFuncDecl(AstNode):
         params: List[AstParam],
         return_type: AstType,
         block: "AstBlockStmt",
+        region: er.SourceView,
     ) -> None:
         super().__init__()
         self.ident = ident
         self.params = params
         self.return_type = return_type
         self.block = block
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
 
     @staticmethod
     def make(
-        ident: Union[lexer.Token, AstError],
-        params: List[Tuple[Union[AstType, AstError], Union[lexer.Token, AstError]]],
+        ident: Union[lx.Token, AstError],
+        params: List[Tuple[Union[AstType, AstError], Union[lx.Token, AstError]]],
         return_type: Union[AstType, AstError],
         block: Union["AstBlockStmt", AstError],
+        region: er.SourceView,
     ) -> Union["AstFuncDecl", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -448,7 +460,7 @@ class AstFuncDecl(AstNode):
             return return_type
         if isinstance(block, AstError):
             return block
-        return AstFuncDecl(str(ident), pure_params, return_type, block)
+        return AstFuncDecl(str(ident), pure_params, return_type, block, region)
 
 
 class AstPrintStmt(AstNode):
@@ -593,7 +605,7 @@ class AstReturnStmt(AstNode):
     Ast node for a return statement.
     """
 
-    def __init__(self, expr: Optional[AstExpr], region: lexer.SourceView) -> None:
+    def __init__(self, expr: Optional[AstExpr], region: er.SourceView) -> None:
         super().__init__()
         self.expr = expr
         self.region = region
@@ -603,7 +615,7 @@ class AstReturnStmt(AstNode):
 
     @staticmethod
     def make(
-        expr: Optional[Union[AstExpr, AstError]], region: lexer.SourceView
+        expr: Optional[Union[AstExpr, AstError]], region: er.SourceView
     ) -> Union["AstReturnStmt", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -645,7 +657,7 @@ class AstUnaryExpr(AstNode):
     """
 
     def __init__(
-        self, operator: lexer.Token, target: AstExpr, region: lexer.SourceView
+        self, operator: lx.Token, target: AstExpr, region: er.SourceView
     ) -> None:
         super().__init__()
         self.operator = operator
@@ -657,9 +669,7 @@ class AstUnaryExpr(AstNode):
 
     @staticmethod
     def make(
-        operator: lexer.Token,
-        target: Union[AstExpr, AstError],
-        region: lexer.SourceView,
+        operator: lx.Token, target: Union[AstExpr, AstError], region: er.SourceView
     ) -> Union["AstUnaryExpr", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -676,11 +686,7 @@ class AstBinaryExpr(AstNode):
     """
 
     def __init__(
-        self,
-        operator: lexer.Token,
-        left: AstExpr,
-        right: AstExpr,
-        region: lexer.SourceView,
+        self, operator: lx.Token, left: AstExpr, right: AstExpr, region: er.SourceView
     ) -> None:
         super().__init__()
         self.operator = operator
@@ -693,10 +699,10 @@ class AstBinaryExpr(AstNode):
 
     @staticmethod
     def make(
-        operator: lexer.Token,
+        operator: lx.Token,
         left: Union[AstExpr, AstError],
         right: Union[AstExpr, AstError],
-        region: lexer.SourceView,
+        region: er.SourceView,
     ) -> Union["AstBinaryExpr", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -714,7 +720,7 @@ class AstIntExpr(AstNode):
     Ast node for an int literal.
     """
 
-    def __init__(self, literal: lexer.Token) -> None:
+    def __init__(self, literal: lx.Token) -> None:
         super().__init__()
         self.literal = str(literal)
         self.region = literal.lexeme
@@ -728,7 +734,7 @@ class AstNumExpr(AstNode):
     Ast node for a num literal.
     """
 
-    def __init__(self, literal: lexer.Token) -> None:
+    def __init__(self, literal: lx.Token) -> None:
         super().__init__()
         self.literal = str(literal)
         self.region = literal.lexeme
@@ -742,7 +748,7 @@ class AstStrExpr(AstNode):
     Ast node for a str literal.
     """
 
-    def __init__(self, literal: lexer.Token) -> None:
+    def __init__(self, literal: lx.Token) -> None:
         super().__init__()
         self.literal = str(literal)
         self.region = literal.lexeme
@@ -759,7 +765,7 @@ class AstIdentExpr(AstNode):
     Ast node for an identifier expression.
     """
 
-    def __init__(self, token: lexer.Token) -> None:
+    def __init__(self, token: lx.Token) -> None:
         super().__init__()
         self.region = token.lexeme
         self.name = str(token)
@@ -775,7 +781,7 @@ class AstBoolExpr(AstNode):
     Ast node for a boolean expression.
     """
 
-    def __init__(self, literal: lexer.Token) -> None:
+    def __init__(self, literal: lx.Token) -> None:
         super().__init__()
         self.value = str(literal) == "true"
         self.region = literal.lexeme
@@ -790,7 +796,7 @@ class AstCallExpr(AstNode):
     """
 
     def __init__(
-        self, function: AstExpr, args: List[AstExpr], region: lexer.SourceView
+        self, function: AstExpr, args: List[AstExpr], region: er.SourceView
     ) -> None:
         super().__init__()
         self.function = function
@@ -804,7 +810,7 @@ class AstCallExpr(AstNode):
     def make(
         function: Union[AstExpr, AstError],
         args: List[Union[AstExpr, AstError]],
-        region: lexer.SourceView,
+        region: er.SourceView,
     ) -> Union["AstCallExpr", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -825,7 +831,7 @@ class AstAtomType(AstNode):
     Ast node for an atomic type.
     """
 
-    def __init__(self, token: lexer.Token) -> None:
+    def __init__(self, token: lx.Token) -> None:
         super().__init__()
         self.region = token.lexeme
         self.name = str(token)
@@ -836,7 +842,7 @@ class AstAtomType(AstNode):
         visitor.atom_type(self)
 
     @staticmethod
-    def make(token: Union[lexer.Token, AstError]) -> Union["AstAtomType", AstError]:
+    def make(token: Union[lx.Token, AstError]) -> Union["AstAtomType", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
@@ -852,7 +858,7 @@ class AstFuncType(AstNode):
     """
 
     def __init__(
-        self, params: List[AstType], return_type: AstType, region: lexer.SourceView
+        self, params: List[AstType], return_type: AstType, region: er.SourceView
     ) -> None:
         super().__init__()
         self.params = params
@@ -866,7 +872,7 @@ class AstFuncType(AstNode):
     def make(
         params: List[Union[AstType, AstError]],
         return_type: Union[AstType, AstError],
-        region: lexer.SourceView,
+        region: er.SourceView,
     ) -> Union["AstFuncType", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
@@ -887,7 +893,7 @@ class AstOptionalType(AstNode):
     Ast node for an optional type.
     """
 
-    def __init__(self, target: AstType, region: lexer.SourceView) -> None:
+    def __init__(self, target: AstType, region: er.SourceView) -> None:
         super().__init__()
         self.target = target
         self.region = region
@@ -897,7 +903,7 @@ class AstOptionalType(AstNode):
 
     @staticmethod
     def make(
-        target: Union[AstType, AstError], region: lexer.SourceView
+        target: Union[AstType, AstError], region: er.SourceView
     ) -> Union["AstOptionalType", AstError]:
         """
         Makes the node or returns an error given its contents with any contained node possibly

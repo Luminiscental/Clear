@@ -4,11 +4,11 @@ Module defining an ast visitor to type check.
 
 from typing import List
 
-import clr.lexer as lexer
+import clr.errors as er
 import clr.ast as ast
 
 
-def check_types(tree: ast.Ast) -> List[lexer.CompileError]:
+def check_types(tree: ast.Ast) -> List[er.CompileError]:
     """
     Run the type checker over an ast.
     """
@@ -66,7 +66,7 @@ class TypeChecker(ast.DeepVisitor):
     """
 
     def __init__(self) -> None:
-        self.errors = lexer.ErrorTracker()
+        self.errors = er.ErrorTracker()
         self.expected_returns: List[ast.TypeAnnot] = []
         self.seen_refs: List[ast.AstIdentRef] = []
         self.circ_deps: List[ast.AstIdentExpr] = []
@@ -78,7 +78,7 @@ class TypeChecker(ast.DeepVisitor):
             if not valid(node.val_type.type_annot):
                 self.errors.add(
                     message=f"invalid value type {node.val_type}",
-                    region=node.val_type.region,
+                    regions=[node.val_type.region],
                 )
             node.type_annot = node.val_type.type_annot
             # TODO: Handle optional/nil better, not just equality checks
@@ -86,13 +86,14 @@ class TypeChecker(ast.DeepVisitor):
                 self.errors.add(
                     message=f"mismatched type for value initializer: "
                     f"expected {node.type_annot} but got {node.val_init.type_annot}",
-                    region=node.val_init.region,
+                    regions=[node.val_init.region],
                 )
         else:
             node.type_annot = node.val_init.type_annot
             if node.type_annot == TYPE_VOID:
                 self.errors.add(
-                    message="cannot declare value as void", region=node.val_init.region
+                    message="cannot declare value as void",
+                    regions=[node.val_init.region],
                 )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
@@ -106,7 +107,7 @@ class TypeChecker(ast.DeepVisitor):
         ):
             self.errors.add(
                 message=f"invalid return type {node.return_type.type_annot}",
-                region=node.return_type.region,
+                regions=[node.return_type.region],
             )
         node.type_annot = ast.FuncTypeAnnot(
             [param.type_annot for param in node.params], node.return_type.type_annot
@@ -122,7 +123,7 @@ class TypeChecker(ast.DeepVisitor):
         if not valid(node.type_annot):
             self.errors.add(
                 message=f"invalid type {node.type_annot} for parameter",
-                region=node.region,
+                regions=[node.region],
             )
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
@@ -130,14 +131,14 @@ class TypeChecker(ast.DeepVisitor):
         if node.expr and node.expr.type_annot != TYPE_STR:
             self.errors.add(
                 message=f"invalid type {node.expr.type_annot} to print, expected str",
-                region=node.expr.region,
+                regions=[node.expr.region],
             )
 
     def _check_cond(self, cond: ast.AstExpr) -> None:
         if cond.type_annot != TYPE_BOOL:
             self.errors.add(
                 message=f"invalid type {cond.type_annot} for condition, expected bool",
-                region=cond.region,
+                regions=[cond.region],
             )
 
     def if_stmt(self, node: ast.AstIfStmt) -> None:
@@ -156,25 +157,25 @@ class TypeChecker(ast.DeepVisitor):
         super().return_stmt(node)
         if not self.expected_returns:
             self.errors.add(
-                message=f"return statement outside of function", region=node.region
+                message=f"return statement outside of function", regions=[node.region]
             )
         if node.expr:
             if not valid(node.expr.type_annot):
                 self.errors.add(
                     message=f"invalid type {node.expr.type_annot} to return",
-                    region=node.expr.region,
+                    regions=[node.expr.region],
                 )
             elif node.expr.type_annot != self.expected_returns[-1]:
                 self.errors.add(
                     message=f"mismatched return type: "
                     f"expected {self.expected_returns[-1]} but got {node.expr.type_annot}",
-                    region=node.expr.region,
+                    regions=[node.expr.region],
                 )
         else:
             if self.expected_returns[-1] != TYPE_VOID:
                 self.errors.add(
                     message=f"missing return value in non-void function",
-                    region=node.region,
+                    regions=[node.region],
                 )
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
@@ -182,7 +183,7 @@ class TypeChecker(ast.DeepVisitor):
         if not valid(node.expr.type_annot) and node.expr.type_annot != TYPE_VOID:
             self.errors.add(
                 f"invalid expression type {node.expr.type_annot}",
-                region=node.expr.region,
+                regions=[node.expr.region],
             )
         # TODO: warnings, e.g. `if node.expr.type_annot != TYPE_VOID: warn("unused value")`
 
@@ -193,13 +194,13 @@ class TypeChecker(ast.DeepVisitor):
                 self.errors.add(
                     message=f"invalid type {node.target.type_annot} "
                     f"for unary operator {node.operator}",
-                    region=node.target.region,
+                    regions=[node.target.region],
                 )
             node.type_annot = node.target.type_annot
         else:
             self.errors.add(
                 message=f"unknown unary operator {node.operator}",
-                region=node.operator.lexeme,
+                regions=[node.operator.lexeme],
             )
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
@@ -209,9 +210,9 @@ class TypeChecker(ast.DeepVisitor):
                 self.errors.add(
                     message=f"mismatched types {node.left.type_annot} and {node.right.type_annot} "
                     f"for binary operator {node.operator}",
-                    region=node.region,
+                    regions=[node.region],
                 )
-                # Guess the result type for smoother chain errors
+                # Guess the result type for smoother chain er
                 node.type_annot = guess_arith_binary(
                     node.left.type_annot, node.right.type_annot
                 )
@@ -223,7 +224,7 @@ class TypeChecker(ast.DeepVisitor):
                     self.errors.add(
                         message=f"invalid operand type {node.left.type_annot} "
                         f"for binary operator {node.operator}",
-                        region=node.region,
+                        regions=[node.region],
                     )
                 node.type_annot = node.left.type_annot
         elif str(node.operator) in COMP_BINARY:
@@ -233,7 +234,7 @@ class TypeChecker(ast.DeepVisitor):
                     self.errors.add(
                         message=f"invalid type {side.type_annot} "
                         f"for comparison operator {node.operator}",
-                        region=side.region,
+                        regions=[side.region],
                     )
 
             check(node.left)
@@ -242,7 +243,7 @@ class TypeChecker(ast.DeepVisitor):
         else:
             self.errors.add(
                 message=f"unknown binary operator {node.operator}",
-                region=node.operator.lexeme,
+                regions=[node.operator.lexeme],
             )
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
@@ -263,17 +264,16 @@ class TypeChecker(ast.DeepVisitor):
             if node.ref not in self.seen_refs:
                 node.ref.accept(self)
             elif node.ref.type_annot is None and node not in self.circ_deps:
-                # TODO: Better errors here, e.g. point out the ref
                 self.circ_deps.append(node)
                 self.errors.add(
                     message=f"circular dependency for value {node.name}",
-                    region=node.region,
+                    regions=[node.region, node.ref.region],
                 )
             node.type_annot = node.ref.type_annot
         else:
             self.errors.add(
                 message=f"couldn't resolve identifier {node.name} ({node})",
-                region=node.region,
+                regions=[node.region],
             )
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
@@ -285,7 +285,7 @@ class TypeChecker(ast.DeepVisitor):
         if not isinstance(node.function.type_annot, ast.FuncTypeAnnot):
             self.errors.add(
                 message=f"invalid type {node.function.type_annot} to call, expected a function",
-                region=node.function.region,
+                regions=[node.function.region],
             )
             return
         arg_count = len(node.args)
@@ -295,9 +295,9 @@ class TypeChecker(ast.DeepVisitor):
             self.errors.add(
                 message=f"too {adjective} arguments to function: "
                 f"expected {param_count} but got {arg_count}",
-                region=lexer.SourceView.range(
-                    node.args[0].region, node.args[-1].region
-                ),
+                regions=[
+                    er.SourceView.range(node.args[0].region, node.args[-1].region)
+                ],
             )
         else:
             for arg, param in zip(node.args, node.function.type_annot.params):
@@ -305,7 +305,7 @@ class TypeChecker(ast.DeepVisitor):
                     self.errors.add(
                         message=f"mismatched type for argument: "
                         f"expected {param} but got {arg.type_annot}",
-                        region=arg.region,
+                        regions=[arg.region],
                     )
         node.type_annot = node.function.type_annot.return_type
 
@@ -314,7 +314,7 @@ class TypeChecker(ast.DeepVisitor):
         node.type_annot = ast.BuiltinTypeAnnot(node.name)
         if not valid(node.type_annot) and node.type_annot != TYPE_VOID:
             self.errors.add(
-                message=f"invalid type {node.type_annot}", region=node.region
+                message=f"invalid type {node.type_annot}", regions=[node.region]
             )
 
     def func_type(self, node: ast.AstFuncType) -> None:
@@ -324,7 +324,7 @@ class TypeChecker(ast.DeepVisitor):
         )
         if not valid(node.type_annot):
             self.errors.add(
-                message=f"invalid type {node.type_annot}", region=node.region
+                message=f"invalid type {node.type_annot}", regions=[node.region]
             )
 
     def optional_type(self, node: ast.AstOptionalType) -> None:
@@ -332,5 +332,5 @@ class TypeChecker(ast.DeepVisitor):
         node.type_annot = ast.OptionalTypeAnnot(node.target.type_annot)
         if not valid(node.type_annot):
             self.errors.add(
-                message=f"invalid type {node.type_annot}", region=node.region
+                message=f"invalid type {node.type_annot}", regions=[node.region]
             )

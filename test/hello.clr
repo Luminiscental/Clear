@@ -1,7 +1,20 @@
 
+val a = fac(b);
+val b = 2i;
+val c = maybe2(false);
+
+val x = y;
+val y = x;
+
 func fac(int n) int {
     if (n == 0i) {
         return 1i;
     }
     return n * fac(n - 1i);
+}
+
+func maybe2(bool input) int {
+    if (input) {
+        return 2i;
+    }
 }

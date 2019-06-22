@@ -4,11 +4,11 @@ Module for name resolution visitors / functions.
 
 from typing import List, Union
 
-import clr.lexer as lexer
+import clr.errors as er
 import clr.ast as ast
 
 
-def resolve_names(tree: ast.Ast) -> List[lexer.CompileError]:
+def resolve_names(tree: ast.Ast) -> List[er.CompileError]:
     """
     Annotates scope nodes with the names they contain, and identifier nodes with the declarations
     they reference, returning a list of any resolve errors.
@@ -77,14 +77,14 @@ class NameResolver(ScopeVisitor):
 
     def __init__(self, tree: ast.Ast) -> None:
         super().__init__(tree)
-        self.errors = lexer.ErrorTracker()
+        self.errors = er.ErrorTracker()
 
     def _resolve_name(
         self, name: str, node: Union[ast.AstIdentExpr, ast.AstAtomType]
     ) -> None:
         if name not in self._get_scope().names:
             self.errors.add(
-                message=f"reference to undeclared name {name}", region=node.region
+                message=f"reference to undeclared name {name}", regions=[node.region]
             )
         else:
             node.ref = self._get_scope().names[name]

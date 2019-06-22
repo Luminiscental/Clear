@@ -8,13 +8,14 @@ from typing import List, Iterable, Sequence, Tuple
 
 import sys
 
-import clr.bytecode as bytecode
-import clr.lexer as lexer
-import clr.parser as parser
+import clr.errors as er
+import clr.bytecode as bc
+import clr.lexer as lx
+import clr.parser as ps
 import clr.ast as ast
-import clr.printer as printer
-import clr.resolver as resolver
-import clr.typechecker as typechecker
+import clr.printer as pr
+import clr.resolver as rs
+import clr.typechecker as tc
 
 DEBUG = True
 
@@ -43,7 +44,7 @@ def _read_source(filename: str) -> str:
         sys.exit(1)
 
 
-def _check_errors(error_name: str, errors: Iterable[lexer.CompileError]) -> None:
+def _check_errors(error_name: str, errors: Iterable[er.CompileError]) -> None:
     if errors:
         print(f"{error_name} Errors:")
         print("--------")
@@ -54,17 +55,17 @@ def _check_errors(error_name: str, errors: Iterable[lexer.CompileError]) -> None
 
 
 def _assemble_code(
-    constants: Sequence[bytecode.Constant], instructions: Sequence[bytecode.Instruction]
+    constants: Sequence[bc.Constant], instructions: Sequence[bc.Instruction]
 ) -> bytearray:
     try:
-        return bytecode.assemble_code(constants, instructions)
-    except bytecode.IndexTooLargeError:
+        return bc.assemble_code(constants, instructions)
+    except bc.IndexTooLargeError:
         print("Couldn't assemble; too many variables")
         sys.exit(1)
-    except bytecode.NegativeIndexError:
+    except bc.NegativeIndexError:
         print("Couldn't assemble; some variables were unresolved")
         sys.exit(1)
-    except bytecode.StringTooLongError:
+    except bc.StringTooLongError:
         print("Couldn't assemble; string literal was too long")
         sys.exit(1)
 
@@ -76,10 +77,10 @@ def main() -> None:
     source_file_name, dest_file_name = _get_filenames()
     source = _read_source(source_file_name)
 
-    tokens, lex_errors = lexer.tokenize_source(source)
+    tokens, lex_errors = lx.tokenize_source(source)
     _check_errors("Lex", lex_errors)
 
-    ptree, parse_errors = parser.parse_tokens(tokens)
+    ptree, parse_errors = ps.parse_tokens(tokens)
     _check_errors("Parse", parse_errors)
 
     tree = ptree.to_ast()
@@ -90,14 +91,14 @@ def main() -> None:
     if DEBUG:
         print("Ast:")
         print("--------")
-        printer.pprint(tree)
+        pr.pprint(tree)
         print("--------")
 
-    _check_errors("Resolve", resolver.resolve_names(tree))
-    _check_errors("Type", typechecker.check_types(tree))
+    _check_errors("Resolve", rs.resolve_names(tree))
+    _check_errors("Type", tc.check_types(tree))
 
-    constants: List[bytecode.Constant] = []
-    instructions: List[bytecode.Instruction] = []
+    constants: List[bc.Constant] = []
+    instructions: List[bc.Instruction] = []
 
     assembled = _assemble_code(constants, instructions)
 
