@@ -298,19 +298,6 @@ AstStmt = Union[
 AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 
-class AstError(Exception, AstNode):
-    """
-    Ast node to represent an error creating the tree.
-    """
-
-    def __init__(self) -> None:
-        super().__init__("incomplete parse")
-
-    def accept(self, visitor: AstVisitor) -> None:
-        # TODO: Do something more reasonable here, maybe visitor.error(self)
-        raise self
-
-
 class Ast(AstNode):
     """
     The root ast node.
@@ -327,14 +314,14 @@ class Ast(AstNode):
             decl.accept(visitor)
 
     @staticmethod
-    def make(decls: List[Union[AstDecl, AstError]]) -> Union["Ast", AstError]:
+    def make(decls: List[Optional[AstDecl]]) -> Optional["Ast"]:
         """
         Makes the node or returns an error given a list of declarations that may include errors.
         """
         pure = []
         for decl in decls:
-            if isinstance(decl, AstError):
-                return decl
+            if decl is None:
+                return None
             pure.append(decl)
         return Ast(pure)
 
@@ -362,24 +349,24 @@ class AstValueDecl(AstNode):
 
     @staticmethod
     def make(
-        ident: Union[lx.Token, AstError],
-        val_type: Optional[Union[AstType, AstError]],
-        val_init: Union[AstExpr, AstError],
+        ident: Optional[lx.Token],
+        val_type: Optional[Optional[AstType]],
+        val_init: Optional[AstExpr],
         region: er.SourceView,
-    ) -> Union["AstValueDecl", AstError]:
+    ) -> Optional["AstValueDecl"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(ident, AstError):
-            return ident
+        if ident is None:
+            return None
         pure_type = None
         if val_type:
-            if isinstance(val_type, AstError):
-                return val_type
+            if val_type is None:
+                return None
             pure_type = val_type
-        if isinstance(val_init, AstError):
-            return val_init
+        if val_init is None:
+            return None
         pure_init = val_init
         return AstValueDecl(str(ident), pure_type, pure_init, region)
 
@@ -400,16 +387,16 @@ class AstParam(AstNode):
 
     @staticmethod
     def make(
-        param_type: Union[AstType, AstError], param_name: Union[lx.Token, AstError]
-    ) -> Union["AstParam", AstError]:
+        param_type: Optional[AstType], param_name: Optional[lx.Token]
+    ) -> Optional["AstParam"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(param_type, AstError):
-            return param_type
-        if isinstance(param_name, AstError):
-            return param_name
+        if param_type is None:
+            return None
+        if param_name is None:
+            return None
         return AstParam(param_type, param_name)
 
 
@@ -438,28 +425,28 @@ class AstFuncDecl(AstNode):
 
     @staticmethod
     def make(
-        ident: Union[lx.Token, AstError],
-        params: List[Tuple[Union[AstType, AstError], Union[lx.Token, AstError]]],
-        return_type: Union[AstType, AstError],
-        block: Union["AstBlockStmt", AstError],
+        ident: Optional[lx.Token],
+        params: List[Tuple[Optional[AstType], Optional[lx.Token]]],
+        return_type: Optional[AstType],
+        block: Optional["AstBlockStmt"],
         region: er.SourceView,
-    ) -> Union["AstFuncDecl", AstError]:
+    ) -> Optional["AstFuncDecl"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(ident, AstError):
-            return ident
+        if ident is None:
+            return None
         pure_params = []
         for param_type, param_ident in params:
             param = AstParam.make(param_type, param_ident)
-            if isinstance(param, AstError):
-                return param
+            if param is None:
+                return None
             pure_params.append(param)
-        if isinstance(return_type, AstError):
-            return return_type
-        if isinstance(block, AstError):
-            return block
+        if return_type is None:
+            return None
+        if block is None:
+            return None
         return AstFuncDecl(str(ident), pure_params, return_type, block, region)
 
 
@@ -476,16 +463,14 @@ class AstPrintStmt(AstNode):
         visitor.print_stmt(self)
 
     @staticmethod
-    def make(
-        expr: Optional[Union[AstExpr, AstError]]
-    ) -> Union["AstPrintStmt", AstError]:
+    def make(expr: Optional[Optional[AstExpr]]) -> Optional["AstPrintStmt"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
         if expr:
-            if isinstance(expr, AstError):
-                return expr
+            if expr is None:
+                return None
             return AstPrintStmt(expr)
         return AstPrintStmt(None)
 
@@ -505,15 +490,15 @@ class AstBlockStmt(AstNode):
         visitor.block_stmt(self)
 
     @staticmethod
-    def make(decls: List[Union[AstDecl, AstError]]) -> Union["AstBlockStmt", AstError]:
+    def make(decls: List[Optional[AstDecl]]) -> Optional["AstBlockStmt"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
         pure_decls = []
         for decl in decls:
-            if isinstance(decl, AstError):
-                return decl
+            if decl is None:
+                return None
             pure_decls.append(decl)
         return AstBlockStmt(pure_decls)
 
@@ -539,31 +524,29 @@ class AstIfStmt(AstNode):
 
     @staticmethod
     def make(
-        if_part: Tuple[Union[AstExpr, AstError], Union[AstBlockStmt, AstError]],
-        elif_parts: List[
-            Tuple[Union[AstExpr, AstError], Union[AstBlockStmt, AstError]]
-        ],
-        else_part: Optional[Union[AstBlockStmt, AstError]],
-    ) -> Union["AstIfStmt", AstError]:
+        if_part: Tuple[Optional[AstExpr], Optional[AstBlockStmt]],
+        elif_parts: List[Tuple[Optional[AstExpr], Optional[AstBlockStmt]]],
+        else_part: Optional[Optional[AstBlockStmt]],
+    ) -> Optional["AstIfStmt"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
         if_cond, if_block = if_part
-        if isinstance(if_cond, AstError):
-            return if_cond
-        if isinstance(if_block, AstError):
-            return if_block
+        if if_cond is None:
+            return None
+        if if_block is None:
+            return None
         pure_elifs = []
         for elif_cond, elif_block in elif_parts:
-            if isinstance(elif_cond, AstError):
-                return elif_cond
-            if isinstance(elif_block, AstError):
-                return elif_block
+            if elif_cond is None:
+                return None
+            if elif_block is None:
+                return None
             pure_elifs.append((elif_cond, elif_block))
         if else_part:
-            if isinstance(else_part, AstError):
-                return else_part
+            if else_part is None:
+                return None
             pure_else: Optional[AstBlockStmt] = else_part
         else:
             pure_else = None
@@ -585,17 +568,17 @@ class AstWhileStmt(AstNode):
 
     @staticmethod
     def make(
-        cond: Optional[Union[AstExpr, AstError]], block: Union[AstBlockStmt, AstError]
-    ) -> Union["AstWhileStmt", AstError]:
+        cond: Optional[Optional[AstExpr]], block: Optional[AstBlockStmt]
+    ) -> Optional["AstWhileStmt"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(block, AstError):
-            return block
+        if block is None:
+            return None
         if cond:
-            if isinstance(cond, AstError):
-                return cond
+            if cond is None:
+                return None
             return AstWhileStmt(cond, block)
         return AstWhileStmt(None, block)
 
@@ -615,15 +598,15 @@ class AstReturnStmt(AstNode):
 
     @staticmethod
     def make(
-        expr: Optional[Union[AstExpr, AstError]], region: er.SourceView
-    ) -> Union["AstReturnStmt", AstError]:
+        expr: Optional[Optional[AstExpr]], region: er.SourceView
+    ) -> Optional["AstReturnStmt"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
         if expr:
-            if isinstance(expr, AstError):
-                return expr
+            if expr is None:
+                return None
             return AstReturnStmt(expr, region)
         return AstReturnStmt(None, region)
 
@@ -641,13 +624,13 @@ class AstExprStmt(AstNode):
         visitor.expr_stmt(self)
 
     @staticmethod
-    def make(expr: Union[AstExpr, AstError]) -> Union["AstExprStmt", AstError]:
+    def make(expr: Optional[AstExpr]) -> Optional["AstExprStmt"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(expr, AstError):
-            return expr
+        if expr is None:
+            return None
         return AstExprStmt(expr)
 
 
@@ -669,14 +652,14 @@ class AstUnaryExpr(AstNode):
 
     @staticmethod
     def make(
-        operator: lx.Token, target: Union[AstExpr, AstError], region: er.SourceView
-    ) -> Union["AstUnaryExpr", AstError]:
+        operator: lx.Token, target: Optional[AstExpr], region: er.SourceView
+    ) -> Optional["AstUnaryExpr"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(target, AstError):
-            return target
+        if target is None:
+            return None
         return AstUnaryExpr(operator, target, region)
 
 
@@ -700,18 +683,18 @@ class AstBinaryExpr(AstNode):
     @staticmethod
     def make(
         operator: lx.Token,
-        left: Union[AstExpr, AstError],
-        right: Union[AstExpr, AstError],
+        left: Optional[AstExpr],
+        right: Optional[AstExpr],
         region: er.SourceView,
-    ) -> Union["AstBinaryExpr", AstError]:
+    ) -> Optional["AstBinaryExpr"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(left, AstError):
-            return left
-        if isinstance(right, AstError):
-            return right
+        if left is None:
+            return None
+        if right is None:
+            return None
         return AstBinaryExpr(operator, left, right, region)
 
 
@@ -808,20 +791,20 @@ class AstCallExpr(AstNode):
 
     @staticmethod
     def make(
-        function: Union[AstExpr, AstError],
-        args: List[Union[AstExpr, AstError]],
+        function: Optional[AstExpr],
+        args: List[Optional[AstExpr]],
         region: er.SourceView,
-    ) -> Union["AstCallExpr", AstError]:
+    ) -> Optional["AstCallExpr"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(function, AstError):
-            return function
+        if function is None:
+            return None
         pure_args = []
         for arg in args:
-            if isinstance(arg, AstError):
-                return arg
+            if arg is None:
+                return None
             pure_args.append(arg)
         return AstCallExpr(function, pure_args, region)
 
@@ -842,13 +825,13 @@ class AstAtomType(AstNode):
         visitor.atom_type(self)
 
     @staticmethod
-    def make(token: Union[lx.Token, AstError]) -> Union["AstAtomType", AstError]:
+    def make(token: Optional[lx.Token]) -> Optional["AstAtomType"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(token, AstError):
-            return token
+        if token is None:
+            return None
         return AstAtomType(token)
 
 
@@ -870,21 +853,21 @@ class AstFuncType(AstNode):
 
     @staticmethod
     def make(
-        params: List[Union[AstType, AstError]],
-        return_type: Union[AstType, AstError],
+        params: List[Optional[AstType]],
+        return_type: Optional[AstType],
         region: er.SourceView,
-    ) -> Union["AstFuncType", AstError]:
+    ) -> Optional["AstFuncType"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
         pure_params = []
         for param in params:
-            if isinstance(param, AstError):
-                return param
+            if param is None:
+                return None
             pure_params.append(param)
-        if isinstance(return_type, AstError):
-            return return_type
+        if return_type is None:
+            return None
         return AstFuncType(pure_params, return_type, region)
 
 
@@ -903,12 +886,12 @@ class AstOptionalType(AstNode):
 
     @staticmethod
     def make(
-        target: Union[AstType, AstError], region: er.SourceView
-    ) -> Union["AstOptionalType", AstError]:
+        target: Optional[AstType], region: er.SourceView
+    ) -> Optional["AstOptionalType"]:
         """
         Makes the node or returns an error given its contents with any contained node possibly
         being an error.
         """
-        if isinstance(target, AstError):
-            return target
+        if target is None:
+            return None
         return AstOptionalType(target, region)

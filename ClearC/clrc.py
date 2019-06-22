@@ -84,7 +84,7 @@ def main() -> None:
     _check_errors("Parse", parse_errors)
 
     tree = ptree.to_ast()
-    if isinstance(tree, ast.AstError):  # Shouldn't happen since we exit on parse errors
+    if tree is None:  # Shouldn't happen since we exit on parse errors
         print("Ast failed to form")
         sys.exit(1)
 

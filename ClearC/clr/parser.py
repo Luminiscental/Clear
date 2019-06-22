@@ -106,7 +106,7 @@ class ParseNode(Generic[T]):
     Base class for nodes of the parse tree.
     """
 
-    def to_ast(self) -> Union[T, ast.AstError]:
+    def to_ast(self) -> Optional[T]:
         """
         Convert the parse node to an ast node.
         """
@@ -130,7 +130,7 @@ class ParseTree(ParseNode[ast.Ast]):
     def __init__(self, decls: List["ParseDecl"]) -> None:
         self.decls = decls
 
-    def to_ast(self) -> Union[ast.Ast, ast.AstError]:
+    def to_ast(self) -> Optional[ast.Ast]:
         return ast.Ast.make([decl.to_ast() for decl in self.decls])
 
     @staticmethod
@@ -155,9 +155,9 @@ class ParseToken(ParseNode[lx.Token]):
     def __init__(self, token: Union[lx.Token, er.CompileError]) -> None:
         self.token = token
 
-    def to_ast(self) -> Union[lx.Token, ast.AstError]:
+    def to_ast(self) -> Optional[lx.Token]:
         if isinstance(self.token, er.CompileError):
-            return ast.AstError()
+            return None
         return self.token
 
     @staticmethod
@@ -188,7 +188,7 @@ class ParseDecl(ParseNode[ast.AstDecl]):
     ) -> None:
         self.decl = decl
 
-    def to_ast(self) -> Union[ast.AstDecl, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstDecl]:
         return self.decl.to_ast()
 
     @staticmethod
@@ -225,7 +225,7 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
         self.expr = expr
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstValueDecl, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstValueDecl]:
         return ast.AstValueDecl.make(
             self.ident.to_ast(),
             self.val_type.to_ast() if self.val_type else None,
@@ -290,7 +290,7 @@ class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
         self.block = block
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstFuncDecl, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstFuncDecl]:
         params = []
         for param_type, param_ident in self.params:
             params.append((param_type.to_ast(), param_ident.to_ast()))
@@ -388,7 +388,7 @@ class ParseStmt(ParseNode[ast.AstStmt]):
     ) -> None:
         self.stmt = stmt
 
-    def to_ast(self) -> Union[ast.AstStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstStmt]:
         return self.stmt.to_ast()
 
     @staticmethod
@@ -425,7 +425,7 @@ class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
     def __init__(self, expr: Optional["ParseExpr"]) -> None:
         self.expr = expr
 
-    def to_ast(self) -> Union[ast.AstPrintStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstPrintStmt]:
         return ast.AstPrintStmt.make(self.expr.to_ast() if self.expr else None)
 
     @staticmethod
@@ -458,7 +458,7 @@ class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
     def __init__(self, decls: List[ParseDecl]) -> None:
         self.decls = decls
 
-    def to_ast(self) -> Union[ast.AstBlockStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstBlockStmt]:
         return ast.AstBlockStmt.make([decl.to_ast() for decl in self.decls])
 
     @staticmethod
@@ -510,10 +510,10 @@ class ParseIfStmt(ParseNode[ast.AstIfStmt]):
         self.pairs = pairs
         self.fallback = fallback
 
-    def to_ast(self) -> Union[ast.AstIfStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstIfStmt]:
         cond_pairs = [(pair[0].to_ast(), pair[1].to_ast()) for pair in self.pairs]
         if not cond_pairs:  # There should be at least an if condition
-            return ast.AstError()
+            return None
         return ast.AstIfStmt.make(
             cond_pairs[0],
             cond_pairs[1:],
@@ -573,7 +573,7 @@ class ParseWhileStmt(ParseNode[ast.AstWhileStmt]):
         self.cond = cond
         self.block = block
 
-    def to_ast(self) -> Union[ast.AstWhileStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstWhileStmt]:
         return ast.AstWhileStmt.make(
             self.cond.to_ast() if self.cond else None, self.block.to_ast()
         )
@@ -611,7 +611,7 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
         self.expr = expr
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstReturnStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstReturnStmt]:
         return ast.AstReturnStmt.make(
             self.expr.to_ast() if self.expr else None, self.region
         )
@@ -648,7 +648,7 @@ class ParseExprStmt(ParseNode[ast.AstExprStmt]):
     def __init__(self, expr: "ParseExpr") -> None:
         self.expr = expr
 
-    def to_ast(self) -> Union[ast.AstExprStmt, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstExprStmt]:
         return ast.AstExprStmt.make(self.expr.to_ast())
 
     @staticmethod
@@ -682,7 +682,7 @@ class ParseType(ParseNode[ast.AstType]):
         self.optional = False
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstType, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstType]:
         return (
             ast.AstOptionalType.make(self.type_node.to_ast(), self.region)
             if self.optional
@@ -748,7 +748,7 @@ class ParseFuncType(ParseNode[ast.AstFuncType]):
         self.return_type = return_type
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstFuncType, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstFuncType]:
         return ast.AstFuncType.make(
             [param.to_ast() for param in self.params],
             self.return_type.to_ast(),
@@ -798,7 +798,7 @@ class ParseAtomType(ParseNode[ast.AstAtomType]):
     def __init__(self, token: ParseToken) -> None:
         self.token = token
 
-    def to_ast(self) -> Union[ast.AstAtomType, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstAtomType]:
         return ast.AstAtomType.make(self.token.to_ast())
 
     @staticmethod
@@ -831,9 +831,9 @@ class ParseExpr(ParseNode[ast.AstExpr]):
         self.expr = expr
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstExpr, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstExpr]:
         if isinstance(self.expr, er.CompileError):
-            return ast.AstError()
+            return None
         return self.expr.to_ast()
 
 
@@ -846,7 +846,7 @@ class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
         self.operator = operator
         self.target = target
 
-    def to_ast(self) -> Union[ast.AstUnaryExpr, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstUnaryExpr]:
         return ast.AstUnaryExpr.make(
             self.operator,
             self.target.to_ast(),
@@ -874,7 +874,7 @@ class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
         self.operator = operator
         self.right = right
 
-    def to_ast(self) -> Union[ast.AstBinaryExpr, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstBinaryExpr]:
         return ast.AstBinaryExpr.make(
             self.operator,
             self.left.to_ast(),
@@ -910,7 +910,7 @@ class ParseCallExpr(ParseNode[ast.AstCallExpr]):
         self.args = args
         self.region = region
 
-    def to_ast(self) -> Union[ast.AstCallExpr, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstCallExpr]:
         return ast.AstCallExpr.make(
             self.function.to_ast(), [arg.to_ast() for arg in self.args], self.region
         )
@@ -946,7 +946,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
     def __init__(self, token: lx.Token) -> None:
         self.token = token
 
-    def to_ast(self) -> Union[ast.AstAtomExpr, ast.AstError]:
+    def to_ast(self) -> Optional[ast.AstAtomExpr]:
         token_exprs: Dict[lx.TokenType, Callable[[lx.Token], ast.AstAtomExpr]] = {
             lx.TokenType.INT_LITERAL: ast.AstIntExpr,
             lx.TokenType.NUM_LITERAL: ast.AstNumExpr,
@@ -957,7 +957,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         }
         if self.token.kind in token_exprs:
             return token_exprs[self.token.kind](self.token)
-        return ast.AstError()
+        return None
 
     @staticmethod
     def finish(parser: Parser) -> Tuple["ParseExpr", List[er.CompileError]]:
