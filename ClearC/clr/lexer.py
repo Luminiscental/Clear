@@ -53,6 +53,7 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
             "or": TokenType.OR,
             "and": TokenType.AND,
             "true": TokenType.TRUE,
+            "nil": TokenType.NIL,
             "false": TokenType.FALSE,
         }
 
@@ -104,6 +105,7 @@ class TokenType(enum.Enum):
     AND = enum.auto()
     TRUE = enum.auto()
     FALSE = enum.auto()
+    NIL = enum.auto()
     # Symbols
     EQUALS = enum.auto()
     DOUBLE_EQUALS = enum.auto()

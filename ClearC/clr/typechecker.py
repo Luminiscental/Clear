@@ -22,6 +22,7 @@ TYPE_STR = ast.BuiltinTypeAnnot("str")
 TYPE_BOOL = ast.BuiltinTypeAnnot("bool")
 TYPE_INT = ast.BuiltinTypeAnnot("int")
 TYPE_NUM = ast.BuiltinTypeAnnot("num")
+TYPE_NIL = ast.BuiltinTypeAnnot("nil")
 
 ARITH_TYPES = [TYPE_INT, TYPE_NUM]
 ARITH_UNARY = ["-"]
@@ -49,7 +50,7 @@ def valid(type_annot: ast.TypeAnnot) -> bool:
     Checks if a type annotation is a valid type for a value to have.
     """
     if isinstance(type_annot, ast.BuiltinTypeAnnot):
-        return type_annot in [TYPE_STR, TYPE_BOOL, TYPE_INT, TYPE_NUM]
+        return type_annot in [TYPE_STR, TYPE_BOOL, TYPE_INT, TYPE_NUM, TYPE_NIL]
     if isinstance(type_annot, ast.FuncTypeAnnot):
         return all(valid(param) for param in type_annot.params) and (
             valid(type_annot.return_type) or type_annot.return_type == TYPE_VOID
@@ -71,6 +72,8 @@ class TypeChecker(ast.DeepVisitor):
         self.circ_deps: List[ast.AstIdentExpr] = []
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
+        if node in self.seen_refs:
+            return
         self.seen_refs.append(node)
         super().value_decl(node)
         if node.val_type:
@@ -96,6 +99,8 @@ class TypeChecker(ast.DeepVisitor):
                 )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
+        if node in self.seen_refs:
+            return
         self.seen_refs.append(node)
         for param in node.params:
             param.accept(self)
@@ -116,6 +121,8 @@ class TypeChecker(ast.DeepVisitor):
         self.expected_returns.pop()
 
     def param(self, node: ast.AstParam) -> None:
+        if node in self.seen_refs:
+            return
         self.seen_refs.append(node)
         super().param(node)
         node.type_annot = node.param_type.type_annot
@@ -283,6 +290,10 @@ class TypeChecker(ast.DeepVisitor):
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
         super().bool_expr(node)
         node.type_annot = TYPE_BOOL
+
+    def nil_expr(self, node: ast.AstNilExpr) -> None:
+        super().nil_expr(node)
+        node.type_annot = TYPE_NIL
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)

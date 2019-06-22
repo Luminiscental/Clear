@@ -958,6 +958,7 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
             lx.TokenType.IDENTIFIER: ast.AstIdentExpr,
             lx.TokenType.TRUE: ast.AstBoolExpr,
             lx.TokenType.FALSE: ast.AstBoolExpr,
+            lx.TokenType.NIL: ast.AstNilExpr,
         }
         if self.token.kind in token_exprs:
             return token_exprs[self.token.kind](self.token)
@@ -1102,6 +1103,7 @@ PRATT_TABLE: DefaultDict[lx.TokenType, PrattRule] = collections.defaultdict(
         lx.TokenType.IDENTIFIER: PrattRule(prefix=ParseAtomExpr.finish),
         lx.TokenType.TRUE: PrattRule(prefix=ParseAtomExpr.finish),
         lx.TokenType.FALSE: PrattRule(prefix=ParseAtomExpr.finish),
+        lx.TokenType.NIL: PrattRule(prefix=ParseAtomExpr.finish),
     },
 )
 

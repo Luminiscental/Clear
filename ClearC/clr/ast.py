@@ -209,6 +209,11 @@ class AstVisitor:
         Visit a boolean expression.
         """
 
+    def nil_expr(self, node: "AstNilExpr") -> None:
+        """
+        Visit a nil literal.
+        """
+
     def call_expr(self, node: "AstCallExpr") -> None:
         """
         Visit a function call expression node.
@@ -316,7 +321,12 @@ class AstNode:
 
 AstType = Union["AstAtomType", "AstFuncType", "AstOptionalType"]
 AstAtomExpr = Union[
-    "AstIntExpr", "AstNumExpr", "AstStrExpr", "AstIdentExpr", "AstBoolExpr"
+    "AstIntExpr",
+    "AstNumExpr",
+    "AstStrExpr",
+    "AstIdentExpr",
+    "AstBoolExpr",
+    "AstNilExpr",
 ]
 AstExpr = Union["AstUnaryExpr", "AstBinaryExpr", "AstAtomExpr", "AstCallExpr"]
 AstStmt = Union[
@@ -803,6 +813,19 @@ class AstBoolExpr(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.bool_expr(self)
+
+
+class AstNilExpr(AstNode):
+    """
+    Ast node for a nil literal.
+    """
+
+    def __init__(self, literal: lx.Token) -> None:
+        super().__init__()
+        self.region = literal.lexeme
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.nil_expr(self)
 
 
 class AstCallExpr(AstNode):
