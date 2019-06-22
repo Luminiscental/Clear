@@ -261,7 +261,7 @@ class ParseValueDecl(ParseNode[ast.AstValueDecl]):
             errors.append(
                 er.CompileError(
                     message="missing ';' to end value initializer",
-                    regions=[parser.curr_region()],
+                    regions=[parser.prev().lexeme, parser.curr_region()],
                 )
             )
 
@@ -442,7 +442,8 @@ class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
         if not parser.match(lx.TokenType.SEMICOLON):
             errors.append(
                 er.CompileError(
-                    "missing ';' to end print statement", [parser.curr_region()]
+                    "missing ';' to end print statement",
+                    [parser.prev().lexeme, parser.curr_region()],
                 )
             )
         return ParsePrintStmt(expr), errors
@@ -631,7 +632,8 @@ class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
             if not parser.match(lx.TokenType.SEMICOLON):
                 errors.append(
                     er.CompileError(
-                        "missing ';' to end return statement", [parser.curr_region()]
+                        "missing ';' to end return statement",
+                        [parser.prev().lexeme, parser.curr_region()],
                     )
                 )
         region = er.SourceView.range(return_token.lexeme, parser.prev().lexeme)
@@ -662,7 +664,8 @@ class ParseExprStmt(ParseNode[ast.AstExprStmt]):
         if not parser.match(lx.TokenType.SEMICOLON):
             errors.append(
                 er.CompileError(
-                    "missing ';' to end expression statement", [parser.curr_region()]
+                    "missing ';' to end expression statement",
+                    [parser.prev().lexeme, parser.curr_region()],
                 )
             )
         return ParseExprStmt(expr), errors
@@ -965,9 +968,36 @@ class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
         Parse an atomic value expression from a Parser given that the token has already been
         consumed.
         """
-        # TODO: Sanitize for size and precision with num/int literals
         token = parser.prev()
-        return ParseExpr(ParseAtomExpr(token), token.lexeme), []
+        errors = []
+        if token.kind == lx.TokenType.INT_LITERAL:
+            val = int(str(token)[:-1])  # cutoff the `i` prefix
+            if val > 2 ** 31 - 1:
+                errors.append(
+                    er.CompileError(
+                        message="literal value is too large", regions=[token.lexeme]
+                    )
+                )
+        elif token.kind == lx.TokenType.NUM_LITERAL and "." in str(token):
+            decimals = str(token).split(".")[1]
+            if len(decimals) > 7:
+                errors.append(
+                    er.CompileError(
+                        message="too many decimal places, "
+                        "precision up to only 7 places is supported",
+                        regions=[token.lexeme],
+                    )
+                )
+        elif token.kind == lx.TokenType.STR_LITERAL:
+            if len(str(token)) > 512 + 2:  # Plus the surrounding `"`
+                errors.append(
+                    er.CompileError(
+                        message="string literal too long, "
+                        "literals have a max length of 512",
+                        regions=[token.lexeme],
+                    )
+                )
+        return ParseExpr(ParseAtomExpr(token), token.lexeme), errors
 
 
 Comparison = Union[bool, "NotImplemented"]

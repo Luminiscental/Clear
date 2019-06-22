@@ -3,12 +3,11 @@ val a = fac(b);
 val b = 2i;
 val c = maybe2(false);
 
-2i;
-
 func fac(int n) int {
     if (n == 0i) {
         return 1i;
     }
+    val n = 4i;
     return n * fac(n - 1i);
 }
 

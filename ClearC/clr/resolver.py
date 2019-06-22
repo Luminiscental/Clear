@@ -2,7 +2,7 @@
 Module for name resolution visitors / functions.
 """
 
-from typing import List, Union
+from typing import List, Union, Optional
 
 import clr.errors as er
 import clr.ast as ast
@@ -15,9 +15,14 @@ def resolve_names(tree: ast.Ast) -> List[er.CompileError]:
     """
     tracker = NameTracker(tree)
     tree.accept(tracker)
+
+    if any(error.severity == er.Severity.ERROR for error in tracker.errors.get()):
+        return tracker.errors.get()
+
     resolver = NameResolver(tree)
     tree.accept(resolver)
-    return resolver.errors.get()
+
+    return tracker.errors.get() + resolver.errors.get()
 
 
 class ScopeVisitor(ast.DeepVisitor):
@@ -27,18 +32,18 @@ class ScopeVisitor(ast.DeepVisitor):
 
     def __init__(self, tree: ast.Ast):
         self.tree = tree
-        self.scopes: List[ast.AstBlockStmt] = []
+        self._scopes: List[ast.AstBlockStmt] = []
 
     def _get_scope(self) -> Union[ast.AstBlockStmt, ast.Ast]:
-        if not self.scopes:
+        if not self._scopes:
             return self.tree
-        return self.scopes[-1]
+        return self._scopes[-1]
 
     def _push_scope(self, node: ast.AstBlockStmt) -> None:
-        self.scopes.append(node)
+        self._scopes.append(node)
 
     def _pop_scope(self) -> None:
-        self.scopes.pop()
+        self._scopes.pop()
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
         self._push_scope(node)
@@ -51,20 +56,28 @@ class NameTracker(ScopeVisitor):
     Ast visitor to annotate what names are in scope.
     """
 
-    def _push_scope(self, node: ast.AstBlockStmt) -> None:
-        parent = self._get_scope()
-        super()._push_scope(node)
-        self._get_scope().names = dict(parent.names)
+    def __init__(self, tree: ast.Ast):
+        super().__init__(tree)
+        self.errors = er.ErrorTracker()
+
+    def _set_name(self, name: str, node: ast.AstIdentRef) -> None:
+        names = self._get_scope().names
+        if name in names:
+            self.errors.add(
+                message=f"redefinition of name {name}",
+                regions=[node.region, names[name].region],
+            )
+        names[name] = node
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
-        self._get_scope().names[node.ident] = node
+        self._set_name(node.ident, node)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        self._get_scope().names[node.ident] = node
+        self._set_name(node.ident, node)
         # Manually handle scopes so that the parameters are in the right scope
         self._push_scope(node.block)
         for param in node.params:
-            self._get_scope().names[param.param_name] = param
+            self._set_name(param.param_name, param)
         for decl in node.block.decls:
             decl.accept(self)
         self._pop_scope()
@@ -79,19 +92,27 @@ class NameResolver(ScopeVisitor):
         super().__init__(tree)
         self.errors = er.ErrorTracker()
 
+    def _get_name(self, name: str) -> Optional[ast.AstIdentRef]:
+        for scope in reversed(self._scopes):
+            if name in scope.names:
+                return scope.names[name]
+        return None
+
     def _resolve_name(
         self, name: str, node: Union[ast.AstIdentExpr, ast.AstAtomType]
     ) -> None:
-        if name not in self._get_scope().names:
+        ref = self._get_name(name)
+        if ref is None:
             self.errors.add(
                 message=f"reference to undeclared name {name}", regions=[node.region]
             )
         else:
-            node.ref = self._get_scope().names[name]
+            node.ref = ref
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         self._resolve_name(node.name, node)
 
     def atom_type(self, node: ast.AstAtomType) -> None:
+        # TODO: Handle builtin types more cleanly
         if node.name not in ["void", "int", "str", "num", "bool"]:
             self._resolve_name(node.name, node)
