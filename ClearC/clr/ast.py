@@ -20,6 +20,9 @@ class UnresolvedTypeAnnot:
     Type annotation for an unresolved node.
     """
 
+    def __init__(self) -> None:
+        self.unresolved = True
+
     def __str__(self) -> str:
         return "<unresolved>"
 
@@ -45,6 +48,7 @@ class BuiltinTypeAnnot:
 
     def __init__(self, name: str) -> None:
         self.name = name
+        self.unresolved = False
 
     def __str__(self) -> str:
         return self.name
@@ -72,6 +76,7 @@ class FuncTypeAnnot:
     def __init__(self, params: List[TypeAnnot], return_type: TypeAnnot) -> None:
         self.params = params
         self.return_type = return_type
+        self.unresolved = False
 
     def __str__(self) -> str:
         param_str = ", ".join(str(param) for param in self.params)
@@ -99,6 +104,7 @@ class OptionalTypeAnnot:
 
     def __init__(self, target: TypeAnnot) -> None:
         self.target = target
+        self.unresolved = False
 
     def __str__(self) -> str:
         return f"({self.target})?"

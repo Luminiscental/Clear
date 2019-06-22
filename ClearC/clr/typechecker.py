@@ -268,7 +268,7 @@ class TypeChecker(ast.DeepVisitor):
         if node.ref:
             if node.ref not in self.seen_refs:
                 node.ref.accept(self)
-            elif node.ref.type_annot is None and node not in self.circ_deps:
+            elif node.ref.type_annot.unresolved and node not in self.circ_deps:
                 self.circ_deps.append(node)
                 self.errors.add(
                     message=f"circular dependency for value {node.name}",

@@ -38,6 +38,9 @@ class Severity(enum.Enum):
             return NotImplemented
         return self.value >= other.value
 
+    def __str__(self) -> str:
+        return self.name
+
 
 class CompileError(NamedTuple):
     """
@@ -53,7 +56,7 @@ class CompileError(NamedTuple):
         Returns a string representation of the error.
         """
         # TODO: Line number, context, e.t.c.
-        return f"{self.message}: {self.regions}"
+        return f"[{self.severity}] {self.message}: {self.regions}"
 
 
 class ErrorTracker:
