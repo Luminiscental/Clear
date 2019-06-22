@@ -15,4 +15,7 @@ func maybe2(bool input) int {
     if (input) {
         return 2i;
     }
+    {
+        val x = 3;
+    }
 }

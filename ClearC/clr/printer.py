@@ -11,7 +11,9 @@ def pprint(node: ast.AstNode) -> None:
     """
     Pretty prints a given ast node.
     """
-    node.accept(AstPrinter())
+    printer = AstPrinter()
+    node.accept(printer)
+    printer.flush()
 
 
 class AstPrinter(ast.AstVisitor):
@@ -20,32 +22,32 @@ class AstPrinter(ast.AstVisitor):
     """
 
     def __init__(self, printer: Callable[[str], None] = print) -> None:
-        # TODO: Handle indentation better, this is buggy and obtuse
-        self.indent = 0
-        self.printer = printer
-        self.buffer = ""
+        self._indent = 0
+        self._printer = printer
+        self._buffer = ""
+        self._dont_break = False
 
-    def _flush(self) -> None:
+    def flush(self) -> None:
         """
-        Flush the buffer.
+        Flush the buffer if it isn't empty.
         """
-        self.printer(self.buffer)
-        self.buffer = ""
+        if self._buffer:
+            self._printer(self._buffer)
+            self._buffer = ""
 
     def _append(self, string: str) -> None:
-        """
-        Append a string to the buffer.
-        """
-        self.buffer += string
+        self._buffer += string
 
     def _startline(self) -> None:
-        """
-        Starts a new line to print on.
-        """
-        self._flush()
-        self._append("    " * self.indent)
+        if self._dont_break:
+            self._dont_break = False
+        else:
+            if self._buffer:
+                self.flush()
+            self._append("    " * self._indent)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
+        self._startline()
         self._append(f"val {node.ident} ")
         if node.val_type:
             node.val_type.accept(self)
@@ -53,9 +55,9 @@ class AstPrinter(ast.AstVisitor):
         self._append("= ")
         node.val_init.accept(self)
         self._append(";")
-        self._startline()
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
+        self._startline()
         self._append(f"func {node.ident}(")
         if node.params:
             node.params[0].accept(self)
@@ -65,31 +67,29 @@ class AstPrinter(ast.AstVisitor):
         self._append(") ")
         node.return_type.accept(self)
         self._append(" ")
+        self._dont_break = True
         node.block.accept(self)
-        self._startline()
 
     def param(self, node: ast.AstParam) -> None:
         node.param_type.accept(self)
         self._append(f" {node.param_name}")
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
+        self._startline()
         self._append("print")
         if node.expr:
             self._append(" ")
             node.expr.accept(self)
         self._append(";")
-        self._startline()
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
-        self._append("{")
-        self.indent += 1
-
         self._startline()
-        for decl in node.decls[:-1]:
+        self._append("{")
+        self._indent += 1
+        for decl in node.decls:
             decl.accept(self)
-        self.indent -= 1
-        node.decls[-1].accept(self)
-
+        self._indent -= 1
+        self._startline()
         self._append("}")
 
     def if_stmt(self, node: ast.AstIfStmt) -> None:
@@ -97,8 +97,10 @@ class AstPrinter(ast.AstVisitor):
             self._append("(")
             cond.accept(self)
             self._append(") ")
+            self._dont_break = True
             block.accept(self)
 
+        self._startline()
         self._append("if ")
         print_part(*node.if_part)
         for cond, block in node.elif_parts:
@@ -106,30 +108,31 @@ class AstPrinter(ast.AstVisitor):
             print_part(cond, block)
         if node.else_part:
             self._append(" else ")
+            self._dont_break = True
             node.else_part.accept(self)
-        self._startline()
 
     def while_stmt(self, node: ast.AstWhileStmt) -> None:
+        self._startline()
         self._append("while ")
         if node.cond:
             self._append("(")
             node.cond.accept(self)
             self._append(") ")
+        self._dont_break = True
         node.block.accept(self)
-        self._startline()
 
     def return_stmt(self, node: ast.AstReturnStmt) -> None:
+        self._startline()
         self._append("return")
         if node.expr:
             self._append(" ")
             node.expr.accept(self)
         self._append(";")
-        self._startline()
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
+        self._startline()
         node.expr.accept(self)
         self._append(";")
-        self._startline()
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         self._append(f"{node.operator}(")
