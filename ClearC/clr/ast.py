@@ -7,9 +7,35 @@ from typing import Union, List, Optional, Tuple, Dict
 import clr.errors as er
 import clr.lexer as lx
 
-TypeAnnot = Union["BuiltinTypeAnnot", "FuncTypeAnnot", "OptionalTypeAnnot", None]
+TypeAnnot = Union[
+    "BuiltinTypeAnnot", "FuncTypeAnnot", "OptionalTypeAnnot", "UnresolvedTypeAnnot"
+]
 
 Comparison = Union[bool, "NotImplemented"]
+
+
+# TODO: Annotation types should probably be with the visitor that uses them but I'm not sure how
+class UnresolvedTypeAnnot:
+    """
+    Type annotation for an unresolved node.
+    """
+
+    def __str__(self) -> str:
+        return "<unresolved>"
+
+    def __eq__(self, other: object) -> Comparison:
+        if isinstance(other, BuiltinTypeAnnot):
+            return False
+        if isinstance(other, FuncTypeAnnot):
+            return False
+        if isinstance(other, OptionalTypeAnnot):
+            return False
+        if isinstance(other, UnresolvedTypeAnnot):  # maybe return True here?
+            return False
+        return NotImplemented
+
+    def __ne__(self, other: object) -> Comparison:
+        return not self == other
 
 
 class BuiltinTypeAnnot:
@@ -30,7 +56,7 @@ class BuiltinTypeAnnot:
             return False
         if isinstance(other, OptionalTypeAnnot):
             return False
-        if other is None:
+        if isinstance(other, UnresolvedTypeAnnot):
             return False
         return NotImplemented
 
@@ -58,7 +84,7 @@ class FuncTypeAnnot:
             return self.params == other.params and self.return_type == other.return_type
         if isinstance(other, OptionalTypeAnnot):
             return False
-        if other is None:
+        if isinstance(other, UnresolvedTypeAnnot):
             return False
         return NotImplemented
 
@@ -84,7 +110,7 @@ class OptionalTypeAnnot:
             return False
         if isinstance(other, OptionalTypeAnnot):
             return self.target == other.target
-        if other is None:
+        if isinstance(other, UnresolvedTypeAnnot):
             return False
         return NotImplemented
 
@@ -273,7 +299,7 @@ class AstNode:
     """
 
     def __init__(self) -> None:
-        self.type_annot: TypeAnnot = None
+        self.type_annot: TypeAnnot = UnresolvedTypeAnnot()
 
     def accept(self, visitor: AstVisitor) -> None:
         """

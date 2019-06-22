@@ -3,11 +3,15 @@ val a = fac(b);
 val b = 2i;
 val c = maybe2(false);
 
+val y = x;
+val x = y;
+
+print x;
+
 func fac(int n) int {
     if (n == 0i) {
         return 1i;
     }
-    val n = 4i;
     return n * fac(n - 1i);
 }
 

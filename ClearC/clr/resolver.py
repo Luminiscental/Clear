@@ -31,12 +31,9 @@ class ScopeVisitor(ast.DeepVisitor):
     """
 
     def __init__(self, tree: ast.Ast):
-        self.tree = tree
-        self._scopes: List[ast.AstBlockStmt] = []
+        self._scopes: List[Union[ast.AstBlockStmt, ast.Ast]] = [tree]
 
     def _get_scope(self) -> Union[ast.AstBlockStmt, ast.Ast]:
-        if not self._scopes:
-            return self.tree
         return self._scopes[-1]
 
     def _push_scope(self, node: ast.AstBlockStmt) -> None:
