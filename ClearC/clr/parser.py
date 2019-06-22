@@ -728,13 +728,14 @@ class ParseType(ParseNode[ast.AstType]):
             errors.extend(errs)
             type_node = atom_type
 
+        end = parser.prev().lexeme
+        region = er.SourceView.range(start, end)
+        result = ParseType(type_node, region)
+
         if parser.match(lx.TokenType.QUESTION_MARK):
             result.optional = True
 
-        end = parser.prev().lexeme
-        region = er.SourceView.range(start, end)
-
-        return ParseType(type_node, region), errors
+        return result, errors
 
 
 class ParseFuncType(ParseNode[ast.AstFuncType]):

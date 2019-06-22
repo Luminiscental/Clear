@@ -1,7 +1,7 @@
 
 val a = fac(b);
 val b = 2i;
-val c = maybe2(false);
+val c bool = maybe2(false) == nil;
 
 val y = x;
 val x = y;
@@ -15,11 +15,9 @@ func fac(int n) int {
     return n * fac(n - 1i);
 }
 
-func maybe2(bool input) int {
+func maybe2(bool input) int? {
     if (input) {
         return 2i;
     }
-    {
-        val x = 3;
-    }
+    return nil;
 }
