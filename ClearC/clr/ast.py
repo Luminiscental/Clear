@@ -319,16 +319,32 @@ class AstNode:
         raise NotImplementedError()
 
 
-AstType = Union["AstAtomType", "AstFuncType", "AstOptionalType"]
-AstAtomExpr = Union[
-    "AstIntExpr",
-    "AstNumExpr",
-    "AstStrExpr",
-    "AstIdentExpr",
-    "AstBoolExpr",
-    "AstNilExpr",
-]
-AstExpr = Union["AstUnaryExpr", "AstBinaryExpr", "AstAtomExpr", "AstCallExpr"]
+class AstType(AstNode):
+    """
+    Base class to help mypy
+    """
+
+    def __init__(self, region: er.SourceView) -> None:
+        super().__init__()
+        self.region = region
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError()
+
+
+class AstExpr(AstNode):
+    """
+    Base class to help mypy
+    """
+
+    def __init__(self, region: er.SourceView) -> None:
+        super().__init__()
+        self.region = region
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError()
+
+
 AstStmt = Union[
     "AstPrintStmt",
     "AstBlockStmt",
@@ -355,18 +371,6 @@ class Ast(AstNode):
         for decl in self.decls:
             decl.accept(visitor)
 
-    @staticmethod
-    def make(decls: List[Optional[AstDecl]]) -> Optional["Ast"]:
-        """
-        Makes the node or returns an error given a list of declarations that may include errors.
-        """
-        pure = []
-        for decl in decls:
-            if decl is None:
-                return None
-            pure.append(decl)
-        return Ast(pure)
-
 
 class AstValueDecl(AstNode):
     """
@@ -389,29 +393,6 @@ class AstValueDecl(AstNode):
     def accept(self, visitor: AstVisitor) -> None:
         visitor.value_decl(self)
 
-    @staticmethod
-    def make(
-        ident: Optional[lx.Token],
-        val_type: Optional[Optional[AstType]],
-        val_init: Optional[AstExpr],
-        region: er.SourceView,
-    ) -> Optional["AstValueDecl"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if ident is None:
-            return None
-        pure_type = None
-        if val_type:
-            if val_type is None:
-                return None
-            pure_type = val_type
-        if val_init is None:
-            return None
-        pure_init = val_init
-        return AstValueDecl(str(ident), pure_type, pure_init, region)
-
 
 class AstParam(AstNode):
     """
@@ -426,20 +407,6 @@ class AstParam(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.param(self)
-
-    @staticmethod
-    def make(
-        param_type: Optional[AstType], param_name: Optional[lx.Token]
-    ) -> Optional["AstParam"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if param_type is None:
-            return None
-        if param_name is None:
-            return None
-        return AstParam(param_type, param_name)
 
 
 class AstFuncDecl(AstNode):
@@ -465,32 +432,6 @@ class AstFuncDecl(AstNode):
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
 
-    @staticmethod
-    def make(
-        ident: Optional[lx.Token],
-        params: List[Tuple[Optional[AstType], Optional[lx.Token]]],
-        return_type: Optional[AstType],
-        block: Optional["AstBlockStmt"],
-        region: er.SourceView,
-    ) -> Optional["AstFuncDecl"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if ident is None:
-            return None
-        pure_params = []
-        for param_type, param_ident in params:
-            param = AstParam.make(param_type, param_ident)
-            if param is None:
-                return None
-            pure_params.append(param)
-        if return_type is None:
-            return None
-        if block is None:
-            return None
-        return AstFuncDecl(str(ident), pure_params, return_type, block, region)
-
 
 class AstPrintStmt(AstNode):
     """
@@ -503,18 +444,6 @@ class AstPrintStmt(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.print_stmt(self)
-
-    @staticmethod
-    def make(expr: Optional[Optional[AstExpr]]) -> Optional["AstPrintStmt"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if expr:
-            if expr is None:
-                return None
-            return AstPrintStmt(expr)
-        return AstPrintStmt(None)
 
 
 class AstBlockStmt(AstNode):
@@ -530,19 +459,6 @@ class AstBlockStmt(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
-
-    @staticmethod
-    def make(decls: List[Optional[AstDecl]]) -> Optional["AstBlockStmt"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        pure_decls = []
-        for decl in decls:
-            if decl is None:
-                return None
-            pure_decls.append(decl)
-        return AstBlockStmt(pure_decls)
 
 
 class AstIfStmt(AstNode):
@@ -564,36 +480,6 @@ class AstIfStmt(AstNode):
     def accept(self, visitor: AstVisitor) -> None:
         visitor.if_stmt(self)
 
-    @staticmethod
-    def make(
-        if_part: Tuple[Optional[AstExpr], Optional[AstBlockStmt]],
-        elif_parts: List[Tuple[Optional[AstExpr], Optional[AstBlockStmt]]],
-        else_part: Optional[Optional[AstBlockStmt]],
-    ) -> Optional["AstIfStmt"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if_cond, if_block = if_part
-        if if_cond is None:
-            return None
-        if if_block is None:
-            return None
-        pure_elifs = []
-        for elif_cond, elif_block in elif_parts:
-            if elif_cond is None:
-                return None
-            if elif_block is None:
-                return None
-            pure_elifs.append((elif_cond, elif_block))
-        if else_part:
-            if else_part is None:
-                return None
-            pure_else: Optional[AstBlockStmt] = else_part
-        else:
-            pure_else = None
-        return AstIfStmt((if_cond, if_block), pure_elifs, pure_else)
-
 
 class AstWhileStmt(AstNode):
     """
@@ -607,22 +493,6 @@ class AstWhileStmt(AstNode):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.while_stmt(self)
-
-    @staticmethod
-    def make(
-        cond: Optional[Optional[AstExpr]], block: Optional[AstBlockStmt]
-    ) -> Optional["AstWhileStmt"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if block is None:
-            return None
-        if cond:
-            if cond is None:
-                return None
-            return AstWhileStmt(cond, block)
-        return AstWhileStmt(None, block)
 
 
 class AstReturnStmt(AstNode):
@@ -638,20 +508,6 @@ class AstReturnStmt(AstNode):
     def accept(self, visitor: AstVisitor) -> None:
         visitor.return_stmt(self)
 
-    @staticmethod
-    def make(
-        expr: Optional[Optional[AstExpr]], region: er.SourceView
-    ) -> Optional["AstReturnStmt"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if expr:
-            if expr is None:
-                return None
-            return AstReturnStmt(expr, region)
-        return AstReturnStmt(None, region)
-
 
 class AstExprStmt(AstNode):
     """
@@ -665,18 +521,8 @@ class AstExprStmt(AstNode):
     def accept(self, visitor: AstVisitor) -> None:
         visitor.expr_stmt(self)
 
-    @staticmethod
-    def make(expr: Optional[AstExpr]) -> Optional["AstExprStmt"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if expr is None:
-            return None
-        return AstExprStmt(expr)
 
-
-class AstUnaryExpr(AstNode):
+class AstUnaryExpr(AstExpr):
     """
     Ast node for a unary expression.
     """
@@ -684,28 +530,15 @@ class AstUnaryExpr(AstNode):
     def __init__(
         self, operator: lx.Token, target: AstExpr, region: er.SourceView
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.operator = operator
         self.target = target
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.unary_expr(self)
 
-    @staticmethod
-    def make(
-        operator: lx.Token, target: Optional[AstExpr], region: er.SourceView
-    ) -> Optional["AstUnaryExpr"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if target is None:
-            return None
-        return AstUnaryExpr(operator, target, region)
 
-
-class AstBinaryExpr(AstNode):
+class AstBinaryExpr(AstExpr):
     """
     Ast node for a binary expression.
     """
@@ -713,70 +546,49 @@ class AstBinaryExpr(AstNode):
     def __init__(
         self, operator: lx.Token, left: AstExpr, right: AstExpr, region: er.SourceView
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.operator = operator
         self.left = left
         self.right = right
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binary_expr(self)
 
-    @staticmethod
-    def make(
-        operator: lx.Token,
-        left: Optional[AstExpr],
-        right: Optional[AstExpr],
-        region: er.SourceView,
-    ) -> Optional["AstBinaryExpr"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if left is None:
-            return None
-        if right is None:
-            return None
-        return AstBinaryExpr(operator, left, right, region)
 
-
-class AstIntExpr(AstNode):
+class AstIntExpr(AstExpr):
     """
     Ast node for an int literal.
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__()
+        super().__init__(literal.lexeme)
         self.literal = str(literal)
-        self.region = literal.lexeme
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.int_expr(self)
 
 
-class AstNumExpr(AstNode):
+class AstNumExpr(AstExpr):
     """
     Ast node for a num literal.
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__()
+        super().__init__(literal.lexeme)
         self.literal = str(literal)
-        self.region = literal.lexeme
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.num_expr(self)
 
 
-class AstStrExpr(AstNode):
+class AstStrExpr(AstExpr):
     """
     Ast node for a str literal.
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__()
+        super().__init__(literal.lexeme)
         self.literal = str(literal)
-        self.region = literal.lexeme
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.str_expr(self)
@@ -785,14 +597,13 @@ class AstStrExpr(AstNode):
 AstIdentRef = Union[AstFuncDecl, AstValueDecl, AstParam]
 
 
-class AstIdentExpr(AstNode):
+class AstIdentExpr(AstExpr):
     """
     Ast node for an identifier expression.
     """
 
     def __init__(self, token: lx.Token) -> None:
-        super().__init__()
-        self.region = token.lexeme
+        super().__init__(token.lexeme)
         self.name = str(token)
         # Annotations:
         self.ref: Optional[AstIdentRef] = None
@@ -801,34 +612,32 @@ class AstIdentExpr(AstNode):
         visitor.ident_expr(self)
 
 
-class AstBoolExpr(AstNode):
+class AstBoolExpr(AstExpr):
     """
     Ast node for a boolean expression.
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__()
+        super().__init__(literal.lexeme)
         self.value = str(literal) == "true"
-        self.region = literal.lexeme
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.bool_expr(self)
 
 
-class AstNilExpr(AstNode):
+class AstNilExpr(AstExpr):
     """
     Ast node for a nil literal.
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__()
-        self.region = literal.lexeme
+        super().__init__(literal.lexeme)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.nil_expr(self)
 
 
-class AstCallExpr(AstNode):
+class AstCallExpr(AstExpr):
     """
     Ast node for a function call expression.
     """
@@ -836,42 +645,21 @@ class AstCallExpr(AstNode):
     def __init__(
         self, function: AstExpr, args: List[AstExpr], region: er.SourceView
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.function = function
         self.args = args
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.call_expr(self)
 
-    @staticmethod
-    def make(
-        function: Optional[AstExpr],
-        args: List[Optional[AstExpr]],
-        region: er.SourceView,
-    ) -> Optional["AstCallExpr"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if function is None:
-            return None
-        pure_args = []
-        for arg in args:
-            if arg is None:
-                return None
-            pure_args.append(arg)
-        return AstCallExpr(function, pure_args, region)
 
-
-class AstAtomType(AstNode):
+class AstAtomType(AstType):
     """
     Ast node for an atomic type.
     """
 
     def __init__(self, token: lx.Token) -> None:
-        super().__init__()
-        self.region = token.lexeme
+        super().__init__(token.lexeme)
         self.name = str(token)
         # Annotations:
         self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
@@ -879,18 +667,8 @@ class AstAtomType(AstNode):
     def accept(self, visitor: AstVisitor) -> None:
         visitor.atom_type(self)
 
-    @staticmethod
-    def make(token: Optional[lx.Token]) -> Optional["AstAtomType"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if token is None:
-            return None
-        return AstAtomType(token)
 
-
-class AstFuncType(AstNode):
+class AstFuncType(AstType):
     """
     Ast node for a function type.
     """
@@ -898,55 +676,22 @@ class AstFuncType(AstNode):
     def __init__(
         self, params: List[AstType], return_type: AstType, region: er.SourceView
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.params = params
         self.return_type = return_type
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_type(self)
 
-    @staticmethod
-    def make(
-        params: List[Optional[AstType]],
-        return_type: Optional[AstType],
-        region: er.SourceView,
-    ) -> Optional["AstFuncType"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        pure_params = []
-        for param in params:
-            if param is None:
-                return None
-            pure_params.append(param)
-        if return_type is None:
-            return None
-        return AstFuncType(pure_params, return_type, region)
 
-
-class AstOptionalType(AstNode):
+class AstOptionalType(AstType):
     """
     Ast node for an optional type.
     """
 
     def __init__(self, target: AstType, region: er.SourceView) -> None:
-        super().__init__()
+        super().__init__(region)
         self.target = target
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.optional_type(self)
-
-    @staticmethod
-    def make(
-        target: Optional[AstType], region: er.SourceView
-    ) -> Optional["AstOptionalType"]:
-        """
-        Makes the node or returns an error given its contents with any contained node possibly
-        being an error.
-        """
-        if target is None:
-            return None
-        return AstOptionalType(target, region)

@@ -85,12 +85,10 @@ def main() -> None:
     tokens, lex_errors = lx.tokenize_source(source)
     _check_errors("Lex", lex_errors)
 
-    ptree, parse_errors = ps.parse_tokens(tokens)
-    _check_errors("Parse", parse_errors)
-
-    tree = ptree.to_ast()
-    if tree is None:  # Shouldn't happen since we exit on parse errors
-        print("Ast failed to form")
+    tree = ps.parse_tokens(tokens)
+    if isinstance(tree, er.CompileError):
+        print("Parse Error:")
+        print(tree.display())
         sys.exit(1)
 
     if DEBUG:

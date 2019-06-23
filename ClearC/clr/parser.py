@@ -5,15 +5,14 @@ Contains functions and definitions for parsing a list of tokens into a parse tre
 from typing import (
     List,
     Sequence,
+    Iterable,
     Optional,
     Union,
     Tuple,
     Callable,
-    Dict,
     DefaultDict,
     NamedTuple,
     TypeVar,
-    Generic,
 )
 
 import enum
@@ -24,13 +23,11 @@ import clr.lexer as lx
 import clr.ast as ast
 
 
-def parse_tokens(
-    tokens: Sequence[lx.Token]
-) -> Tuple["ParseTree", List[er.CompileError]]:
+def parse_tokens(tokens: Sequence[lx.Token]) -> Union[ast.Ast, er.CompileError]:
     """
-    Parses a ParseTree from a list of tokens.
+    Parses an ast from a list of tokens.
     """
-    return ParseTree.parse(Parser(tokens))
+    return parse_ast(Parser(tokens))
 
 
 T = TypeVar("T")  # pylint: disable=invalid-name
@@ -101,18 +98,6 @@ class Parser:
         return self.prev().lexeme
 
 
-class ParseNode(Generic[T]):
-    """
-    Base class for nodes of the parse tree.
-    """
-
-    def to_ast(self) -> Optional[T]:
-        """
-        Convert the parse node to an ast node.
-        """
-        raise NotImplementedError()
-
-
 def indent(orig: str) -> str:
     """
     Indents a string with four spaces.
@@ -120,886 +105,537 @@ def indent(orig: str) -> str:
     return "\n".join(f"    {line}" for line in orig.splitlines())
 
 
-class ParseTree(ParseNode[ast.Ast]):
+def parse_ast(parser: Parser) -> Union[ast.Ast, er.CompileError]:
     """
-    The root node of the parse tree, contains a list of declarations.
+    Parse the ast from a parser or return an error.
 
-    ParseTree : ParseDecl* ;
+    Ast : AstDecl* ;
     """
-
-    def __init__(self, decls: List["ParseDecl"]) -> None:
-        self.decls = decls
-
-    def to_ast(self) -> Optional[ast.Ast]:
-        return ast.Ast.make([decl.to_ast() for decl in self.decls])
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseTree", List[er.CompileError]]:
-        """
-        Parses a ParseTree from a Parser.
-        """
-        decls = []
-        errors = []
-        while not parser.done():
-            decl, errs = ParseDecl.parse(parser)
-            decls.append(decl)
-            errors.extend(errs)
-        return ParseTree(decls), errors
+    decls = []
+    while not parser.done():
+        decl = parse_decl(parser)
+        if isinstance(decl, er.CompileError):
+            return decl
+        decls.append(decl)
+    return ast.Ast(decls)
 
 
-class ParseToken(ParseNode[lx.Token]):
+def parse_token(parser: Parser, kinds: Iterable[lx.TokenType]) -> Optional[lx.Token]:
     """
-    Parse node for an identifier token to wrap errors of missing tokens.
+    Parses a token from a given iterable of token types to check, and if none of the types match
+    returns None.
     """
-
-    def __init__(self, token: Union[lx.Token, er.CompileError]) -> None:
-        self.token = token
-
-    def to_ast(self) -> Optional[lx.Token]:
-        if isinstance(self.token, er.CompileError):
-            return None
-        return self.token
-
-    @staticmethod
-    def parse(
-        parser: Parser, types: List[lx.TokenType]
-    ) -> Tuple["ParseToken", List[er.CompileError]]:
-        """
-        Parses a ParseIdent from a Parser.
-        """
-        for token_type in types:
-            if parser.match(token_type):
-                return ParseToken(parser.prev()), []
-        err = er.CompileError(
-            message="missing identifier", regions=[parser.curr_region()]
-        )
-        return ParseToken(err), [err]
+    for kind in kinds:
+        if parser.match(kind):
+            return parser.prev()
+    return None
 
 
-class ParseDecl(ParseNode[ast.AstDecl]):
+def parse_decl(parser: Parser) -> Union[ast.AstDecl, er.CompileError]:
     """
-    Parse node for a generic declaration.
+    Parse a declaration from the parser or return an error.
 
-    ParseDecl : ParseValueDecl | ParseFuncDecl | ParseStmt ;
+    AstDecl : AstValueDecl | AstFuncDecl | AstStmt ;
     """
-
-    def __init__(
-        self, decl: Union["ParseValueDecl", "ParseFuncDecl", "ParseStmt"]
-    ) -> None:
-        self.decl = decl
-
-    def to_ast(self) -> Optional[ast.AstDecl]:
-        return self.decl.to_ast()
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseDecl", List[er.CompileError]]:
-        """
-        Parses a ParseDecl from a Parser.
-        """
-        if parser.match(lx.TokenType.VAL):
-            val_decl, errs = ParseValueDecl.finish(parser)
-            return ParseDecl(val_decl), errs
-        if parser.match(lx.TokenType.FUNC):
-            func_decl, errs = ParseFuncDecl.finish(parser)
-            return ParseDecl(func_decl), errs
-        stmt_decl, errs = ParseStmt.parse(parser)
-        return ParseDecl(stmt_decl), errs
+    if parser.match(lx.TokenType.VAL):
+        return finish_value_decl(parser)
+    if parser.match(lx.TokenType.FUNC):
+        return finish_func_decl(parser)
+    return parse_stmt(parser)
 
 
-class ParseValueDecl(ParseNode[ast.AstValueDecl]):
+def finish_value_decl(parser: Parser) -> Union[ast.AstValueDecl, er.CompileError]:
     """
-    Parse node for a value declaration.
+    Parse a value declaration from the parser or return an error. Assumes that the "val" token has
+    already been consumed.
 
-    ParseValueDecl : "val" identifier (ParseType)? "=" ParseExpr ";" ;
+    AstValueDecl : "val" IDENTIFIER AstType? "=" AstExpr ";" ;
     """
-
-    def __init__(
-        self,
-        ident: ParseToken,
-        val_type: Optional["ParseType"],
-        expr: "ParseExpr",
-        region: er.SourceView,
-    ):
-        self.ident = ident
-        self.val_type = val_type
-        self.expr = expr
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstValueDecl]:
-        return ast.AstValueDecl.make(
-            self.ident.to_ast(),
-            self.val_type.to_ast() if self.val_type else None,
-            self.expr.to_ast(),
-            self.region,
+    start = parser.prev().lexeme
+    ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
+    if ident is None:
+        return er.CompileError(
+            message="missing value name", regions=[parser.curr_region()]
         )
 
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseValueDecl", List[er.CompileError]]:
-        """
-        Parses a ParseValueDecl from a Parser, given that the "val" keyword has already been
-        consumed.
-        """
-        start = parser.prev().lexeme
-        ident, errors = ParseToken.parse(parser, [lx.TokenType.IDENTIFIER])
-
-        val_type = None
+    val_type = None
+    if not parser.match(lx.TokenType.EQUALS):
+        val_type_ = parse_type(parser)
+        if isinstance(val_type_, er.CompileError):
+            return val_type_
+        val_type = val_type_
         if not parser.match(lx.TokenType.EQUALS):
-            val_type, errs = ParseType.parse(parser)
-            errors.extend(errs)
-            if not parser.match(lx.TokenType.EQUALS):
-                errors.append(
-                    er.CompileError(
-                        message="missing '=' for value initializer",
-                        regions=[parser.curr_region()],
-                    )
-                )
-
-        expr, errs = pratt_parse(parser, PRATT_TABLE)
-        errors.extend(errs)
-
-        if not parser.match(lx.TokenType.SEMICOLON):
-            errors.append(
-                er.CompileError(
-                    message="missing ';' to end value initializer",
-                    regions=[parser.prev().lexeme, parser.curr_region()],
-                )
+            return er.CompileError(
+                message="missing '=' for value initializer",
+                regions=[parser.curr_region()],
             )
 
-        region = er.SourceView.range(start, parser.prev().lexeme)
-        return ParseValueDecl(ident, val_type, expr, region), errors
+    expr = parse_expr(parser)
+    if isinstance(expr, er.CompileError):
+        return expr
 
-
-class ParseFuncDecl(ParseNode[ast.AstFuncDecl]):
-    """
-    Parse node for a function declaration.
-
-    ParseFuncDecl : "func" identifier ParseParams ParseType ParseBlockStmt ;
-    """
-
-    def __init__(
-        self,
-        ident: ParseToken,
-        params: List[Tuple["ParseType", ParseToken]],
-        return_type: "ParseType",
-        block: "ParseBlockStmt",
-        region: er.SourceView,
-    ) -> None:
-        self.ident = ident
-        self.params = params
-        self.return_type = return_type
-        self.block = block
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstFuncDecl]:
-        params = []
-        for param_type, param_ident in self.params:
-            params.append((param_type.to_ast(), param_ident.to_ast()))
-        return ast.AstFuncDecl.make(
-            self.ident.to_ast(),
-            params,
-            self.return_type.to_ast(),
-            self.block.to_ast(),
-            self.region,
+    if not parser.match(lx.TokenType.SEMICOLON):
+        return er.CompileError(
+            message="missing ';' to end value initializer",
+            regions=[parser.prev().lexeme, parser.curr_region()],
         )
 
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseFuncDecl", List[er.CompileError]]:
-        """
-        Parses a ParseFuncDecl from a Parser, given that the "func" keyword has already been
-        consumed.
-        """
-        start = parser.prev().lexeme
-        ident, errors = ParseToken.parse(parser, [lx.TokenType.IDENTIFIER])
+    region = er.SourceView.range(start, parser.prev().lexeme)
+    return ast.AstValueDecl(str(ident), val_type, expr, region)
 
-        def parse_param(parser: Parser) -> Tuple["ParseType", ParseToken]:
-            param_type, errs = ParseType.parse(parser)
-            errors.extend(errs)
-            param_ident, errs = ParseToken.parse(parser, [lx.TokenType.IDENTIFIER])
-            errors.extend(errs)
-            return param_type, param_ident
 
-        if not parser.match(lx.TokenType.LEFT_PAREN):
-            errors.append(
-                er.CompileError(
-                    message="missing '(' to begin parameters",
-                    regions=[parser.curr_region()],
-                )
-            )
-        params, errs = parse_tuple(parser, parse_param)
-        errors.extend(errs)
-        return_type, errs = ParseType.parse(parser)
-        errors.extend(errs)
-        block, errs = ParseBlockStmt.parse(parser)
-        errors.extend(errs)
+def finish_func_decl(parser: Parser) -> Union[ast.AstFuncDecl, er.CompileError]:
+    """
+    Parse a function declaration from the parser or return an error. Assumes that the "func" token
+    has already been consumed.
 
-        region = er.SourceView.range(start, parser.prev().lexeme)
-        return ParseFuncDecl(ident, params, return_type, block, region), errors
+    AstFuncDecl : "func" IDENTIFIER "(" ( AstParam ( "," AstParam )* )? ")" AstType AstBlockStmt ;
+    """
+    start = parser.prev().lexeme
+    ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
+    if ident is None:
+        return er.CompileError(
+            message="missing function name", regions=[parser.curr_region()]
+        )
+
+    if not parser.match(lx.TokenType.LEFT_PAREN):
+        return er.CompileError(
+            message="missing '(' to begin parameters", regions=[parser.curr_region()]
+        )
+
+    params = parse_tuple(parser, parse_param)
+    if isinstance(params, er.CompileError):
+        return params
+
+    return_type = parse_type(parser)
+    if isinstance(return_type, er.CompileError):
+        return return_type
+
+    if not parser.match(lx.TokenType.LEFT_BRACE):
+        return er.CompileError(
+            message="expected function body", regions=[parser.curr_region()]
+        )
+    block = finish_block_stmt(parser)
+    if isinstance(block, er.CompileError):
+        return block
+
+    region = er.SourceView.range(start, parser.prev().lexeme)
+    return ast.AstFuncDecl(str(ident), params, return_type, block, region)
+
+
+def parse_param(parser: Parser) -> Union[ast.AstParam, er.CompileError]:
+    """
+    Parse a parameter from the parser or return an error.
+
+    AstParam : AstType IDENTIFIER ;
+    """
+    param_type = parse_type(parser)
+    if isinstance(param_type, er.CompileError):
+        return param_type
+    param_ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
+    if param_ident is None:
+        return er.CompileError(
+            message="missing parameter name", regions=[parser.curr_region()]
+        )
+    return ast.AstParam(param_type, param_ident)
 
 
 def parse_tuple(
-    parser: Parser, parse_func: Callable[[Parser], T]
-) -> Tuple[List[T], List[er.CompileError]]:
+    parser: Parser, parse_func: Callable[[Parser], Union[T, er.CompileError]]
+) -> Union[List[T], er.CompileError]:
     """
     Given that the opening '(' has already been consumed, parse the elements of a tuple (a,b,...)
     form into a list using a parameter function to parse each element.
     """
     opener = parser.prev()
     if parser.match(lx.TokenType.RIGHT_PAREN):
-        return [], []
-    errors = []
-    pairs = [parse_func(parser)]
+        return []
+
+    first = parse_func(parser)
+    if isinstance(first, er.CompileError):
+        return first
+    pairs = [first]
+
     while not parser.match(lx.TokenType.RIGHT_PAREN):
         if parser.done():
-            errors.append(
-                er.CompileError(message="unclosed '('", regions=[opener.lexeme])
-            )
-            break
+            return er.CompileError(message="unclosed '('", regions=[opener.lexeme])
         if not parser.match(lx.TokenType.COMMA):
-            errors.append(
-                er.CompileError("missing ',' delimiter", [parser.curr_region()])
-            )
-        pairs.append(parse_func(parser))
-    return pairs, errors
+            return er.CompileError("missing ',' delimiter", [parser.curr_region()])
+        elem = parse_func(parser)
+        if isinstance(elem, er.CompileError):
+            return elem
+        pairs.append(elem)
+    return pairs
 
 
-class ParseStmt(ParseNode[ast.AstStmt]):
+def parse_stmt(parser: Parser) -> Union[ast.AstStmt, er.CompileError]:
     """
-    Parse node for a generic statement.
+    Parse a statement from the parser or return an error.
 
-    ParseStmt : ParsePrintStmt
-              | ParseBlockStmt
-              | ParseIfStmt
-              | ParseWhileStmt
-              | ParseReturnStmt
-              | ParseExprStmt
+    AstStmt : AstPrintStmt
+            | AstBlockStmt
+            | AstIfStmt
+            | AstWhileStmt
+            | AstReturnStmt
+            | AstExprStmt
+            ;
+    """
+    if parser.match(lx.TokenType.PRINT):
+        return finish_print_stmt(parser)
+    if parser.match(lx.TokenType.LEFT_BRACE):
+        return finish_block_stmt(parser)
+    if parser.match(lx.TokenType.IF):
+        return finish_if_stmt(parser)
+    if parser.match(lx.TokenType.WHILE):
+        return finish_while_stmt(parser)
+    if parser.match(lx.TokenType.RETURN):
+        return finish_return_stmt(parser)
+    return parse_expr_stmt(parser)
+
+
+def finish_print_stmt(parser: Parser) -> Union[ast.AstPrintStmt, er.CompileError]:
+    """
+    Parse a print statement from the parser or return an error. Assumes that the "print" token has
+    already been consumed.
+
+    AstPrintStmt : "print" AstExpr? ";" ;
+    """
+    if parser.match(lx.TokenType.SEMICOLON):
+        return ast.AstPrintStmt(None)
+
+    expr = parse_expr(parser)
+    if isinstance(expr, er.CompileError):
+        return expr
+
+    if not parser.match(lx.TokenType.SEMICOLON):
+        return er.CompileError(
+            message="missing ';' to end print statement",
+            regions=[parser.prev().lexeme, parser.curr_region()],
+        )
+
+    return ast.AstPrintStmt(expr)
+
+
+def finish_block_stmt(parser: Parser) -> Union[ast.AstBlockStmt, er.CompileError]:
+    """
+    Parse a block statement from the parser or return an error. Assumes that the opening brace has
+    already been consumed.
+
+    AstBlockStmt : "{" AstDecl* "}" ;
+    """
+    decls = []
+    open_brace = parser.prev()
+    while not parser.match(lx.TokenType.RIGHT_BRACE):
+        if parser.done():
+            return er.CompileError(
+                message="unclosed '{'",
+                regions=[open_brace.lexeme, parser.curr_region()],
+            )
+        decl = parse_decl(parser)
+        if isinstance(decl, er.CompileError):
+            return decl
+        decls.append(decl)
+    return ast.AstBlockStmt(decls)
+
+
+def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
+    """
+    Parse an if statement from the parser or return an error. Assumes that the "if" token has
+    already been consumed.
+
+    AstIfStmt : "if" "(" AstExpr ")" AstBlockStmt
+                ( "else" "if" "(" AstExpr ")" AstBlockStmt )*
+                ( "else" AstBlockStmt )?
               ;
     """
 
-    def __init__(
-        self,
-        stmt: Union[
-            "ParsePrintStmt",
-            "ParseBlockStmt",
-            "ParseIfStmt",
-            "ParseWhileStmt",
-            "ParseReturnStmt",
-            "ParseExprStmt",
-        ],
-    ) -> None:
-        self.stmt = stmt
-
-    def to_ast(self) -> Optional[ast.AstStmt]:
-        return self.stmt.to_ast()
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseStmt", List[er.CompileError]]:
-        """
-        Parses a ParseStmt from a Parser.
-        """
-        if parser.match(lx.TokenType.PRINT):
-            print_stmt, errs = ParsePrintStmt.finish(parser)
-            return ParseStmt(print_stmt), errs
-        if parser.match(lx.TokenType.LEFT_BRACE):
-            block_stmt, errs = ParseBlockStmt.finish(parser)
-            return ParseStmt(block_stmt), errs
-        if parser.match(lx.TokenType.IF):
-            if_stmt, errs = ParseIfStmt.finish(parser)
-            return ParseStmt(if_stmt), errs
-        if parser.match(lx.TokenType.WHILE):
-            while_stmt, errs = ParseWhileStmt.finish(parser)
-            return ParseStmt(while_stmt), errs
-        if parser.match(lx.TokenType.RETURN):
-            return_stmt, errs = ParseReturnStmt.finish(parser)
-            return ParseStmt(return_stmt), errs
-        expr_stmt, errs = ParseExprStmt.parse(parser)
-        return ParseStmt(expr_stmt), errs
-
-
-class ParsePrintStmt(ParseNode[ast.AstPrintStmt]):
-    """
-    Parse node for a print statement.
-
-    ParsePrintStmt : "print" ParseExpr? ";" ;
-    """
-
-    def __init__(self, expr: Optional["ParseExpr"]) -> None:
-        self.expr = expr
-
-    def to_ast(self) -> Optional[ast.AstPrintStmt]:
-        return ast.AstPrintStmt.make(self.expr.to_ast() if self.expr else None)
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParsePrintStmt", List[er.CompileError]]:
-        """
-        Parses a ParsePrintStmt from a Parser, given that the "print" keyword has already been
-        consumed.
-        """
-        if parser.match(lx.TokenType.SEMICOLON):
-            return ParsePrintStmt(None), []
-        errors = []
-        expr, errs = pratt_parse(parser, PRATT_TABLE)
-        errors.extend(errs)
-        if not parser.match(lx.TokenType.SEMICOLON):
-            errors.append(
-                er.CompileError(
-                    "missing ';' to end print statement",
-                    [parser.prev().lexeme, parser.curr_region()],
-                )
-            )
-        return ParsePrintStmt(expr), errors
-
-
-class ParseBlockStmt(ParseNode[ast.AstBlockStmt]):
-    """
-    Parse node for a block statement.
-
-    ParseBlockStmt : "{" ParseDecl* "}" ;
-    """
-
-    def __init__(self, decls: List[ParseDecl]) -> None:
-        self.decls = decls
-
-    def to_ast(self) -> Optional[ast.AstBlockStmt]:
-        return ast.AstBlockStmt.make([decl.to_ast() for decl in self.decls])
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseBlockStmt", List[er.CompileError]]:
-        """
-        Parses a ParseBlockStmt from a Parser.
-        """
-        if parser.match(lx.TokenType.LEFT_BRACE):
-            return ParseBlockStmt.finish(parser)
-
-        return (
-            ParseBlockStmt(decls=[]),
-            [er.CompileError("expected '{' to start block", [parser.curr_region()])],
-        )
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseBlockStmt", List[er.CompileError]]:
-        """
-        Parses a ParseBlockStmt from a Parser, given that the open brace has already been consumed.
-        """
-        errors = []
-        decls = []
-        open_brace = parser.prev()
-        while not parser.match(lx.TokenType.RIGHT_BRACE):
-            if parser.done():
-                errors.append(er.CompileError("unclosed block", [open_brace.lexeme]))
-                break
-            decl, errs = ParseDecl.parse(parser)
-            decls.append(decl)
-            errors.extend(errs)
-        return ParseBlockStmt(decls), errors
-
-
-class ParseIfStmt(ParseNode[ast.AstIfStmt]):
-    """
-    Parse node for an if statement.
-
-    ParseIfStmt : "if" "(" ParseExpr ")" ParseBlockStmt
-                ( "else" "if" "(" ParseExpr ")" ParseBlockStmt )*
-                ( "else" ParseBlockStmt )?
-                ;
-    """
-
-    def __init__(
-        self,
-        pairs: List[Tuple["ParseExpr", ParseBlockStmt]],
-        fallback: Optional[ParseBlockStmt],
-    ) -> None:
-        self.pairs = pairs
-        self.fallback = fallback
-
-    def to_ast(self) -> Optional[ast.AstIfStmt]:
-        cond_pairs = [(pair[0].to_ast(), pair[1].to_ast()) for pair in self.pairs]
-        if not cond_pairs:  # There should be at least an if condition
-            return None
-        return ast.AstIfStmt.make(
-            cond_pairs[0],
-            cond_pairs[1:],
-            self.fallback.to_ast() if self.fallback else None,
-        )
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseIfStmt", List[er.CompileError]]:
-        """
-        Parses a ParseIfStmt from a Parser, given that the "if" keyword has already been consumed.
-        """
-        errors = []
-        pairs = []
-        fallback = None
-
-        def parse_cond() -> None:
-            if not parser.match(lx.TokenType.LEFT_PAREN):
-                errors.append(
-                    er.CompileError(
-                        "missing '(' to start condition", [parser.curr_region()]
-                    )
-                )
-            cond, errs = pratt_parse(parser, PRATT_TABLE)
-            errors.extend(errs)
-            if not parser.match(lx.TokenType.RIGHT_PAREN):
-                errors.append(
-                    er.CompileError(
-                        "missing ')' to end condition", [parser.curr_region()]
-                    )
-                )
-            block, errs = ParseBlockStmt.parse(parser)
-            errors.extend(errs)
-            pairs.append((cond, block))
-
-        # parse the if block
-        parse_cond()
-        while parser.match(lx.TokenType.ELSE):
-            if parser.match(lx.TokenType.IF):
-                # parse an else if block
-                parse_cond()
-            else:
-                # parse the else block
-                fallback, errs = ParseBlockStmt.parse(parser)
-                errors.extend(errs)
-                break
-        return ParseIfStmt(pairs, fallback), errors
-
-
-class ParseWhileStmt(ParseNode[ast.AstWhileStmt]):
-    """
-    Parse node for a while statement.
-
-    ParseWhileStmt : "while" ( "(" ParseExpr ")" )? ParseBlockStmt ;
-    """
-
-    def __init__(self, cond: Optional["ParseExpr"], block: ParseBlockStmt) -> None:
-        self.cond = cond
-        self.block = block
-
-    def to_ast(self) -> Optional[ast.AstWhileStmt]:
-        return ast.AstWhileStmt.make(
-            self.cond.to_ast() if self.cond else None, self.block.to_ast()
-        )
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseWhileStmt", List[er.CompileError]]:
-        """
-        Parses a ParseWhileStmt from a Parser, given that the "while" keyword has already been
-        consumed.
-        """
-        errors = []
-        cond = None
-        if parser.match(lx.TokenType.LEFT_PAREN):
-            cond, errs = pratt_parse(parser, PRATT_TABLE)
-            errors.extend(errs)
-            if not parser.match(lx.TokenType.RIGHT_PAREN):
-                errors.append(
-                    er.CompileError(
-                        "missing ')' to end condition", [parser.curr_region()]
-                    )
-                )
-        block, errs = ParseBlockStmt.parse(parser)
-        errors.extend(errs)
-        return ParseWhileStmt(cond, block), errors
-
-
-class ParseReturnStmt(ParseNode[ast.AstReturnStmt]):
-    """
-    Parse node for a return statement.
-
-    ParseReturnStmt : "return" ParseExpr? ";" ;
-    """
-
-    def __init__(self, expr: Optional["ParseExpr"], region: er.SourceView) -> None:
-        self.expr = expr
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstReturnStmt]:
-        return ast.AstReturnStmt.make(
-            self.expr.to_ast() if self.expr else None, self.region
-        )
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseReturnStmt", List[er.CompileError]]:
-        """
-        Parses a ParseReturnStmt from a Parser, given that the "return" keyword has already been
-        consumed.
-        """
-        return_token = parser.prev()
-        errors = []
-        expr = None
-        if not parser.match(lx.TokenType.SEMICOLON):
-            expr, errs = pratt_parse(parser, PRATT_TABLE)
-            errors.extend(errs)
-            if not parser.match(lx.TokenType.SEMICOLON):
-                errors.append(
-                    er.CompileError(
-                        "missing ';' to end return statement",
-                        [parser.prev().lexeme, parser.curr_region()],
-                    )
-                )
-        region = er.SourceView.range(return_token.lexeme, parser.prev().lexeme)
-        return ParseReturnStmt(expr, region), errors
-
-
-class ParseExprStmt(ParseNode[ast.AstExprStmt]):
-    """
-    Parse node for an expression statement.
-
-    ParseExprStmt : ParseExpr ";" ;
-    """
-
-    def __init__(self, expr: "ParseExpr") -> None:
-        self.expr = expr
-
-    def to_ast(self) -> Optional[ast.AstExprStmt]:
-        return ast.AstExprStmt.make(self.expr.to_ast())
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseExprStmt", List[er.CompileError]]:
-        """
-        Parses a ParseExprStmt from a Parser.
-        """
-        errors = []
-        expr, errs = pratt_parse(parser, PRATT_TABLE)
-        errors.extend(errs)
-        if not parser.match(lx.TokenType.SEMICOLON):
-            errors.append(
-                er.CompileError(
-                    "missing ';' to end expression statement",
-                    [parser.prev().lexeme, parser.curr_region()],
-                )
-            )
-        return ParseExprStmt(expr), errors
-
-
-class ParseType(ParseNode[ast.AstType]):
-    """
-    Parse node for a type.
-
-    ParseType : ( "(" ParseType ")" | ParseFuncType | ParseAtomType ) ( "?" )? ;
-    """
-
-    def __init__(
-        self, type_node: Union["ParseFuncType", "ParseAtomType"], region: er.SourceView
-    ) -> None:
-        self.type_node = type_node
-        self.optional = False
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstType]:
-        return (
-            ast.AstOptionalType.make(self.type_node.to_ast(), self.region)
-            if self.optional
-            else self.type_node.to_ast()
-        )
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseType", List[er.CompileError]]:
-        """
-        Parse a ParseType from a Parser.
-        """
-        errors = []
-
-        if parser.match(lx.TokenType.LEFT_PAREN):
-            start = parser.prev().lexeme
-            result, errs = ParseType.parse(parser)
-            errors.extend(errs)
-            if not parser.match(lx.TokenType.RIGHT_PAREN):
-                errors.append(
-                    er.CompileError(
-                        "missing ')' to end type grouping", [parser.curr_region()]
-                    )
-                )
-            end = parser.prev().lexeme
-            result.region = er.SourceView.range(start, end)
-            return result, errors
-
-        if parser.match(lx.TokenType.FUNC):
-            start = parser.prev().lexeme
-            func_type, errs = ParseFuncType.finish(parser)
-            errors.extend(errs)
-            type_node: Union["ParseFuncType", "ParseAtomType"] = func_type
-        else:
-            atom_type, errs = ParseAtomType.parse(parser)
-            start = (
-                atom_type.token.token.lexeme
-                if isinstance(atom_type.token.token, lx.Token)
-                else parser.prev().lexeme
-            )
-            errors.extend(errs)
-            type_node = atom_type
-
-        end = parser.prev().lexeme
-        region = er.SourceView.range(start, end)
-        result = ParseType(type_node, region)
-
-        if parser.match(lx.TokenType.QUESTION_MARK):
-            result.optional = True
-
-        return result, errors
-
-
-class ParseFuncType(ParseNode[ast.AstFuncType]):
-    """
-    Parse node for a function type.
-
-    ParseFuncType : "func" "(" ( ParseType ( "," ParseType )* )? ")" ParseType ;
-    """
-
-    def __init__(
-        self, params: List[ParseType], return_type: ParseType, region: er.SourceView
-    ) -> None:
-        self.params = params
-        self.return_type = return_type
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstFuncType]:
-        return ast.AstFuncType.make(
-            [param.to_ast() for param in self.params],
-            self.return_type.to_ast(),
-            self.region,
-        )
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseFuncType", List[er.CompileError]]:
-        """
-        Parse a ParseFuncType from a Parser given that the "func" keyword has already been
-        consumed.
-        """
-        errors = []
-        start = parser.prev().lexeme
-
+    def parse_cond() -> Union[Tuple[ast.AstExpr, ast.AstBlockStmt], er.CompileError]:
         if not parser.match(lx.TokenType.LEFT_PAREN):
-            errors.append(
-                er.CompileError(
-                    "missing '(' to begin parameter types", [parser.curr_region()]
-                )
+            return er.CompileError(
+                message="missing '(' to start condition", regions=[parser.curr_region()]
             )
+        cond = parse_expr(parser)
+        if isinstance(cond, er.CompileError):
+            return cond
+        if not parser.match(lx.TokenType.RIGHT_PAREN):
+            return er.CompileError(
+                message="missing ')' to end condition", regions=[parser.curr_region()]
+            )
+        if not parser.match(lx.TokenType.LEFT_BRACE):
+            return er.CompileError(
+                message="expected block after condition", regions=[parser.curr_region()]
+            )
+        block = finish_block_stmt(parser)
+        if isinstance(block, er.CompileError):
+            return block
+        return cond, block
 
-        def parse_param(parser: Parser) -> ParseType:
-            param_type, errs = ParseType.parse(parser)
-            errors.extend(errs)
-            return param_type
-
-        params, errs = parse_tuple(parser, parse_param)
-        errors.extend(errs)
-
-        return_type, errs = ParseType.parse(parser)
-        errors.extend(errs)
-
-        end = parser.prev().lexeme
-        region = er.SourceView.range(start, end)
-
-        return ParseFuncType(params, return_type, region), errors
-
-
-class ParseAtomType(ParseNode[ast.AstAtomType]):
-    """
-    Parse node for an atomic type.
-
-    ParseAtomType : identifier | "void" ;
-    """
-
-    def __init__(self, token: ParseToken) -> None:
-        self.token = token
-
-    def to_ast(self) -> Optional[ast.AstAtomType]:
-        return ast.AstAtomType.make(self.token.to_ast())
-
-    @staticmethod
-    def parse(parser: Parser) -> Tuple["ParseAtomType", List[er.CompileError]]:
-        """
-        Parse a ParseAtomType from a Parser.
-        """
-        token, errors = ParseToken.parse(
-            parser, [lx.TokenType.IDENTIFIER, lx.TokenType.VOID]
-        )
-        return ParseAtomType(token), errors
-
-
-class ParseExpr(ParseNode[ast.AstExpr]):
-    """
-    Parse node for an expression.
-    """
-
-    def __init__(
-        self,
-        expr: Union[
-            "ParseUnaryExpr",
-            "ParseBinaryExpr",
-            "ParseAtomExpr",
-            "ParseCallExpr",
-            er.CompileError,
-        ],
-        region: er.SourceView,
-    ) -> None:
-        self.expr = expr
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstExpr]:
-        if isinstance(self.expr, er.CompileError):
-            return None
-        return self.expr.to_ast()
-
-
-class ParseUnaryExpr(ParseNode[ast.AstUnaryExpr]):
-    """
-    Prefix expression for a unary operator.
-    """
-
-    def __init__(self, operator: lx.Token, target: ParseExpr) -> None:
-        self.operator = operator
-        self.target = target
-
-    def to_ast(self) -> Optional[ast.AstUnaryExpr]:
-        return ast.AstUnaryExpr.make(
-            self.operator,
-            self.target.to_ast(),
-            er.SourceView.range(self.operator.lexeme, self.target.region),
-        )
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseExpr", List[er.CompileError]]:
-        """
-        Parse a unary expression from a Parser given that the operator has already been consumed.
-        """
-        operator = parser.prev()
-        target, errs = pratt_parse(parser, PRATT_TABLE, precedence=Precedence.UNARY)
-        region = er.SourceView.range(operator.lexeme, target.region)
-        return ParseExpr(ParseUnaryExpr(operator, target), region), errs
-
-
-class ParseBinaryExpr(ParseNode[ast.AstBinaryExpr]):
-    """
-    Infix expression for a binary operator.
-    """
-
-    def __init__(self, left: ParseExpr, operator: lx.Token, right: ParseExpr) -> None:
-        self.left = left
-        self.operator = operator
-        self.right = right
-
-    def to_ast(self) -> Optional[ast.AstBinaryExpr]:
-        return ast.AstBinaryExpr.make(
-            self.operator,
-            self.left.to_ast(),
-            self.right.to_ast(),
-            er.SourceView.range(self.left.region, self.right.region),
-        )
-
-    @staticmethod
-    def finish(
-        parser: Parser, lhs: ParseExpr
-    ) -> Tuple["ParseExpr", List[er.CompileError]]:
-        """
-        Parse the right hand side of a binary expression from a Parser given that the operator has
-        already been consumed.
-        """
-        left = lhs
-        operator = parser.prev()
-        prec = PRATT_TABLE[operator.kind].precedence
-        right, errs = pratt_parse(parser, PRATT_TABLE, prec.next())
-        region = er.SourceView.range(left.region, right.region)
-        return ParseExpr(ParseBinaryExpr(left, operator, right), region), errs
-
-
-class ParseCallExpr(ParseNode[ast.AstCallExpr]):
-    """
-    Infix expression for a function call.
-    """
-
-    def __init__(
-        self, function: ParseExpr, args: List[ParseExpr], region: er.SourceView
-    ) -> None:
-        self.function = function
-        self.args = args
-        self.region = region
-
-    def to_ast(self) -> Optional[ast.AstCallExpr]:
-        return ast.AstCallExpr.make(
-            self.function.to_ast(), [arg.to_ast() for arg in self.args], self.region
-        )
-
-    @staticmethod
-    def finish(
-        parser: Parser, lhs: ParseExpr
-    ) -> Tuple["ParseExpr", List[er.CompileError]]:
-        """
-        Parse the call part of a function call expression given that the open parenthesis has
-        already been consumed.
-        """
-        function = lhs
-        errors = []
-
-        def parse_arg(parser: Parser) -> ParseExpr:
-            parse, errs = pratt_parse(parser, PRATT_TABLE)
-            errors.extend(errs)
-            return parse
-
-        args, errs = parse_tuple(parser, parse_arg)
-        errors.extend(errs)
-
-        region = er.SourceView.range(function.region, parser.prev().lexeme)
-        return ParseExpr(ParseCallExpr(function, args, region), region), errors
-
-
-class ParseAtomExpr(ParseNode[ast.AstAtomExpr]):
-    """
-    Prefix expression for an atomic value expression.
-    """
-
-    def __init__(self, token: lx.Token) -> None:
-        self.token = token
-
-    def to_ast(self) -> Optional[ast.AstAtomExpr]:
-        token_exprs: Dict[lx.TokenType, Callable[[lx.Token], ast.AstAtomExpr]] = {
-            lx.TokenType.INT_LITERAL: ast.AstIntExpr,
-            lx.TokenType.NUM_LITERAL: ast.AstNumExpr,
-            lx.TokenType.STR_LITERAL: ast.AstStrExpr,
-            lx.TokenType.IDENTIFIER: ast.AstIdentExpr,
-            lx.TokenType.TRUE: ast.AstBoolExpr,
-            lx.TokenType.FALSE: ast.AstBoolExpr,
-            lx.TokenType.NIL: ast.AstNilExpr,
-        }
-        if self.token.kind in token_exprs:
-            return token_exprs[self.token.kind](self.token)
-        return None
-
-    @staticmethod
-    def finish(parser: Parser) -> Tuple["ParseExpr", List[er.CompileError]]:
-        """
-        Parse an atomic value expression from a Parser given that the token has already been
-        consumed.
-        """
-        token = parser.prev()
-        errors = []
-        if token.kind == lx.TokenType.INT_LITERAL:
-            val = int(str(token)[:-1])  # cutoff the `i` prefix
-            if val > 2 ** 31 - 1:
-                errors.append(
-                    er.CompileError(
-                        message="literal value is too large", regions=[token.lexeme]
-                    )
+    if_pair = parse_cond()
+    if isinstance(if_pair, er.CompileError):
+        return if_pair
+    elif_pairs = []
+    else_block = None
+    while parser.match(lx.TokenType.ELSE):
+        if parser.match(lx.TokenType.IF):
+            elif_pair = parse_cond()
+            if isinstance(elif_pair, er.CompileError):
+                return elif_pair
+            elif_pairs.append(elif_pair)
+        else:
+            if not parser.match(lx.TokenType.LEFT_BRACE):
+                return er.CompileError(
+                    message="expected else block", regions=[parser.curr_region()]
                 )
-        elif token.kind == lx.TokenType.NUM_LITERAL and "." in str(token):
-            decimals = str(token).split(".")[1]
-            if len(decimals) > 7:
-                errors.append(
-                    er.CompileError(
-                        message="too many decimal places, "
-                        "precision up to only 7 places is supported",
-                        regions=[token.lexeme],
-                    )
-                )
-        elif token.kind == lx.TokenType.STR_LITERAL:
-            if len(str(token)) > 512 + 2:  # Plus the surrounding `"`
-                errors.append(
-                    er.CompileError(
-                        message="string literal too long, "
-                        "literals have a max length of 512",
-                        regions=[token.lexeme],
-                    )
-                )
-        return ParseExpr(ParseAtomExpr(token), token.lexeme), errors
+            else_block_ = finish_block_stmt(parser)
+            if isinstance(else_block_, er.CompileError):
+                return else_block_
+            else_block = else_block_
+            break
+    return ast.AstIfStmt(if_pair, elif_pairs, else_block)
+
+
+def finish_while_stmt(parser: Parser) -> Union[ast.AstWhileStmt, er.CompileError]:
+    """
+    Parse a while statement from the parser or return an error. Assumes the "while" token has
+    already been consumed.
+
+    AstWhileStmt : "while" ( "(" AstExpr ")" )? AstBlockStmt ;
+    """
+    cond = None
+    if parser.match(lx.TokenType.LEFT_PAREN):
+        cond_ = parse_expr(parser)
+        if isinstance(cond_, er.CompileError):
+            return cond_
+        cond = cond_
+        if not parser.match(lx.TokenType.RIGHT_PAREN):
+            return er.CompileError(
+                message="missing ')' to end condition", regions=[parser.curr_region()]
+            )
+    if not parser.match(lx.TokenType.LEFT_BRACE):
+        return er.CompileError(message="expected block", regions=[parser.curr_region()])
+    block = finish_block_stmt(parser)
+    if isinstance(block, er.CompileError):
+        return block
+    return ast.AstWhileStmt(cond, block)
+
+
+def finish_return_stmt(parser: Parser) -> Union[ast.AstReturnStmt, er.CompileError]:
+    """
+    Parse a return statement from the parser or return an error. Assumes the "return" token has
+    already been consumed.
+
+    AstReturnStmt : "return" AstExpr? ";" ;
+    """
+    return_token = parser.prev()
+    expr = None
+    if not parser.match(lx.TokenType.SEMICOLON):
+        expr_ = parse_expr(parser)
+        if isinstance(expr_, er.CompileError):
+            return expr_
+        expr = expr_
+        if not parser.match(lx.TokenType.SEMICOLON):
+            return er.CompileError(
+                message="missing ';' to end return statement",
+                regions=[parser.prev().lexeme, parser.curr_region()],
+            )
+    region = er.SourceView.range(return_token.lexeme, parser.prev().lexeme)
+    return ast.AstReturnStmt(expr, region)
+
+
+def parse_expr_stmt(parser: Parser) -> Union[ast.AstExprStmt, er.CompileError]:
+    """
+    Parse an expression statement from the parser or return an error.
+
+    AstExprStmt : AstExpr ";" ;
+    """
+    expr = parse_expr(parser)
+    if isinstance(expr, er.CompileError):
+        return expr
+    if not parser.match(lx.TokenType.SEMICOLON):
+        return er.CompileError(
+            message="missing ';' to end expression statement",
+            regions=[parser.prev().lexeme, parser.curr_region()],
+        )
+    return ast.AstExprStmt(expr)
+
+
+def parse_type(parser: Parser) -> Union[ast.AstType, er.CompileError]:
+    """
+    Parse a type from the parser or return an error.
+
+    AstType : ( "(" AstType ")" | AstFuncType | AstAtomType ) ( "?" )? ;
+    """
+    if parser.match(lx.TokenType.LEFT_PAREN):
+        start = parser.prev().lexeme
+        result = parse_type(parser)
+        if isinstance(result, er.CompileError):
+            return result
+        if not parser.match(lx.TokenType.RIGHT_PAREN):
+            return er.CompileError(
+                message="missing ')' to end type grouping",
+                regions=[parser.curr_region()],
+            )
+        result.region = er.SourceView.range(start, parser.prev().lexeme)
+        return result
+
+    if parser.match(lx.TokenType.FUNC):
+        result = finish_func_type(parser)
+    else:
+        result = parse_atom_type(parser)
+
+    if isinstance(result, er.CompileError):
+        return result
+
+    if parser.match(lx.TokenType.QUESTION_MARK):
+        result = ast.AstOptionalType(
+            result, er.SourceView.range(result.region, parser.prev().lexeme)
+        )
+    return result
+
+
+def finish_func_type(parser: Parser) -> Union[ast.AstFuncType, er.CompileError]:
+    """
+    Parse a function type from the parser or return an error. Assumes that the "func" token has
+    already been consumed.
+
+    AstFuncType : "func" "(" ( AstType ( "," AstType )* )? ")" AstType ;
+    """
+    start = parser.prev().lexeme
+    if not parser.match(lx.TokenType.LEFT_PAREN):
+        return er.CompileError(
+            message="missing '(' to begin parameter types",
+            regions=[parser.curr_region()],
+        )
+    params = parse_tuple(parser, parse_type)
+    if isinstance(params, er.CompileError):
+        return params
+    return_type = parse_type(parser)
+    if isinstance(return_type, er.CompileError):
+        return return_type
+    region = er.SourceView.range(start, parser.prev().lexeme)
+    return ast.AstFuncType(params, return_type, region)
+
+
+def parse_atom_type(parser: Parser) -> Union[ast.AstAtomType, er.CompileError]:
+    """
+    Parse an atom type from the parser or return an error.
+
+    AstAtomType : IDENTIFIER | "void" ;
+    """
+    token = parse_token(parser, [lx.TokenType.IDENTIFIER, lx.TokenType.VOID])
+    if token is None:
+        return er.CompileError(message="expected type", regions=[parser.curr_region()])
+    return ast.AstAtomType(token)
+
+
+def finish_unary_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
+    """
+    Parse a unary expression from the parser or return an error. Assumes that the operator token
+    has already been consumed.
+    """
+    operator = parser.prev()
+    target = parse_expr(parser, precedence=Precedence.UNARY)
+    if isinstance(target, er.CompileError):
+        return target
+    region = er.SourceView.range(operator.lexeme, target.region)
+    return ast.AstUnaryExpr(operator, target, region)
+
+
+def finish_binary_expr(
+    parser: Parser, lhs: ast.AstExpr
+) -> Union[ast.AstExpr, er.CompileError]:
+    """
+    Parse a binary expression from the parser or return an error. Assumes the operator token has
+    already been consumed, and takes the lhs expression as a parameter.
+    """
+    operator = parser.prev()
+    prec = PRATT_TABLE[operator.kind].precedence
+    rhs = parse_expr(parser, prec.next())
+    if isinstance(rhs, er.CompileError):
+        return rhs
+    region = er.SourceView.range(lhs.region, rhs.region)
+    return ast.AstBinaryExpr(operator, lhs, rhs, region)
+
+
+def finish_call_expr(
+    parser: Parser, lhs: ast.AstExpr
+) -> Union[ast.AstExpr, er.CompileError]:
+    """
+    Parse a function call expression from the parser or return an error. Assumes that the open
+    parenthesis has already been consumed, and takes the function expression as a parameter.
+    """
+    args = parse_tuple(parser, parse_expr)
+    if isinstance(args, er.CompileError):
+        return args
+    region = er.SourceView.range(lhs.region, parser.prev().lexeme)
+    return ast.AstCallExpr(lhs, args, region)
+
+
+def finish_int_expr(parser: Parser) -> Union[ast.AstIntExpr, er.CompileError]:
+    """
+    Parse an int expression from the parser or return an error. Assumes that the literal token has
+    already been consumed.
+    """
+    token = parser.prev()
+    val = int(str(token)[:-1])
+    if val > 2 ** 31 - 1:
+        return er.CompileError(
+            message="literal value is too large", regions=[token.lexeme]
+        )
+    return ast.AstIntExpr(token)
+
+
+def finish_num_expr(parser: Parser) -> Union[ast.AstNumExpr, er.CompileError]:
+    """
+    Parse a num expression from the parser or return an error. Assumes that the literal token has
+    already been consumed.
+    """
+    token = parser.prev()
+    if "." in str(token):
+        decimals = str(token).split(".")[1]
+        if len(decimals) > 7:
+            return er.CompileError(
+                message="too many decimal palces, precision up to only 7 is supported",
+                regions=[token.lexeme],
+            )
+    return ast.AstNumExpr(token)
+
+
+def finish_str_expr(parser: Parser) -> Union[ast.AstStrExpr, er.CompileError]:
+    """
+    Parse a str expression from the parser or return an error. Assumes that the literal token has
+    already been consumed.
+    """
+    token = parser.prev()
+    if len(str(token)) > 512 + 2:
+        return er.CompileError(
+            message="string literal too long, max length is 512", regions=[token.lexeme]
+        )
+    return ast.AstStrExpr(token)
+
+
+def finish_ident_expr(parser: Parser) -> Union[ast.AstIdentExpr, er.CompileError]:
+    """
+    Parse an identifier expression from the parser or return an error. Assumes that the identifier
+    has already been consumed.
+    """
+    return ast.AstIdentExpr(parser.prev())
+
+
+def finish_bool_expr(parser: Parser) -> Union[ast.AstBoolExpr, er.CompileError]:
+    """
+    Parse a bool expression from the parser or return an error. Assumes that the literal token has
+    already been consumed.
+    """
+    return ast.AstBoolExpr(parser.prev())
+
+
+def finish_nil_expr(parser: Parser) -> Union[ast.AstNilExpr, er.CompileError]:
+    """
+    Parse a nil expression from the parser or return an error. Assumes that the literal token has
+    already been consumed.
+    """
+    return ast.AstNilExpr(parser.prev())
 
 
 Comparison = Union[bool, "NotImplemented"]
@@ -1051,8 +687,8 @@ class Precedence(enum.Enum):
         return Precedence(min(next_value, Precedence.MAX.value))
 
 
-PrefixRule = Callable[[Parser], Tuple[ParseExpr, List[er.CompileError]]]
-InfixRule = Callable[[Parser, ParseExpr], Tuple[ParseExpr, List[er.CompileError]]]
+PrefixRule = Callable[[Parser], Union[ast.AstExpr, er.CompileError]]
+InfixRule = Callable[[Parser, ast.AstExpr], Union[ast.AstExpr, er.CompileError]]
 
 
 class PrattRule(NamedTuple):
@@ -1069,83 +705,75 @@ PRATT_TABLE: DefaultDict[lx.TokenType, PrattRule] = collections.defaultdict(
     PrattRule,
     {
         lx.TokenType.LEFT_PAREN: PrattRule(
-            infix=ParseCallExpr.finish, precedence=Precedence.CALL
+            infix=finish_call_expr, precedence=Precedence.CALL
         ),
         lx.TokenType.MINUS: PrattRule(
-            prefix=ParseUnaryExpr.finish,
-            infix=ParseBinaryExpr.finish,
+            prefix=finish_unary_expr,
+            infix=finish_binary_expr,
             precedence=Precedence.TERM,
         ),
         lx.TokenType.PLUS: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.TERM
+            infix=finish_binary_expr, precedence=Precedence.TERM
         ),
         lx.TokenType.STAR: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.FACTOR
+            infix=finish_binary_expr, precedence=Precedence.FACTOR
         ),
         lx.TokenType.SLASH: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.FACTOR
+            infix=finish_binary_expr, precedence=Precedence.FACTOR
         ),
-        lx.TokenType.OR: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.OR
-        ),
+        lx.TokenType.OR: PrattRule(infix=finish_binary_expr, precedence=Precedence.OR),
         lx.TokenType.AND: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.AND
+            infix=finish_binary_expr, precedence=Precedence.AND
         ),
         lx.TokenType.DOUBLE_EQUALS: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.EQUALITY
+            infix=finish_binary_expr, precedence=Precedence.EQUALITY
         ),
         lx.TokenType.NOT_EQUALS: PrattRule(
-            infix=ParseBinaryExpr.finish, precedence=Precedence.EQUALITY
+            infix=finish_binary_expr, precedence=Precedence.EQUALITY
         ),
-        lx.TokenType.STR_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
-        lx.TokenType.NUM_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
-        lx.TokenType.INT_LITERAL: PrattRule(prefix=ParseAtomExpr.finish),
-        lx.TokenType.IDENTIFIER: PrattRule(prefix=ParseAtomExpr.finish),
-        lx.TokenType.TRUE: PrattRule(prefix=ParseAtomExpr.finish),
-        lx.TokenType.FALSE: PrattRule(prefix=ParseAtomExpr.finish),
-        lx.TokenType.NIL: PrattRule(prefix=ParseAtomExpr.finish),
+        lx.TokenType.STR_LITERAL: PrattRule(prefix=finish_str_expr),
+        lx.TokenType.NUM_LITERAL: PrattRule(prefix=finish_num_expr),
+        lx.TokenType.INT_LITERAL: PrattRule(prefix=finish_int_expr),
+        lx.TokenType.IDENTIFIER: PrattRule(prefix=finish_ident_expr),
+        lx.TokenType.TRUE: PrattRule(prefix=finish_bool_expr),
+        lx.TokenType.FALSE: PrattRule(prefix=finish_bool_expr),
+        lx.TokenType.NIL: PrattRule(prefix=finish_nil_expr),
     },
 )
 
 
-def pratt_prefix(
-    parser: Parser, table: DefaultDict[lx.TokenType, PrattRule]
-) -> Tuple[ParseExpr, List[er.CompileError]]:
+def parse_prefix(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
     """
     Parses a prefix expression from a Parser using a pratt table.
     """
     start_token = parser.advance()
     if not start_token:
-        err = er.CompileError(
-            "unexpected EOF; expected expression", [parser.curr_region()]
+        return er.CompileError(
+            message="unexpected EOF; expected expression",
+            regions=[parser.curr_region()],
         )
-        return ParseExpr(err, parser.curr_region()), [err]
-    rule = table[start_token.kind]
+    rule = PRATT_TABLE[start_token.kind]
     if not rule.prefix:
-        err = er.CompileError(
-            "unexpected token; expected expression", [start_token.lexeme]
+        return er.CompileError(
+            message="unexpected token; expected expression",
+            regions=[start_token.lexeme],
         )
-        return ParseExpr(err, region=er.SourceView.all("<error>")), [err]
     return rule.prefix(parser)
 
 
-def pratt_infix(
-    parser: Parser,
-    table: DefaultDict[lx.TokenType, PrattRule],
-    expr: ParseExpr,
-    precedence: Precedence,
-) -> Optional[Tuple[ParseExpr, List[er.CompileError]]]:
+def parse_infix(
+    parser: Parser, expr: ast.AstExpr, precedence: Precedence
+) -> Optional[Union[ast.AstExpr, er.CompileError]]:
     """
     Given an initial expression and precedence parses an infix expression from a Parser using a
     pratt table. If there are no infix extensions bound by the precedence returns None.
     """
-    errors = []
     # See if there's an infix token
     # If not, there's no expression to parse
     token = parser.curr()
     if not token:
         return None
-    rule = table[token.kind]
+    rule = PRATT_TABLE[token.kind]
     if not rule.infix:
         return None
     # While the infix token is bound by the precedence of the expression
@@ -1153,29 +781,31 @@ def pratt_infix(
         # Advance past the infix token and run its rule
         parser.advance()
         if rule.infix:  # Should always be true but mypy can't tell
-            expr, errs = rule.infix(parser, expr)
-            errors.extend(errs)
+            expr_ = rule.infix(parser, expr)
+            if isinstance(expr_, er.CompileError):
+                return expr_
+            expr = expr_
         # See if there's another infix token
         # If not, the expression is finished
         token = parser.curr()
         if not token:
             break
-        rule = table[token.kind]
+        rule = PRATT_TABLE[token.kind]
         if not rule.infix:
             break
-    return expr, errors
+    return expr
 
 
-def pratt_parse(
-    parser: Parser,
-    table: DefaultDict[lx.TokenType, PrattRule],
-    precedence: Precedence = Precedence.ASSIGNMENT,
-) -> Tuple[ParseExpr, List[er.CompileError]]:
+def parse_expr(
+    parser: Parser, precedence: Precedence = Precedence.ASSIGNMENT
+) -> Union[ast.AstExpr, er.CompileError]:
     """
     Parses an expression bound by a given precedence from a Parser using a pratt table.
     """
-    prefix_expr, errs = pratt_prefix(parser, table)
-    infix_parse = pratt_infix(parser, table, prefix_expr, precedence)
-    if infix_parse:
-        return infix_parse[0], errs + infix_parse[1]
-    return prefix_expr, errs
+    prefix_expr = parse_prefix(parser)
+    if isinstance(prefix_expr, er.CompileError):
+        return prefix_expr
+    infix_parse = parse_infix(parser, prefix_expr, precedence)
+    if infix_parse is None:
+        return prefix_expr
+    return infix_parse
