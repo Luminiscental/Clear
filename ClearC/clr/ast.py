@@ -6,122 +6,7 @@ from typing import Union, List, Optional, Tuple, Dict
 
 import clr.errors as er
 import clr.lexer as lx
-
-TypeAnnot = Union[
-    "BuiltinTypeAnnot", "FuncTypeAnnot", "OptionalTypeAnnot", "UnresolvedTypeAnnot"
-]
-
-Comparison = Union[bool, "NotImplemented"]
-
-
-# TODO: Annotation types should probably be with the visitor that uses them but I'm not sure how
-class UnresolvedTypeAnnot:
-    """
-    Type annotation for an unresolved node.
-    """
-
-    def __init__(self) -> None:
-        self.unresolved = True
-
-    def __str__(self) -> str:
-        return "<unresolved>"
-
-    def __eq__(self, other: object) -> Comparison:
-        if isinstance(other, BuiltinTypeAnnot):
-            return False
-        if isinstance(other, FuncTypeAnnot):
-            return False
-        if isinstance(other, OptionalTypeAnnot):
-            return False
-        if isinstance(other, UnresolvedTypeAnnot):  # maybe return True here?
-            return False
-        return NotImplemented
-
-    def __ne__(self, other: object) -> Comparison:
-        return not self == other
-
-
-class BuiltinTypeAnnot:
-    """
-    Type annotation for a built in type.
-    """
-
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.unresolved = False
-
-    def __str__(self) -> str:
-        return self.name
-
-    def __eq__(self, other: object) -> Comparison:
-        if isinstance(other, BuiltinTypeAnnot):
-            return self.name == other.name
-        if isinstance(other, FuncTypeAnnot):
-            return False
-        if isinstance(other, OptionalTypeAnnot):
-            return False
-        if isinstance(other, UnresolvedTypeAnnot):
-            return False
-        return NotImplemented
-
-    def __ne__(self, other: object) -> Comparison:
-        return not self == other
-
-
-class FuncTypeAnnot:
-    """
-    Type annotation for a function type.
-    """
-
-    def __init__(self, params: List[TypeAnnot], return_type: TypeAnnot) -> None:
-        self.params = params
-        self.return_type = return_type
-        self.unresolved = False
-
-    def __str__(self) -> str:
-        param_str = ", ".join(str(param) for param in self.params)
-        return f"func({param_str}) {self.return_type}"
-
-    def __eq__(self, other: object) -> Comparison:
-        if isinstance(other, BuiltinTypeAnnot):
-            return False
-        if isinstance(other, FuncTypeAnnot):
-            return self.params == other.params and self.return_type == other.return_type
-        if isinstance(other, OptionalTypeAnnot):
-            return False
-        if isinstance(other, UnresolvedTypeAnnot):
-            return False
-        return NotImplemented
-
-    def __ne__(self, other: object) -> Comparison:
-        return not self == other
-
-
-class OptionalTypeAnnot:
-    """
-    Type annotation for an optional type.
-    """
-
-    def __init__(self, target: TypeAnnot) -> None:
-        self.target = target
-        self.unresolved = False
-
-    def __str__(self) -> str:
-        return f"({self.target})?"
-
-    def __eq__(self, other: object) -> Comparison:
-        if isinstance(other, BuiltinTypeAnnot):
-            return False
-        if isinstance(other, FuncTypeAnnot):
-            return False
-        if isinstance(other, OptionalTypeAnnot):
-            return self.target == other.target
-        if isinstance(other, UnresolvedTypeAnnot):
-            return False
-        return NotImplemented
-
-    def __ne__(self, other: object) -> Comparison:
-        return not self == other
+import clr.annotations as an
 
 
 class AstVisitor:
@@ -310,7 +195,8 @@ class AstNode:
     """
 
     def __init__(self) -> None:
-        self.type_annot: TypeAnnot = UnresolvedTypeAnnot()
+        self.type_annot: an.TypeAnnot = an.UnresolvedTypeAnnot()
+        self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
 
     def accept(self, visitor: AstVisitor) -> None:
         """
@@ -438,9 +324,10 @@ class AstPrintStmt(AstNode):
     Ast node for a print statement.
     """
 
-    def __init__(self, expr: Optional[AstExpr]) -> None:
+    def __init__(self, expr: Optional[AstExpr], region: er.SourceView) -> None:
         super().__init__()
         self.expr = expr
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.print_stmt(self)
@@ -451,9 +338,10 @@ class AstBlockStmt(AstNode):
     Ast node for a block statement.
     """
 
-    def __init__(self, decls: List[AstDecl]) -> None:
+    def __init__(self, decls: List[AstDecl], region: er.SourceView) -> None:
         super().__init__()
         self.decls = decls
+        self.region = region
         # Annotations:
         self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
 
@@ -471,11 +359,13 @@ class AstIfStmt(AstNode):
         if_part: Tuple[AstExpr, AstBlockStmt],
         elif_parts: List[Tuple[AstExpr, AstBlockStmt]],
         else_part: Optional[AstBlockStmt],
+        region: er.SourceView,
     ) -> None:
         super().__init__()
         self.if_part = if_part
         self.elif_parts = elif_parts
         self.else_part = else_part
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.if_stmt(self)
@@ -486,10 +376,13 @@ class AstWhileStmt(AstNode):
     Ast node for a while statement.
     """
 
-    def __init__(self, cond: Optional[AstExpr], block: AstBlockStmt) -> None:
+    def __init__(
+        self, cond: Optional[AstExpr], block: AstBlockStmt, region: er.SourceView
+    ) -> None:
         super().__init__()
         self.cond = cond
         self.block = block
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.while_stmt(self)
@@ -514,9 +407,10 @@ class AstExprStmt(AstNode):
     Ast node for an expression statement.
     """
 
-    def __init__(self, expr: AstExpr) -> None:
+    def __init__(self, expr: AstExpr, region: er.SourceView) -> None:
         super().__init__()
         self.expr = expr
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.expr_stmt(self)

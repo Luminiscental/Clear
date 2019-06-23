@@ -300,8 +300,10 @@ def finish_print_stmt(parser: Parser) -> Union[ast.AstPrintStmt, er.CompileError
 
     AstPrintStmt : "print" AstExpr? ";" ;
     """
+    start = parser.prev().lexeme
+
     if parser.match(lx.TokenType.SEMICOLON):
-        return ast.AstPrintStmt(None)
+        return ast.AstPrintStmt(None, er.SourceView.range(start, parser.prev().lexeme))
 
     expr = parse_expr(parser)
     if isinstance(expr, er.CompileError):
@@ -313,7 +315,7 @@ def finish_print_stmt(parser: Parser) -> Union[ast.AstPrintStmt, er.CompileError
             regions=[parser.prev().lexeme, parser.curr_region()],
         )
 
-    return ast.AstPrintStmt(expr)
+    return ast.AstPrintStmt(expr, er.SourceView.range(start, parser.prev().lexeme))
 
 
 def finish_block_stmt(parser: Parser) -> Union[ast.AstBlockStmt, er.CompileError]:
@@ -323,6 +325,8 @@ def finish_block_stmt(parser: Parser) -> Union[ast.AstBlockStmt, er.CompileError
 
     AstBlockStmt : "{" AstDecl* "}" ;
     """
+    start = parser.prev().lexeme
+
     decls = []
     open_brace = parser.prev()
     while not parser.match(lx.TokenType.RIGHT_BRACE):
@@ -335,7 +339,7 @@ def finish_block_stmt(parser: Parser) -> Union[ast.AstBlockStmt, er.CompileError
         if isinstance(decl, er.CompileError):
             return decl
         decls.append(decl)
-    return ast.AstBlockStmt(decls)
+    return ast.AstBlockStmt(decls, er.SourceView.range(start, parser.prev().lexeme))
 
 
 def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
@@ -348,6 +352,7 @@ def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
                 ( "else" AstBlockStmt )?
               ;
     """
+    start = parser.prev().lexeme
 
     def parse_cond() -> Union[Tuple[ast.AstExpr, ast.AstBlockStmt], er.CompileError]:
         if not parser.match(lx.TokenType.LEFT_PAREN):
@@ -391,7 +396,12 @@ def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
                 return else_block_
             else_block = else_block_
             break
-    return ast.AstIfStmt(if_pair, elif_pairs, else_block)
+    return ast.AstIfStmt(
+        if_pair,
+        elif_pairs,
+        else_block,
+        er.SourceView.range(start, parser.prev().lexeme),
+    )
 
 
 def finish_while_stmt(parser: Parser) -> Union[ast.AstWhileStmt, er.CompileError]:
@@ -401,6 +411,8 @@ def finish_while_stmt(parser: Parser) -> Union[ast.AstWhileStmt, er.CompileError
 
     AstWhileStmt : "while" ( "(" AstExpr ")" )? AstBlockStmt ;
     """
+    start = parser.prev().lexeme
+
     cond = None
     if parser.match(lx.TokenType.LEFT_PAREN):
         cond_ = parse_expr(parser)
@@ -416,7 +428,9 @@ def finish_while_stmt(parser: Parser) -> Union[ast.AstWhileStmt, er.CompileError
     block = finish_block_stmt(parser)
     if isinstance(block, er.CompileError):
         return block
-    return ast.AstWhileStmt(cond, block)
+    return ast.AstWhileStmt(
+        cond, block, er.SourceView.range(start, parser.prev().lexeme)
+    )
 
 
 def finish_return_stmt(parser: Parser) -> Union[ast.AstReturnStmt, er.CompileError]:
@@ -456,7 +470,7 @@ def parse_expr_stmt(parser: Parser) -> Union[ast.AstExprStmt, er.CompileError]:
             message="missing ';' to end expression statement",
             regions=[parser.prev().lexeme, parser.curr_region()],
         )
-    return ast.AstExprStmt(expr)
+    return ast.AstExprStmt(expr, er.SourceView.range(expr.region, parser.prev().lexeme))
 
 
 def parse_type(parser: Parser) -> Union[ast.AstType, er.CompileError]:

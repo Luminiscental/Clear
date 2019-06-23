@@ -13,6 +13,17 @@ func fac(int n) int {
 func maybe2(bool input) int? {
     if (input) {
         return 2i;
+    } else {
+        return nil;
     }
-    return nil;
+}
+
+func x() str {
+    if (false) {
+        return "2";
+    } else if (true) {
+        return "3";
+    } else {
+        print "oh no";
+    }
 }

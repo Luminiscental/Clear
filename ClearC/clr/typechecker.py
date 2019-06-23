@@ -6,6 +6,7 @@ from typing import List, Optional, Callable, TypeVar
 
 import clr.errors as er
 import clr.ast as ast
+import clr.annotations as an
 
 T = TypeVar("T")  # pylint: disable=invalid-name
 R = TypeVar("R")  # pylint: disable=invalid-name
@@ -20,32 +21,25 @@ def check_types(tree: ast.Ast) -> List[er.CompileError]:
     return checker.errors.get()
 
 
-TYPE_VOID = ast.BuiltinTypeAnnot("void")
-TYPE_STR = ast.BuiltinTypeAnnot("str")
-TYPE_BOOL = ast.BuiltinTypeAnnot("bool")
-TYPE_INT = ast.BuiltinTypeAnnot("int")
-TYPE_NUM = ast.BuiltinTypeAnnot("num")
-TYPE_NIL = ast.BuiltinTypeAnnot("nil")
-
-ARITH_TYPES = [TYPE_INT, TYPE_NUM]
+ARITH_TYPES = [an.TYPE_INT, an.TYPE_NUM]
 ARITH_UNARY = ["-"]
 ARITH_BINARY = ["+", "-", "*", "/"]
 
 COMP_BINARY = ["==", "!="]
 
 
-def guess_arith_binary(lhs: ast.TypeAnnot, rhs: ast.TypeAnnot) -> ast.TypeAnnot:
+def guess_arith_binary(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
     """
     Guess the result type of an arithmetic binary operator given mismatched lhs and rhs types.
     """
     # If there's a str assume user wanted concatenation
-    if TYPE_STR in (lhs, rhs):
-        return TYPE_STR
+    if an.TYPE_STR in (lhs, rhs):
+        return an.TYPE_STR
     # If there's a num assume user wanted num operation
-    if TYPE_NUM in (lhs, rhs):
-        return TYPE_NUM
+    if an.TYPE_NUM in (lhs, rhs):
+        return an.TYPE_NUM
     # Fallback to int
-    return TYPE_INT
+    return an.TYPE_INT
 
 
 def symmetrize(func: Callable[[T, T], Optional[R]]) -> Callable[[T, T], Optional[R]]:
@@ -60,22 +54,22 @@ def symmetrize(func: Callable[[T, T], Optional[R]]) -> Callable[[T, T], Optional
 
 
 @symmetrize
-def union(lhs: ast.TypeAnnot, rhs: ast.TypeAnnot) -> Optional[ast.TypeAnnot]:
+def union(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> Optional[an.TypeAnnot]:
     """
     Returns the type that contains both the lhs and rhs type, if it exists.
     """
     if lhs == rhs:
         return lhs
-    if lhs == TYPE_NIL:
-        if isinstance(rhs, ast.OptionalTypeAnnot):
+    if lhs == an.TYPE_NIL:
+        if isinstance(rhs, an.OptionalTypeAnnot):
             return rhs
-        return ast.OptionalTypeAnnot(rhs)
-    if isinstance(lhs, ast.OptionalTypeAnnot) and rhs == lhs.target:
+        return an.OptionalTypeAnnot(rhs)
+    if isinstance(lhs, an.OptionalTypeAnnot) and rhs == lhs.target:
         return lhs
     return None
 
 
-def contains(inner: ast.TypeAnnot, outer: ast.TypeAnnot) -> bool:
+def contains(inner: an.TypeAnnot, outer: an.TypeAnnot) -> bool:
     """
     Checks if the inner type is contained by the outer type (defers to union).
     """
@@ -85,17 +79,23 @@ def contains(inner: ast.TypeAnnot, outer: ast.TypeAnnot) -> bool:
     return combined == outer
 
 
-def valid(type_annot: ast.TypeAnnot) -> bool:
+def valid(type_annot: an.TypeAnnot) -> bool:
     """
     Checks if a type annotation is a valid type for a value to have.
     """
-    if isinstance(type_annot, ast.BuiltinTypeAnnot):
-        return type_annot in [TYPE_STR, TYPE_BOOL, TYPE_INT, TYPE_NUM, TYPE_NIL]
-    if isinstance(type_annot, ast.FuncTypeAnnot):
+    if isinstance(type_annot, an.BuiltinTypeAnnot):
+        return type_annot in [
+            an.TYPE_STR,
+            an.TYPE_BOOL,
+            an.TYPE_INT,
+            an.TYPE_NUM,
+            an.TYPE_NIL,
+        ]
+    if isinstance(type_annot, an.FuncTypeAnnot):
         return all(valid(param) for param in type_annot.params) and (
-            valid(type_annot.return_type) or type_annot.return_type == TYPE_VOID
+            valid(type_annot.return_type) or type_annot.return_type == an.TYPE_VOID
         )
-    if isinstance(type_annot, ast.OptionalTypeAnnot):
+    if isinstance(type_annot, an.OptionalTypeAnnot):
         return valid(type_annot.target)
     return False
 
@@ -107,7 +107,7 @@ class TypeChecker(ast.DeepVisitor):
 
     def __init__(self) -> None:
         self.errors = er.ErrorTracker()
-        self.expected_returns: List[ast.TypeAnnot] = []
+        self.expected_returns: List[an.TypeAnnot] = []
         self.seen_refs: List[ast.AstIdentRef] = []
         self.circ_deps: List[ast.AstIdentExpr] = []
 
@@ -131,7 +131,7 @@ class TypeChecker(ast.DeepVisitor):
                 )
         else:
             node.type_annot = node.val_init.type_annot
-            if node.type_annot == TYPE_VOID:
+            if node.type_annot == an.TYPE_VOID:
                 self.errors.add(
                     message="cannot declare value as void",
                     regions=[node.val_init.region],
@@ -146,13 +146,13 @@ class TypeChecker(ast.DeepVisitor):
         node.return_type.accept(self)
         if (
             not valid(node.return_type.type_annot)
-            and node.return_type.type_annot != TYPE_VOID
+            and node.return_type.type_annot != an.TYPE_VOID
         ):
             self.errors.add(
                 message=f"invalid return type {node.return_type.type_annot}",
                 regions=[node.return_type.region],
             )
-        node.type_annot = ast.FuncTypeAnnot(
+        node.type_annot = an.FuncTypeAnnot(
             [param.type_annot for param in node.params], node.return_type.type_annot
         )
         self.expected_returns.append(node.type_annot.return_type)
@@ -173,14 +173,14 @@ class TypeChecker(ast.DeepVisitor):
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
-        if node.expr and node.expr.type_annot != TYPE_STR:
+        if node.expr and node.expr.type_annot != an.TYPE_STR:
             self.errors.add(
                 message=f"invalid type {node.expr.type_annot} to print, expected str",
                 regions=[node.expr.region],
             )
 
     def _check_cond(self, cond: ast.AstExpr) -> None:
-        if cond.type_annot != TYPE_BOOL:
+        if cond.type_annot != an.TYPE_BOOL:
             self.errors.add(
                 message=f"invalid type {cond.type_annot} for condition, expected bool",
                 regions=[cond.region],
@@ -198,7 +198,6 @@ class TypeChecker(ast.DeepVisitor):
             self._check_cond(node.cond)
 
     def return_stmt(self, node: ast.AstReturnStmt) -> None:
-        # TODO: Make a pass that checks whether functions always return
         super().return_stmt(node)
         if not self.expected_returns:
             self.errors.add(
@@ -217,7 +216,7 @@ class TypeChecker(ast.DeepVisitor):
                     regions=[node.expr.region],
                 )
         else:
-            if self.expected_returns[-1] != TYPE_VOID:
+            if self.expected_returns[-1] != an.TYPE_VOID:
                 self.errors.add(
                     message=f"missing return value in non-void function",
                     regions=[node.region],
@@ -225,12 +224,12 @@ class TypeChecker(ast.DeepVisitor):
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
-        if not valid(node.expr.type_annot) and node.expr.type_annot != TYPE_VOID:
+        if not valid(node.expr.type_annot) and node.expr.type_annot != an.TYPE_VOID:
             self.errors.add(
                 f"invalid expression type {node.expr.type_annot}",
                 regions=[node.expr.region],
             )
-        if node.expr.type_annot != TYPE_VOID:
+        if node.expr.type_annot != an.TYPE_VOID:
             self.errors.add(
                 message=f"unused non-void value",
                 regions=[node.expr.region],
@@ -268,7 +267,7 @@ class TypeChecker(ast.DeepVisitor):
                 )
             else:
                 # Overloaded concat operator
-                if str(node.operator) == "+" and node.left.type_annot == TYPE_STR:
+                if str(node.operator) == "+" and node.left.type_annot == an.TYPE_STR:
                     pass
                 elif node.left.type_annot not in ARITH_TYPES:
                     self.errors.add(
@@ -289,7 +288,7 @@ class TypeChecker(ast.DeepVisitor):
 
             check(node.left)
             check(node.right)
-            node.type_annot = TYPE_BOOL
+            node.type_annot = an.TYPE_BOOL
         else:
             self.errors.add(
                 message=f"unknown binary operator {node.operator}",
@@ -298,15 +297,15 @@ class TypeChecker(ast.DeepVisitor):
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
         super().int_expr(node)
-        node.type_annot = TYPE_INT
+        node.type_annot = an.TYPE_INT
 
     def num_expr(self, node: ast.AstNumExpr) -> None:
         super().num_expr(node)
-        node.type_annot = TYPE_NUM
+        node.type_annot = an.TYPE_NUM
 
     def str_expr(self, node: ast.AstStrExpr) -> None:
         super().str_expr(node)
-        node.type_annot = TYPE_STR
+        node.type_annot = an.TYPE_STR
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
@@ -328,15 +327,15 @@ class TypeChecker(ast.DeepVisitor):
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
         super().bool_expr(node)
-        node.type_annot = TYPE_BOOL
+        node.type_annot = an.TYPE_BOOL
 
     def nil_expr(self, node: ast.AstNilExpr) -> None:
         super().nil_expr(node)
-        node.type_annot = TYPE_NIL
+        node.type_annot = an.TYPE_NIL
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)
-        if not isinstance(node.function.type_annot, ast.FuncTypeAnnot):
+        if not isinstance(node.function.type_annot, an.FuncTypeAnnot):
             self.errors.add(
                 message=f"invalid type {node.function.type_annot} to call, expected a function",
                 regions=[node.function.region],
@@ -365,15 +364,15 @@ class TypeChecker(ast.DeepVisitor):
 
     def atom_type(self, node: ast.AstAtomType) -> None:
         super().atom_type(node)
-        node.type_annot = ast.BuiltinTypeAnnot(node.name)
-        if not valid(node.type_annot) and node.type_annot != TYPE_VOID:
+        node.type_annot = an.BuiltinTypeAnnot(node.name)
+        if not valid(node.type_annot) and node.type_annot != an.TYPE_VOID:
             self.errors.add(
                 message=f"invalid type {node.type_annot}", regions=[node.region]
             )
 
     def func_type(self, node: ast.AstFuncType) -> None:
         super().func_type(node)
-        node.type_annot = ast.FuncTypeAnnot(
+        node.type_annot = an.FuncTypeAnnot(
             [param.type_annot for param in node.params], node.return_type.type_annot
         )
         if not valid(node.type_annot):
@@ -383,7 +382,7 @@ class TypeChecker(ast.DeepVisitor):
 
     def optional_type(self, node: ast.AstOptionalType) -> None:
         super().optional_type(node)
-        node.type_annot = ast.OptionalTypeAnnot(node.target.type_annot)
+        node.type_annot = an.OptionalTypeAnnot(node.target.type_annot)
         if not valid(node.type_annot):
             self.errors.add(
                 message=f"invalid type {node.type_annot}", regions=[node.region]

@@ -12,10 +12,10 @@ import clr.errors as er
 import clr.bytecode as bc
 import clr.lexer as lx
 import clr.parser as ps
-import clr.ast as ast
 import clr.printer as pr
 import clr.resolver as rs
 import clr.typechecker as tc
+import clr.controlflow as cf
 
 DEBUG = True
 
@@ -97,8 +97,13 @@ def main() -> None:
         pr.pprint(tree)
         print("--------")
 
-    _check_errors("Resolve", rs.resolve_names(tree))
-    _check_errors("Type", tc.check_types(tree))
+    passes = [
+        ("Resolve", rs.resolve_names),
+        ("Type", tc.check_types),
+        ("Control Flow", cf.check_flow),
+    ]
+    for pass_name, pass_func in passes:
+        _check_errors(pass_name, pass_func(tree))
 
     constants: List[bc.Constant] = []
     instructions: List[bc.Instruction] = []

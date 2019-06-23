@@ -64,20 +64,12 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
         return token
 
     return (
-        list(
-            map(
-                keywordize,
-                filter(lambda token: token.kind != TokenType.ERROR, lexer.tokens),
-            )
-        ),
-        list(
-            map(
-                lambda token: er.CompileError(
-                    message=f"unexpected token {token}", regions=[token.lexeme]
-                ),
-                filter(lambda token: token.kind == TokenType.ERROR, lexer.tokens),
-            )
-        ),
+        [keywordize(token) for token in lexer.tokens if token.kind != TokenType.ERROR],
+        [
+            er.CompileError(message=f"unexpected token {token}", regions=[token.lexeme])
+            for token in lexer.tokens
+            if token.kind == TokenType.ERROR
+        ],
     )
 
 
