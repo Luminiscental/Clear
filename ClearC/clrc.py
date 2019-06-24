@@ -17,6 +17,7 @@ import clr.resolver as rs
 import clr.sequencer as sq
 import clr.typechecker as tc
 import clr.controlflow as cf
+import clr.indexer as ix
 
 DEBUG = True
 
@@ -110,6 +111,7 @@ def main() -> None:
         ("Sequencing", sq.SequenceWriter()),
         ("Type", tc.TypeChecker()),
         ("Control Flow", cf.FlowChecker()),
+        ("Indexing", ix.Indexer()),
     ]
 
     for name, visitor in subpasses:

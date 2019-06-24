@@ -143,3 +143,46 @@ class ReturnAnnot(enum.Enum):
     NEVER = enum.auto()
     SOMETIMES = enum.auto()
     ALWAYS = enum.auto()
+
+    def __str__(self) -> str:
+        return self.name
+
+
+# Index annotations
+
+
+@enum.unique
+class IndexAnnotType(enum.Enum):
+    """
+    Enumerates the possible types of index.
+    """
+
+    GLOBAL = enum.auto()
+    LOCAL = enum.auto()
+    UPVALUE = enum.auto()
+    PARAM = enum.auto()
+    UNRESOLVED = enum.auto()
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class IndexAnnot:
+    """
+    Annotation for the index and type of a value reference.
+    """
+
+    def __init__(self, value: int, kind: IndexAnnotType) -> None:
+        self.value = value
+        self.kind = kind
+
+    def __eq__(self, other: object) -> Comparison:
+        if isinstance(other, IndexAnnot):
+            return self.kind == other.kind and self.value == other.value
+        return NotImplemented
+
+    def __ne__(self, other: object) -> Comparison:
+        return not self == other
+
+    def __str__(self) -> str:
+        return f"{self.kind}:{self.value}"

@@ -246,6 +246,9 @@ class AstNode:
         # Annotations:
         self.type_annot: an.TypeAnnot = an.UnresolvedTypeAnnot()
         self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
+        self.index_annot: an.IndexAnnot = an.IndexAnnot(
+            value=-1, kind=an.IndexAnnotType.UNRESOLVED
+        )
 
     def accept(self, visitor: AstVisitor) -> None:
         """
@@ -369,6 +372,7 @@ class AstFuncDecl(AstNode):
         self.region = region
         # Annotations:
         self.scope: Optional[Union[Ast, AstBlockStmt]] = None
+        self.upvalues: List[AstIdentRef] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
