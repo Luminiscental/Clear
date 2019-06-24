@@ -7,6 +7,8 @@ import clr.ast as ast
 import clr.annotations as an
 import clr.errors as er
 
+# TODO: Make a control flow graph
+
 
 def check_flow(tree: ast.Ast) -> List[er.CompileError]:
     """

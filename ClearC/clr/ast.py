@@ -207,7 +207,7 @@ class AstNode:
 
 class AstType(AstNode):
     """
-    Base class to help mypy
+    Base class for type nodes to help mypy.
     """
 
     def __init__(self, region: er.SourceView) -> None:
@@ -220,7 +220,7 @@ class AstType(AstNode):
 
 class AstExpr(AstNode):
     """
-    Base class to help mypy
+    Base class for expression nodes to help mypy.
     """
 
     def __init__(self, region: er.SourceView) -> None:
@@ -252,8 +252,10 @@ class Ast(AstNode):
         self.decls = decls
         # Annotations:
         self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
+        self.sequence: List[AstDecl] = []
 
     def accept(self, visitor: AstVisitor) -> None:
+        # TODO: Maybe this should be delegated to the visitor
         for decl in self.decls:
             decl.accept(visitor)
 
@@ -275,6 +277,8 @@ class AstValueDecl(AstNode):
         self.val_type = val_type
         self.val_init = val_init
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.value_decl(self)
@@ -314,6 +318,8 @@ class AstFuncDecl(AstNode):
         self.return_type = return_type
         self.block = block
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
@@ -328,6 +334,8 @@ class AstPrintStmt(AstNode):
         super().__init__()
         self.expr = expr
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.print_stmt(self)
@@ -344,6 +352,8 @@ class AstBlockStmt(AstNode):
         self.region = region
         # Annotations:
         self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
+        self.sequence: List[AstDecl] = []
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
@@ -366,6 +376,8 @@ class AstIfStmt(AstNode):
         self.elif_parts = elif_parts
         self.else_part = else_part
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.if_stmt(self)
@@ -383,6 +395,8 @@ class AstWhileStmt(AstNode):
         self.cond = cond
         self.block = block
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.while_stmt(self)
@@ -397,6 +411,8 @@ class AstReturnStmt(AstNode):
         super().__init__()
         self.expr = expr
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.return_stmt(self)
@@ -411,6 +427,8 @@ class AstExprStmt(AstNode):
         super().__init__()
         self.expr = expr
         self.region = region
+        # Annotations:
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.expr_stmt(self)

@@ -108,13 +108,8 @@ class TypeChecker(ast.DeepVisitor):
     def __init__(self) -> None:
         self.errors = er.ErrorTracker()
         self.expected_returns: List[an.TypeAnnot] = []
-        self.seen_refs: List[ast.AstIdentRef] = []
-        self.circ_deps: List[ast.AstIdentExpr] = []
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
-        if node in self.seen_refs:
-            return
-        self.seen_refs.append(node)
         super().value_decl(node)
         if node.val_type:
             if not valid(node.val_type.type_annot):
@@ -138,9 +133,6 @@ class TypeChecker(ast.DeepVisitor):
                 )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        if node in self.seen_refs:
-            return
-        self.seen_refs.append(node)
         for param in node.params:
             param.accept(self)
         node.return_type.accept(self)
@@ -160,23 +152,12 @@ class TypeChecker(ast.DeepVisitor):
         self.expected_returns.pop()
 
     def param(self, node: ast.AstParam) -> None:
-        if node in self.seen_refs:
-            return
-        self.seen_refs.append(node)
         super().param(node)
         node.type_annot = node.param_type.type_annot
         if not valid(node.type_annot):
             self.errors.add(
                 message=f"invalid type {node.type_annot} for parameter",
                 regions=[node.region],
-            )
-
-    def print_stmt(self, node: ast.AstPrintStmt) -> None:
-        super().print_stmt(node)
-        if node.expr and node.expr.type_annot != an.TYPE_STR:
-            self.errors.add(
-                message=f"invalid type {node.expr.type_annot} to print, expected str",
-                regions=[node.expr.region],
             )
 
     def _check_cond(self, cond: ast.AstExpr) -> None:
@@ -310,18 +291,10 @@ class TypeChecker(ast.DeepVisitor):
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
         if node.ref:
-            if node.ref not in self.seen_refs:
-                node.ref.accept(self)
-            elif node.ref.type_annot.unresolved and node not in self.circ_deps:
-                self.circ_deps.append(node)
-                self.errors.add(
-                    message=f"circular dependency for value {node.name}",
-                    regions=[node.region, node.ref.region],
-                )
             node.type_annot = node.ref.type_annot
         else:
             self.errors.add(
-                message=f"couldn't resolve identifier {node.name} ({node})",
+                message=f"couldn't resolve identifier {node.name}",
                 regions=[node.region],
             )
 

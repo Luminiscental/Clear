@@ -14,6 +14,7 @@ import clr.lexer as lx
 import clr.parser as ps
 import clr.printer as pr
 import clr.resolver as rs
+import clr.sequencer as sq
 import clr.typechecker as tc
 import clr.controlflow as cf
 
@@ -82,12 +83,14 @@ def main() -> None:
     source_file_name, dest_file_name = _get_filenames()
     source = _read_source(source_file_name)
 
+    # Lexical analysis
     tokens, lex_errors = lx.tokenize_source(source)
-    _check_errors("Lex", lex_errors)
+    _check_errors("Lexical", lex_errors)
 
+    # Syntax analysis
     tree = ps.parse_tokens(tokens)
     if isinstance(tree, er.CompileError):
-        print("Parse Error:")
+        print("Syntax")
         print(tree.display())
         sys.exit(1)
 
@@ -97,13 +100,18 @@ def main() -> None:
         pr.pprint(tree)
         print("--------")
 
-    passes = [
+    # Semantic analysis
+    subpasses = [
         ("Resolve", rs.resolve_names),
+        ("Sequencing", sq.sequence_tree),
         ("Type", tc.check_types),
         ("Control Flow", cf.check_flow),
     ]
-    for pass_name, pass_func in passes:
+
+    for pass_name, pass_func in subpasses:
         _check_errors(pass_name, pass_func(tree))
+
+    # TODO: Code generation
 
     constants: List[bc.Constant] = []
     instructions: List[bc.Instruction] = []

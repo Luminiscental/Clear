@@ -1,29 +1,14 @@
 
-val a = fac(b);
-val b = 2i;
-val c bool? = maybe2(false) == nil;
+print f(a);
 
-func fac(int n) int {
-    if (n == 0i) {
-        return 1i;
-    }
-    return n * fac(n - 1i);
+val a = b;
+val b = f(c);
+val c = 3;
+
+func f(num x) num {
+    return g(x * x);
 }
 
-func maybe2(bool input) int? {
-    if (input) {
-        return 2i;
-    } else {
-        return nil;
-    }
-}
-
-func x() str {
-    if (false) {
-        return "2";
-    } else if (true) {
-        return "3";
-    } else {
-        print "oh no";
-    }
+func g(num x) num {
+    return c * x;
 }
