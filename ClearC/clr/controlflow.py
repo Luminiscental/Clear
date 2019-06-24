@@ -8,8 +8,6 @@ import clr.ast as ast
 import clr.annotations as an
 import clr.errors as er
 
-# TODO: Make a control flow graph
-
 
 class FlowChecker(ast.DeepVisitor):
     """
@@ -20,7 +18,7 @@ class FlowChecker(ast.DeepVisitor):
         super().func_decl(node)
         # TODO: Show how rather than just highlighting the whole function
         if (
-            node.return_type.type_annot != an.TYPE_VOID
+            node.return_type.type_annot != an.BuiltinTypeAnnot.VOID
             and node.block.return_annot != an.ReturnAnnot.ALWAYS
         ):
             self.errors.add(

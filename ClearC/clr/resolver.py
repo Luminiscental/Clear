@@ -5,6 +5,7 @@ Module for name resolution visitors / functions.
 from typing import Union, Optional
 
 import clr.ast as ast
+import clr.annotations as an
 
 
 class NameTracker(ast.ScopeVisitor):
@@ -109,6 +110,5 @@ class NameResolver(ast.ScopeVisitor):
         self._resolve_name(node.name, node)
 
     def atom_type(self, node: ast.AstAtomType) -> None:
-        # TODO: Handle builtin types more cleanly
-        if node.name not in ["void", "int", "str", "num", "bool"]:
+        if node.name not in {annot.value for annot in an.BuiltinTypeAnnot}:
             self._resolve_name(node.name, node)

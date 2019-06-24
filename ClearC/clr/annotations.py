@@ -41,21 +41,25 @@ class UnresolvedTypeAnnot:
         return not self == other
 
 
-class BuiltinTypeAnnot:
+@enum.unique
+class BuiltinTypeAnnot(enum.Enum):
     """
-    Type annotation for a built in type.
+    Enumerates the built in type annotations.
     """
 
-    def __init__(self, name: str) -> None:
-        self.name = name
-        self.unresolved = False
+    VOID = "void"
+    INT = "int"
+    NUM = "num"
+    STR = "str"
+    BOOL = "bool"
+    NIL = "nil"
 
     def __str__(self) -> str:
-        return self.name
+        return str(self.value)
 
     def __eq__(self, other: object) -> Comparison:
         if isinstance(other, BuiltinTypeAnnot):
-            return self.name == other.name
+            return self.value == other.value
         if isinstance(other, FuncTypeAnnot):
             return False
         if isinstance(other, OptionalTypeAnnot):
@@ -124,17 +128,12 @@ class OptionalTypeAnnot:
         return not self == other
 
 
-TYPE_VOID = BuiltinTypeAnnot("void")
-TYPE_STR = BuiltinTypeAnnot("str")
-TYPE_BOOL = BuiltinTypeAnnot("bool")
-TYPE_INT = BuiltinTypeAnnot("int")
-TYPE_NUM = BuiltinTypeAnnot("num")
-TYPE_NIL = BuiltinTypeAnnot("nil")
-
+ARITH_TYPES = [BuiltinTypeAnnot.INT, BuiltinTypeAnnot.NUM]
 
 # Return annotations
 
 
+@enum.unique
 class ReturnAnnot(enum.Enum):
     """
     Enumerates the different kinds of control flow for parts of code, either they always return,
