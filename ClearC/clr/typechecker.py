@@ -12,15 +12,6 @@ T = TypeVar("T")  # pylint: disable=invalid-name
 R = TypeVar("R")  # pylint: disable=invalid-name
 
 
-def check_types(tree: ast.Ast) -> List[er.CompileError]:
-    """
-    Run the type checker over an ast.
-    """
-    checker = TypeChecker()
-    tree.accept(checker)
-    return checker.errors.get()
-
-
 ARITH_TYPES = [an.TYPE_INT, an.TYPE_NUM]
 ARITH_UNARY = ["-"]
 ARITH_BINARY = ["+", "-", "*", "/"]
@@ -106,7 +97,7 @@ class TypeChecker(ast.DeepVisitor):
     """
 
     def __init__(self) -> None:
-        self.errors = er.ErrorTracker()
+        super().__init__()
         self.expected_returns: List[an.TypeAnnot] = []
 
     def value_decl(self, node: ast.AstValueDecl) -> None:

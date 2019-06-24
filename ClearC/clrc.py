@@ -83,6 +83,8 @@ def main() -> None:
     source_file_name, dest_file_name = _get_filenames()
     source = _read_source(source_file_name)
 
+    print("--------")
+
     # Lexical analysis
     tokens, lex_errors = lx.tokenize_source(source)
     _check_errors("Lexical", lex_errors)
@@ -90,26 +92,35 @@ def main() -> None:
     # Syntax analysis
     tree = ps.parse_tokens(tokens)
     if isinstance(tree, er.CompileError):
-        print("Syntax")
-        print(tree.display())
-        sys.exit(1)
+        _check_errors("Syntax", [tree])
+        sys.exit(1)  # Even if it's only a warning we can't do much without the tree.
 
     if DEBUG:
         print("Ast:")
         print("--------")
-        pr.pprint(tree)
+        tree.accept(pr.AstPrinter())
         print("--------")
 
     # Semantic analysis
     subpasses = [
-        ("Resolve", rs.resolve_names),
-        ("Sequencing", sq.sequence_tree),
-        ("Type", tc.check_types),
-        ("Control Flow", cf.check_flow),
+        ("Resolve", rs.NameTracker()),
+        ("Resolve", rs.ScopeTracker()),
+        ("Resolve", rs.NameResolver()),
+        ("Sequencing", sq.SequenceBuilder()),
+        ("Sequencing", sq.SequenceWriter()),
+        ("Type", tc.TypeChecker()),
+        ("Control Flow", cf.FlowChecker()),
     ]
 
-    for pass_name, pass_func in subpasses:
-        _check_errors(pass_name, pass_func(tree))
+    for name, visitor in subpasses:
+        tree.accept(visitor)
+        _check_errors(name, visitor.errors.get())
+
+    if DEBUG:
+        print("Sequenced Ast:")
+        print("--------")
+        tree.accept(pr.AstPrinter())
+        print("--------")
 
     # TODO: Code generation
 

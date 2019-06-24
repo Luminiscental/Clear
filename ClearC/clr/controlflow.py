@@ -1,6 +1,7 @@
 """
 Defines a visitor to check the control flow of fuctions, verifying if they always/never return.
 """
+
 from typing import List
 
 import clr.ast as ast
@@ -10,22 +11,10 @@ import clr.errors as er
 # TODO: Make a control flow graph
 
 
-def check_flow(tree: ast.Ast) -> List[er.CompileError]:
-    """
-    Run the flow checker over an ast.
-    """
-    checker = FlowChecker()
-    tree.accept(checker)
-    return checker.errors.get()
-
-
 class FlowChecker(ast.DeepVisitor):
     """
     Ast visitor to check which parts of code always/sometimes return.
     """
-
-    def __init__(self) -> None:
-        self.errors = er.ErrorTracker()
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         super().func_decl(node)

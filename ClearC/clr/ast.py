@@ -8,11 +8,21 @@ import clr.errors as er
 import clr.lexer as lx
 import clr.annotations as an
 
+# Visitor definitions:
+
 
 class AstVisitor:
     """
     Base class for an ast visitor.
     """
+
+    def __init__(self) -> None:
+        self.errors = er.ErrorTracker()
+
+    def start(self, node: "Ast") -> None:
+        """
+        Start visiting a tree.
+        """
 
     def value_decl(self, node: "AstValueDecl") -> None:
         """
@@ -125,6 +135,10 @@ class DeepVisitor(AstVisitor):
     Ast visitor that propogates to all nodes for a convenient base class.
     """
 
+    def start(self, node: "Ast") -> None:
+        for decl in node.decls:
+            decl.accept(self)
+
     def value_decl(self, node: "AstValueDecl") -> None:
         node.val_init.accept(self)
         if node.val_type:
@@ -189,12 +203,47 @@ class DeepVisitor(AstVisitor):
         node.target.accept(self)
 
 
-class AstNode:
+class ScopeVisitor(DeepVisitor):
     """
-    Base class for an ast node that can accept a visitor.
+    Ast visitor base class to keep track of the current scope.
     """
 
     def __init__(self) -> None:
+        super().__init__()
+        self._scopes: List[Union["AstBlockStmt", "Ast"]] = []
+
+    def _get_scope(self) -> Union["AstBlockStmt", "Ast"]:
+        return self._scopes[-1]
+
+    def _push_scope(self, node: Union["AstBlockStmt", "Ast"]) -> None:
+        self._scopes.append(node)
+
+    def _pop_scope(self) -> None:
+        self._scopes.pop()
+
+    def start(self, node: "Ast") -> None:
+        self._push_scope(node)
+        super().start(node)
+        self._pop_scope()
+
+    def block_stmt(self, node: "AstBlockStmt") -> None:
+        self._push_scope(node)
+        super().block_stmt(node)
+        self._pop_scope()
+
+
+# Node definitions:
+
+# Base node types:
+
+
+class AstNode:
+    """
+    Base class for an ast node. All nodes must be able to accept an ast visitor.
+    """
+
+    def __init__(self) -> None:
+        # Annotations:
         self.type_annot: an.TypeAnnot = an.UnresolvedTypeAnnot()
         self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
 
@@ -241,6 +290,8 @@ AstStmt = Union[
 ]
 AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
+# Specific nodes:
+
 
 class Ast(AstNode):
     """
@@ -255,9 +306,7 @@ class Ast(AstNode):
         self.sequence: List[AstDecl] = []
 
     def accept(self, visitor: AstVisitor) -> None:
-        # TODO: Maybe this should be delegated to the visitor
-        for decl in self.decls:
-            decl.accept(visitor)
+        visitor.start(self)
 
 
 class AstValueDecl(AstNode):
@@ -506,6 +555,7 @@ class AstStrExpr(AstExpr):
         visitor.str_expr(self)
 
 
+# Type alias for identifier declarations
 AstIdentRef = Union[AstFuncDecl, AstValueDecl, AstParam]
 
 

@@ -7,30 +7,19 @@ from typing import Callable
 import clr.ast as ast
 
 
-def pprint(node: ast.AstNode) -> None:
-    """
-    Pretty prints a given ast node.
-    """
-    printer = AstPrinter()
-    node.accept(printer)
-    printer.flush()
-
-
 class AstPrinter(ast.AstVisitor):
     """
     Ast visitor that pretty prints the nodes it visits.
     """
 
     def __init__(self, printer: Callable[[str], None] = print) -> None:
+        super().__init__()
         self._indent = 0
         self._printer = printer
         self._buffer = ""
         self._dont_break = False
 
-    def flush(self) -> None:
-        """
-        Flush the buffer if it isn't empty.
-        """
+    def _flush(self) -> None:
         if self._buffer:
             self._printer(self._buffer)
             self._buffer = ""
@@ -43,8 +32,13 @@ class AstPrinter(ast.AstVisitor):
             self._dont_break = False
         else:
             if self._buffer:
-                self.flush()
+                self._flush()
             self._append("    " * self._indent)
+
+    def start(self, node: ast.Ast) -> None:
+        for decl in node.decls:
+            decl.accept(self)
+        self._flush()
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         self._startline()

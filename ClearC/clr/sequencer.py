@@ -5,21 +5,6 @@ Module for sequencing visitors / functions.
 from typing import List, Union
 
 import clr.ast as ast
-import clr.errors as er
-import clr.resolver as rs
-
-
-def sequence_tree(tree: ast.Ast) -> List[er.CompileError]:
-    """
-    Finds a viable execution order for the ast and puts the declarations in that order.
-    """
-    builder = SequenceBuilder(tree)
-    tree.accept(builder)
-
-    if not any(error.severity == er.Severity.ERROR for error in builder.errors.get()):
-        tree.accept(SequenceWriter(tree))
-
-    return builder.errors.get()
 
 
 def _sequence(node: ast.AstDecl) -> None:
@@ -27,14 +12,13 @@ def _sequence(node: ast.AstDecl) -> None:
         node.scope.sequence.append(node)
 
 
-class SequenceBuilder(rs.ScopeVisitor):
+class SequenceBuilder(ast.ScopeVisitor):
     """
     Ast visitor to annotate the execution order of declarations.
     """
 
-    def __init__(self, tree: ast.Ast) -> None:
-        super().__init__(tree)
-        self.errors = er.ErrorTracker()
+    def __init__(self) -> None:
+        super().__init__()
         self.started: List[Union[ast.AstValueDecl, ast.AstFuncDecl]] = []
         self.completed: List[Union[ast.AstValueDecl, ast.AstFuncDecl]] = []
 
@@ -42,6 +26,7 @@ class SequenceBuilder(rs.ScopeVisitor):
         if node in self.completed:
             return
         if node in self.started:
+            # TODO: Show the loop somehow.
             self.errors.add(
                 message=f"circular dependency for {node.ident}", regions=[node.region]
             )
@@ -101,13 +86,13 @@ class SequenceBuilder(rs.ScopeVisitor):
 
 class SequenceWriter(ast.DeepVisitor):
     """
-    Ast visitor to put statements in execution order from annotations.
+    Ast visitor to put declarations in execution order from annotations.
     """
 
-    def __init__(self, tree: ast.Ast) -> None:
-        super().__init__()
-        tree.decls = list(tree.sequence)
+    def start(self, node: ast.Ast) -> None:
+        super().start(node)
+        node.decls = node.sequence
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
         super().block_stmt(node)
-        node.decls = list(node.sequence)
+        node.decls = node.sequence

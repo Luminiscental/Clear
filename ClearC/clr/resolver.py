@@ -2,67 +2,15 @@
 Module for name resolution visitors / functions.
 """
 
-from typing import List, Union, Optional
+from typing import Union, Optional
 
-import clr.errors as er
 import clr.ast as ast
 
 
-def resolve_names(tree: ast.Ast) -> List[er.CompileError]:
-    """
-    Annotates scopes, declarations and identifiers:
-    - Scopes are annotated with a dict for the named values they contain.
-    - Declarations are annotated with their enclosing scope.
-    - Identifiers are annotated with the declaration they reference.
-    """
-    errs: List[er.CompileError] = []
-
-    def run_subpass(visitor: Union[NameTracker, ScopeTracker, NameResolver]) -> bool:
-        tree.accept(visitor)
-        errs.extend(visitor.errors.get())
-        if any(error.severity == er.Severity.ERROR for error in visitor.errors.get()):
-            return False
-        return True
-
-    if not run_subpass(NameTracker(tree)):
-        return errs
-    if not run_subpass(ScopeTracker(tree)):
-        return errs
-    run_subpass(NameResolver(tree))
-    return errs
-
-
-class ScopeVisitor(ast.DeepVisitor):
-    """
-    Ast visitor to keep track of the current scope.
-    """
-
-    def __init__(self, tree: ast.Ast):
-        self._scopes: List[Union[ast.AstBlockStmt, ast.Ast]] = [tree]
-
-    def _get_scope(self) -> Union[ast.AstBlockStmt, ast.Ast]:
-        return self._scopes[-1]
-
-    def _push_scope(self, node: ast.AstBlockStmt) -> None:
-        self._scopes.append(node)
-
-    def _pop_scope(self) -> None:
-        self._scopes.pop()
-
-    def block_stmt(self, node: ast.AstBlockStmt) -> None:
-        self._push_scope(node)
-        super().block_stmt(node)
-        self._pop_scope()
-
-
-class NameTracker(ScopeVisitor):
+class NameTracker(ast.ScopeVisitor):
     """
     Ast visitor to annotate what names are in scope.
     """
-
-    def __init__(self, tree: ast.Ast):
-        super().__init__(tree)
-        self.errors = er.ErrorTracker()
 
     def _set_name(self, name: str, node: ast.AstIdentRef) -> None:
         names = self._get_scope().names
@@ -87,14 +35,10 @@ class NameTracker(ScopeVisitor):
         self._pop_scope()
 
 
-class ScopeTracker(ScopeVisitor):
+class ScopeTracker(ast.ScopeVisitor):
     """
     Ast visitor to annotate what scope declarations are in.
     """
-
-    def __init__(self, tree: ast.Ast) -> None:
-        super().__init__(tree)
-        self.errors = er.ErrorTracker()
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
@@ -139,14 +83,10 @@ class ScopeTracker(ScopeVisitor):
         node.scope = self._get_scope()
 
 
-class NameResolver(ScopeVisitor):
+class NameResolver(ast.ScopeVisitor):
     """
     Ast visitor to annotate what declarations identifiers reference.
     """
-
-    def __init__(self, tree: ast.Ast) -> None:
-        super().__init__(tree)
-        self.errors = er.ErrorTracker()
 
     def _get_name(self, name: str) -> Optional[ast.AstIdentRef]:
         for scope in reversed(self._scopes):
