@@ -75,13 +75,9 @@ class SequenceBuilder(ast.ScopeVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
+        # If the ref is None there was already an error
         if node.ref:
             node.ref.accept(self)
-        else:
-            self.errors.add(
-                message=f"couldn't resolve identifier {node.name}",
-                regions=[node.region],
-            )
 
 
 class SequenceWriter(ast.DeepVisitor):

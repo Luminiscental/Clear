@@ -58,6 +58,7 @@ class Indexer(ast.ScopeVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
+        # If the ref is None there was already an error
         if node.ref:
             if (
                 self._functions  # In a function
@@ -84,9 +85,3 @@ class Indexer(ast.ScopeVisitor):
             else:
                 # Not an upvalue so just use the declaration
                 node.index_annot = node.ref.index_annot
-        else:
-            self.errors.add(
-                message=f"couldn't resolve identifier {node.name}",
-                regions=[node.region],
-            )
-        print(f"{node.name} is {node.index_annot}")

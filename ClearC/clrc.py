@@ -16,7 +16,7 @@ import clr.printer as pr
 import clr.resolver as rs
 import clr.sequencer as sq
 import clr.typechecker as tc
-import clr.controlflow as cf
+import clr.flowchecker as fc
 import clr.indexer as ix
 
 DEBUG = True
@@ -110,7 +110,7 @@ def main() -> None:
         ("Sequencing", sq.SequenceBuilder()),
         ("Sequencing", sq.SequenceWriter()),
         ("Type", tc.TypeChecker()),
-        ("Control Flow", cf.FlowChecker()),
+        ("Control Flow", fc.FlowChecker()),
         ("Indexing", ix.Indexer()),
     ]
 

@@ -280,13 +280,9 @@ class TypeChecker(ast.DeepVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
+        # If the ref is None there was already an error
         if node.ref:
             node.type_annot = node.ref.type_annot
-        else:
-            self.errors.add(
-                message=f"couldn't resolve identifier {node.name}",
-                regions=[node.region],
-            )
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
         super().bool_expr(node)

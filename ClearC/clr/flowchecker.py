@@ -2,8 +2,6 @@
 Defines a visitor to check the control flow of fuctions, verifying if they always/never return.
 """
 
-from typing import List
-
 import clr.ast as ast
 import clr.annotations as an
 import clr.errors as er
