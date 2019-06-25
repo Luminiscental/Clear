@@ -145,6 +145,20 @@ class Opcode(enum.Enum):
 Instruction = Union[Opcode, int]
 
 
+def size(instructions: Iterable[Instruction]) -> int:
+    """
+    Returns the size in bytes of an iterable of instructions after assembly.
+    """
+    # Currently redundant (equal to len) because everything is 1 byte
+    result = 0
+    for instruction in instructions:
+        if isinstance(instruction, Opcode):
+            result += 1
+        else:
+            result += 1
+    return result
+
+
 def assemble_code(
     constants: Sequence[Constant], instructions: Iterable[Instruction]
 ) -> bytearray:

@@ -232,6 +232,21 @@ class ScopeVisitor(DeepVisitor):
         self._pop_scope()
 
 
+class FunctionVisitor(ScopeVisitor):
+    """
+    Ast visitor base class to keep track of the current function and scope.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._functions: List["AstFuncDecl"] = []
+
+    def func_decl(self, node: "AstFuncDecl") -> None:
+        self._functions.append(node)
+        super().func_decl(node)
+        self._functions.pop()
+
+
 # Node definitions:
 
 # Base node types:
@@ -373,6 +388,7 @@ class AstFuncDecl(AstNode):
         # Annotations:
         self.scope: Optional[Union[Ast, AstBlockStmt]] = None
         self.upvalues: List[AstIdentRef] = []
+        self.upvalue_refs: List[an.IndexAnnot] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
@@ -528,6 +544,7 @@ class AstIntExpr(AstExpr):
     def __init__(self, literal: lx.Token) -> None:
         super().__init__(literal.lexeme)
         self.literal = str(literal)
+        self.value = int(self.literal[:-1])
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.int_expr(self)
@@ -541,6 +558,7 @@ class AstNumExpr(AstExpr):
     def __init__(self, literal: lx.Token) -> None:
         super().__init__(literal.lexeme)
         self.literal = str(literal)
+        self.value = float(self.literal)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.num_expr(self)
@@ -554,6 +572,7 @@ class AstStrExpr(AstExpr):
     def __init__(self, literal: lx.Token) -> None:
         super().__init__(literal.lexeme)
         self.literal = str(literal)
+        self.value = self.literal[1:-1]
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.str_expr(self)

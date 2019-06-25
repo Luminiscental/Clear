@@ -4,7 +4,7 @@ Given a module name, it loads the .clr file, compiles it,
 and exports the assembled .clr.b.
 """
 
-from typing import List, Iterable, Sequence, Tuple
+from typing import Iterable, Sequence, Tuple
 
 import sys
 
@@ -18,6 +18,7 @@ import clr.sequencer as sq
 import clr.typechecker as tc
 import clr.flowchecker as fc
 import clr.indexer as ix
+import clr.codegenerator as cg
 
 DEBUG = True
 
@@ -126,10 +127,7 @@ def main() -> None:
 
     # TODO: Code generation
 
-    constants: List[bc.Constant] = []
-    instructions: List[bc.Instruction] = []
-
-    assembled = _assemble_code(constants, instructions)
+    assembled = _assemble_code(*cg.generate_code(tree))
 
     with open(dest_file_name, "wb") as dest_file:
         dest_file.write(assembled)

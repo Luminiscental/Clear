@@ -1,22 +1,7 @@
 
-print f(a);
-
-val a = b;
-val b = f(c);
-val c = 3;
-
-print "I would";
-print f(b);
-print "like to";
-val x = y;
-print "keep this in";
-val y = 2;
-print "order";
-
-func f(num x) num {
-    return g(x * x);
+{
+    val a = b;
+    print b;
+    print a;
 }
-
-func g(num x) num {
-    return c * x;
-}
+val b = 2;
