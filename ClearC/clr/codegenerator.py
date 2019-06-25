@@ -137,7 +137,8 @@ class Program:
             self.code.append(index_annot.value)
         elif index_annot.kind == an.IndexAnnotType.UPVALUE:
             self.get_upvalue(index_annot.value)
-            self.code.append(bc.Opcode.DEREF)
+            if index_annot.value != 0:
+                self.code.append(bc.Opcode.DEREF)
         else:
             self.code.append(bc.Opcode.PUSH_LOCAL)
             self.code.append(index_annot.value)

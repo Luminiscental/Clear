@@ -1,17 +1,9 @@
-{
-    func double(func(num) num f) func(num) num {
-        func result(num x) num {
-            return 2 * f(x);
-        }
-        return result;
-    }
 
-    func square(num x) num {
-        return x * x;
+func fac(num x) num {
+    if (x == 0) {
+        return 1;
     }
-
-    val double_square = double(square);
-    print double_square(3);
+    return x * fac(x - 1);
 }
 
-print nil;
+print fac(5);
