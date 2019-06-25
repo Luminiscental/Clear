@@ -112,6 +112,7 @@ def main() -> None:
         ("Sequencing", sq.SequenceWriter()),
         ("Type", tc.TypeChecker()),
         ("Control Flow", fc.FlowChecker()),
+        ("Indexing", ix.UpvalueTracker()),
         ("Indexing", ix.Indexer()),
     ]
 

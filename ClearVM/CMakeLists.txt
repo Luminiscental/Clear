@@ -3,7 +3,7 @@ project(clr C)
 
 option(DEBUG "Whether to compile in debug mode" ON)
 option(DEBUG_MEM "Whether to print out memory allocation info" OFF)
-option(DEUBG_STACK "Whether to print stack info" OFF)
+option(DEBUG_STACK "Whether to print stack info" OFF)
 
 if(DEBUG)
     set(CMAKE_BUILD_TYPE Debug)

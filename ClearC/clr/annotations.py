@@ -57,6 +57,9 @@ class BuiltinTypeAnnot(enum.Enum):
     def __str__(self) -> str:
         return str(self.value)
 
+    def __hash__(self) -> int:
+        return hash(self.value) * 31
+
     def __eq__(self, other: object) -> Comparison:
         if isinstance(other, BuiltinTypeAnnot):
             return self.value == other.value
@@ -86,6 +89,9 @@ class FuncTypeAnnot:
         param_str = ", ".join(str(param) for param in self.params)
         return f"func({param_str}) {self.return_type}"
 
+    def __hash__(self) -> int:
+        return hash((*self.params, self.return_type)) * 41
+
     def __eq__(self, other: object) -> Comparison:
         if isinstance(other, BuiltinTypeAnnot):
             return False
@@ -112,6 +118,9 @@ class OptionalTypeAnnot:
 
     def __str__(self) -> str:
         return f"({self.target})?"
+
+    def __hash__(self) -> int:
+        return hash(self.target) * 17
 
     def __eq__(self, other: object) -> Comparison:
         if isinstance(other, BuiltinTypeAnnot):

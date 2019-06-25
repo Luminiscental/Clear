@@ -41,8 +41,8 @@ class Indexer(ast.FunctionVisitor):
     def __init__(self) -> None:
         super().__init__()
         self._global_index = 0
-        self._local_index = 0
-        self._param_index = 0
+        self._local_indices: List[int] = []
+        self._param_indices: List[int] = []
 
     def _declare(self) -> an.IndexAnnot:
         if len(self._scopes) == 1:
@@ -52,9 +52,9 @@ class Indexer(ast.FunctionVisitor):
             self._global_index += 1
         else:
             result = an.IndexAnnot(
-                value=self._local_index, kind=an.IndexAnnotType.LOCAL
+                value=self._local_indices[-1], kind=an.IndexAnnotType.LOCAL
             )
-            self._local_index += 1
+            self._local_indices[-1] += 1
         return result
 
     def _load(self, ref: ast.AstIdentRef) -> an.IndexAnnot:
@@ -75,6 +75,10 @@ class Indexer(ast.FunctionVisitor):
             result.value += 1 + len(self._functions[-1].params)
         return result
 
+    def start(self, node: ast.Ast) -> None:
+        self._local_indices.append(0)
+        super().start(node)
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.index_annot = self._declare()
         super().value_decl(node)
@@ -83,20 +87,23 @@ class Indexer(ast.FunctionVisitor):
         node.index_annot = self._declare()
         for upvalue in node.upvalues:
             node.upvalue_refs.append(self._load(upvalue))
+        self._param_indices.append(0)
+        # Reset the locals
+        self._local_indices.append(0)
         super().func_decl(node)
-        # Reset param index
-        self._param_index = 0
+        self._local_indices.pop()
+        self._param_indices.pop()
 
     def param(self, node: ast.AstParam) -> None:
         node.index_annot = an.IndexAnnot(
-            value=1 + self._param_index, kind=an.IndexAnnotType.PARAM
+            value=1 + self._param_indices[-1], kind=an.IndexAnnotType.PARAM
         )
-        self._param_index += 1
+        self._param_indices[-1] += 1
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
+        self._local_indices.append(self._local_indices[-1])
         super().block_stmt(node)
-        # Reset local index
-        self._local_index -= len(node.names)
+        self._local_indices.pop()
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)

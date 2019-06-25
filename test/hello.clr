@@ -1,7 +1,15 @@
-
 {
-    val a = b;
-    print b;
-    print a;
+    func double(func(num) num f) func(num) num {
+        func result(num x) num {
+            return 2 * f(x);
+        }
+        return result;
+    }
+
+    func square(num x) num {
+        return x * x;
+    }
+
+    val double_square = double(square);
+    print double_square(3);
 }
-val b = 2;
