@@ -1,4 +1,4 @@
-syn keyword clrKeywords val var print if else and or return func while struct void this nil with as prop
+syn keyword clrKeywords val var print if else and or return func while struct void this with as prop
 hi link clrKeywords Type
 
 syn keyword clrBuiltins str num int bool clock
@@ -6,6 +6,9 @@ hi link clrBuiltins PreProc
 
 syn keyword clrBoolean true false
 hi link clrBoolean Constant
+
+syn keyword clrNil nil
+hi link clrNil Constant
 
 syn match clrIdent '[a-zA-Z_][a-zA-Z0-9_]*'
 hi link clrIdent Normal

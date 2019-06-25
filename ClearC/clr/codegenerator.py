@@ -2,7 +2,9 @@
 Module for generating code from an annotated ast.
 """
 
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional, Iterator
+
+import contextlib
 
 import clr.ast as ast
 import clr.annotations as an
@@ -56,6 +58,53 @@ class Program:
         """
         size = bc.size(self.code[size_index + 1 :])
         self.code[size_index] = size
+
+    @contextlib.contextmanager
+    def condition(self, condition: bool) -> Iterator[None]:
+        """
+        Context manager for conditional execution.
+        """
+        jump = self.begin_jump(not condition)
+        yield
+        self.end_jump(jump)
+
+    def begin_jump(self, condition: Optional[bool] = None) -> int:
+        """
+        Emit a jump instruction, possibly checking for a boolean condition. Returns an index used
+        by end_jump.
+        """
+        if condition is None:
+            self.code.append(bc.Opcode.JUMP)
+        else:
+            if condition:
+                self.code.append(bc.Opcode.NOT)
+            self.code.append(bc.Opcode.JUMP_IF_FALSE)
+        index = len(self.code)
+        self.code.append(0)
+        return index
+
+    def end_jump(self, index: int) -> None:
+        """
+        Given an index patches the offset of the jump at that index.
+        """
+        size = bc.size(self.code[index + 1 :])
+        self.code[index] = size
+
+    def start_loop(self) -> int:
+        """
+        Begins a loop, returning an index used by loop_back.
+        """
+        return len(self.code) - 1
+
+    def loop_back(self, target: int) -> None:
+        """
+        Given a target index loops back to the instrucion at that index.
+        """
+        self.code.append(bc.Opcode.LOOP)
+        index = len(self.code)
+        self.code.append(0)
+        size = bc.size(self.code[target + 1 :])
+        self.code[index] = size
 
     def emit_return(self, function: ast.AstFuncDecl) -> None:
         """
@@ -162,6 +211,40 @@ class CodeGenerator(ast.FunctionVisitor):
         super().block_stmt(node)
         for _ in node.names:
             self.program.append_op(bc.Opcode.POP)
+
+    def if_stmt(self, node: ast.AstIfStmt) -> None:
+        end_jumps = []
+        conds = [node.if_part] + node.elif_parts
+        # Go through all the conditions
+        for cond, block in conds:
+            cond.accept(self)
+            with self.program.condition(True):
+                # If the condition is true execute the block and jump to the end
+                block.accept(self)
+                end_jumps.append(self.program.begin_jump())
+        # If we haven't jumped to the end and there's an else block execute it
+        if node.else_part:
+            node.else_part.accept(self)
+        # End after the if, elif, and else parts
+        for jump in end_jumps:
+            self.program.end_jump(jump)
+
+    def while_stmt(self, node: ast.AstWhileStmt) -> None:
+        loop = self.program.start_loop()
+
+        def run() -> None:
+            # Running the loop means executing the block and looping back
+            node.block.accept(self)
+            self.program.loop_back(loop)
+
+        if node.cond:
+            # If there is a condition, check it and only run if it's true
+            node.cond.accept(self)
+            with self.program.condition(True):
+                run()
+        else:
+            # Otherwise run unconditionally
+            run()
 
     def return_stmt(self, node: ast.AstReturnStmt) -> None:
         super().return_stmt(node)

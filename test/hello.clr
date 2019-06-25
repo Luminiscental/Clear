@@ -13,3 +13,5 @@
     val double_square = double(square);
     print double_square(3);
 }
+
+print nil;
