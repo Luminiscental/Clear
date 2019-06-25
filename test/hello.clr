@@ -11,4 +11,9 @@ func some_value(int input) (int | num | bool)? {
     }
 }
 
-print some_value(5i);
+func printer() void {
+    print some_value(5i);
+}
+
+printer();
+// print printer();

@@ -255,7 +255,8 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
-        self.program.append_op(bc.Opcode.POP)
+        if node.expr.type_annot != an.BuiltinTypeAnnot.VOID:
+            self.program.append_op(bc.Opcode.POP)
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)

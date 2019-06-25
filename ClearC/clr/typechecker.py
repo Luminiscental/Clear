@@ -123,6 +123,21 @@ class TypeChecker(ast.DeepVisitor):
                 regions=[node.region],
             )
 
+    def print_stmt(self, node: ast.AstPrintStmt) -> None:
+        super().print_stmt(node)
+        printable_types = an.UnionTypeAnnot(
+            {
+                value
+                for value in an.BuiltinTypeAnnot
+                if value != an.BuiltinTypeAnnot.VOID
+            }
+        )
+        if node.expr and not contains(node.expr.type_annot, printable_types):
+            self.errors.add(
+                message=f"unprintable type {node.expr.type_annot}",
+                regions=[node.region],
+            )
+
     def _check_cond(self, cond: ast.AstExpr) -> None:
         if cond.type_annot != an.BuiltinTypeAnnot.BOOL:
             self.errors.add(
