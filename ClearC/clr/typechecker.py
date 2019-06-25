@@ -2,69 +2,45 @@
 Module defining an ast visitor to type check.
 """
 
-from typing import List, Optional, Callable, TypeVar
+from typing import Set, List, Callable, Dict, Tuple
 
 import clr.errors as er
 import clr.ast as ast
 import clr.annotations as an
 
-T = TypeVar("T")  # pylint: disable=invalid-name
-R = TypeVar("R")  # pylint: disable=invalid-name
 
-
-def guess_arith_binary(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
+def contract_union(types: Set[an.UnitType]) -> an.TypeAnnot:
     """
-    Guess the result type of an arithmetic binary operator given mismatched lhs and rhs types.
+    Contracts an expanded list of types into a single type annotation.
     """
-    # If there's a str assume user wanted concatenation
-    if an.BuiltinTypeAnnot.STR in (lhs, rhs):
-        return an.BuiltinTypeAnnot.STR
-    # If there's a num assume user wanted num operation
-    if an.BuiltinTypeAnnot.NUM in (lhs, rhs):
-        return an.BuiltinTypeAnnot.NUM
-    # Fallback to int
-    return an.BuiltinTypeAnnot.INT
+    # Unresolved types contaminate the whole union
+    if an.UnresolvedTypeAnnot() in types:
+        return an.UnresolvedTypeAnnot()
+    # If there's only one type the union is trivial
+    if len(types) == 1:
+        return types.pop()
+    # Nil makes the union optional
+    if an.BuiltinTypeAnnot.NIL in types:
+        target = contract_union(
+            {subtype for subtype in types if subtype != an.BuiltinTypeAnnot.NIL}
+        )
+        return an.OptionalTypeAnnot(target)
+    # Otherwise make a union type
+    return an.UnionTypeAnnot({subtype for subtype in types})
 
 
-def symmetrize(func: Callable[[T, T], Optional[R]]) -> Callable[[T, T], Optional[R]]:
+def union(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
     """
-    Makes a function attempt both orders of arguments before returning None.
+    Returns the simplest type containing both the lhs and rhs.
     """
-
-    def result(lhs: T, rhs: T) -> Optional[R]:
-        return func(lhs, rhs) or func(rhs, lhs)
-
-    return result
-
-
-@symmetrize
-def union(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> Optional[an.TypeAnnot]:
-    """
-    Returns the type that contains both the lhs and rhs type, if it exists.
-    """
-    if lhs == rhs:
-        return lhs
-    if lhs == an.BuiltinTypeAnnot.NIL:
-        if isinstance(rhs, an.OptionalTypeAnnot):
-            return rhs
-        return an.OptionalTypeAnnot(rhs)
-    if isinstance(lhs, an.OptionalTypeAnnot) and rhs == lhs.target:
-        return lhs
-    return None
+    return contract_union(lhs.expand().union(rhs.expand()))
 
 
 def contains(inner: an.TypeAnnot, outer: an.TypeAnnot) -> bool:
     """
     Checks if the inner type is contained by the outer type (defers to union).
     """
-    # union() doesn't make UnionTypeAnnot instances so check manually
-    if isinstance(outer, an.UnionTypeAnnot):
-        return any(contains(inner, elem) for elem in outer.types)
-
-    combined = union(outer, inner)
-    if combined is None:
-        return False
-    return combined == outer
+    return union(outer, inner) == contract_union(outer.expand())
 
 
 def valid(type_annot: an.TypeAnnot) -> bool:
@@ -80,6 +56,10 @@ def valid(type_annot: an.TypeAnnot) -> bool:
         )
     if isinstance(type_annot, an.OptionalTypeAnnot):
         return valid(type_annot.target)
+    if isinstance(type_annot, an.UnionTypeAnnot):
+        if not type_annot.types:
+            return False
+        return all(map(valid, type_annot.types))
     return False
 
 
@@ -223,17 +203,49 @@ class TypeChecker(ast.DeepVisitor):
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
-        typed_binary_ops = {
-            "+": [
-                an.BuiltinTypeAnnot.NUM,
-                an.BuiltinTypeAnnot.INT,
-                an.BuiltinTypeAnnot.STR,
-            ],
-            "-": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT],
-            "*": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT],
-            "/": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT],
+        typed_binary_ops: Dict[
+            str, Tuple[an.TypeAnnot, Callable[[an.TypeAnnot], an.TypeAnnot]]
+        ] = {
+            "+": (
+                an.UnionTypeAnnot(
+                    {
+                        an.BuiltinTypeAnnot.NUM,
+                        an.BuiltinTypeAnnot.INT,
+                        an.BuiltinTypeAnnot.STR,
+                    }
+                ),
+                lambda in_type: in_type,
+            ),
+            "-": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda in_type: in_type,
+            ),
+            "*": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda in_type: in_type,
+            ),
+            "/": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda in_type: in_type,
+            ),
+            "<": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda _: an.BuiltinTypeAnnot.BOOL,
+            ),
+            ">": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda _: an.BuiltinTypeAnnot.BOOL,
+            ),
+            "<=": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda _: an.BuiltinTypeAnnot.BOOL,
+            ),
+            ">=": (
+                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
+                lambda _: an.BuiltinTypeAnnot.BOOL,
+            ),
         }
-        untyped_binary_ops = {
+        untyped_binary_ops: Dict[str, an.TypeAnnot] = {
             "==": an.BuiltinTypeAnnot.BOOL,
             "!=": an.BuiltinTypeAnnot.BOOL,
         }
@@ -245,17 +257,15 @@ class TypeChecker(ast.DeepVisitor):
                     f"for binary operator {node.operator}",
                     regions=[node.region],
                 )
-                # Guess the result type for smoother chain er
-                node.type_annot = guess_arith_binary(
-                    node.left.type_annot, node.right.type_annot
-                )
-            elif node.left.type_annot not in typed_binary_ops[operator]:
-                self.errors.add(
-                    message=f"invalid operand type {node.left.type_annot} "
-                    f"for binary operator {node.operator}",
-                    regions=[node.region],
-                )
-                node.type_annot = node.left.type_annot
+            else:
+                if not contains(node.left.type_annot, typed_binary_ops[operator][0]):
+                    self.errors.add(
+                        message=f"invalid operand type {node.left.type_annot} "
+                        f"for binary operator {node.operator}",
+                        regions=[node.region],
+                    )
+            converter = typed_binary_ops[operator][1]
+            node.type_annot = converter(node.left.type_annot)
         elif operator in untyped_binary_ops:
             node.type_annot = untyped_binary_ops[operator]
         else:
@@ -313,6 +323,11 @@ class TypeChecker(ast.DeepVisitor):
         else:
             for arg, param in zip(node.args, node.function.type_annot.params):
                 if not contains(arg.type_annot, param):
+                    print(
+                        f"arg={arg.type_annot} ; ({repr(arg.type_annot)}), param={param} ; ({repr(param)})"
+                    )
+                    print(f"union = {union(arg.type_annot, param)}")
+                    print(f"contains = {contains(arg.type_annot, param)}")
                     self.errors.add(
                         message=f"mismatched type for argument: "
                         f"expected {param} but got {arg.type_annot}",
@@ -322,11 +337,10 @@ class TypeChecker(ast.DeepVisitor):
 
     def atom_type(self, node: ast.AstAtomType) -> None:
         super().atom_type(node)
-        node.type_annot = an.BuiltinTypeAnnot(node.name)
-        if not valid(node.type_annot) and node.type_annot != an.BuiltinTypeAnnot.VOID:
-            self.errors.add(
-                message=f"invalid type {node.type_annot}", regions=[node.region]
-            )
+        try:
+            node.type_annot = an.BuiltinTypeAnnot(node.name)
+        except ValueError:
+            self.errors.add(message=f"invalid type {node.name}", regions=[node.region])
 
     def func_type(self, node: ast.AstFuncType) -> None:
         super().func_type(node)
@@ -342,6 +356,14 @@ class TypeChecker(ast.DeepVisitor):
         super().optional_type(node)
         node.type_annot = an.OptionalTypeAnnot(node.target.type_annot)
         if not valid(node.type_annot):
+            self.errors.add(
+                message=f"invalid type {node.type_annot}", regions=[node.region]
+            )
+
+    def union_type(self, node: ast.AstUnionType) -> None:
+        super().union_type(node)
+        node.type_annot = an.UnionTypeAnnot({elem.type_annot for elem in node.types})
+        if not valid(node.type_annot) and node.type_annot != an.BuiltinTypeAnnot.VOID:
             self.errors.add(
                 message=f"invalid type {node.type_annot}", regions=[node.region]
             )

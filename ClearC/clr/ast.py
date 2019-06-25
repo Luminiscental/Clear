@@ -129,6 +129,11 @@ class AstVisitor:
         Visit an optional type node.
         """
 
+    def union_type(self, node: "AstUnionType") -> None:
+        """
+        Visit a union type node.
+        """
+
 
 class DeepVisitor(AstVisitor):
     """
@@ -201,6 +206,10 @@ class DeepVisitor(AstVisitor):
 
     def optional_type(self, node: "AstOptionalType") -> None:
         node.target.accept(self)
+
+    def union_type(self, node: "AstUnionType") -> None:
+        for subtype in node.types:
+            subtype.accept(self)
 
 
 class ScopeVisitor(DeepVisitor):
@@ -662,3 +671,16 @@ class AstOptionalType(AstType):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.optional_type(self)
+
+
+class AstUnionType(AstType):
+    """
+    Ast node for a union type.
+    """
+
+    def __init__(self, types: List[AstType], region: er.SourceView) -> None:
+        super().__init__(region)
+        self.types = types
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.union_type(self)

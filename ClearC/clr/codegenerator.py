@@ -2,7 +2,7 @@
 Module for generating code from an annotated ast.
 """
 
-from typing import List, Tuple, Dict, Optional, Iterator
+from typing import List, Tuple, Optional, Iterator, Dict
 
 import contextlib
 
@@ -259,7 +259,7 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)
-        unary_ops: Dict[str, Dict[an.TypeAnnot, bc.Opcode]] = {
+        unary_ops: Dict[str, Dict[an.TypeAnnot, bc.Instruction]] = {
             "-": {
                 an.BuiltinTypeAnnot.NUM: bc.Opcode.NUM_NEG,
                 an.BuiltinTypeAnnot.INT: bc.Opcode.INT_NEG,
@@ -270,32 +270,49 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
-        typed_binary_ops: Dict[str, Dict[an.TypeAnnot, bc.Opcode]] = {
+        typed_binary_ops: Dict[str, Dict[an.TypeAnnot, List[bc.Instruction]]] = {
             "+": {
-                an.BuiltinTypeAnnot.NUM: bc.Opcode.NUM_ADD,
-                an.BuiltinTypeAnnot.INT: bc.Opcode.INT_ADD,
-                an.BuiltinTypeAnnot.STR: bc.Opcode.STR_CAT,
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_ADD],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_ADD],
+                an.BuiltinTypeAnnot.STR: [bc.Opcode.STR_CAT],
             },
             "-": {
-                an.BuiltinTypeAnnot.NUM: bc.Opcode.NUM_SUB,
-                an.BuiltinTypeAnnot.INT: bc.Opcode.INT_SUB,
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_SUB],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_SUB],
             },
             "*": {
-                an.BuiltinTypeAnnot.NUM: bc.Opcode.NUM_MUL,
-                an.BuiltinTypeAnnot.INT: bc.Opcode.INT_MUL,
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_MUL],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_MUL],
             },
             "/": {
-                an.BuiltinTypeAnnot.NUM: bc.Opcode.NUM_DIV,
-                an.BuiltinTypeAnnot.INT: bc.Opcode.INT_DIV,
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_DIV],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_DIV],
+            },
+            "<": {
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_LESS],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_LESS],
+            },
+            ">": {
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_GREATER],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_GREATER],
+            },
+            "<=": {
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_GREATER, bc.Opcode.NOT],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_GREATER, bc.Opcode.NOT],
+            },
+            ">=": {
+                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_LESS, bc.Opcode.NOT],
+                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_LESS, bc.Opcode.NOT],
             },
         }
-        untyped_binary_ops = {
+        untyped_binary_ops: Dict[str, List[bc.Instruction]] = {
             "==": [bc.Opcode.EQUAL],
             "!=": [bc.Opcode.EQUAL, bc.Opcode.NOT],
         }
         operator = str(node.operator)
         if operator in typed_binary_ops:
-            self.program.append_op(typed_binary_ops[operator][node.left.type_annot])
+            for opcode in typed_binary_ops[operator][node.left.type_annot]:
+                self.program.append_op(opcode)
         else:
             for opcode in untyped_binary_ops[operator]:
                 self.program.append_op(opcode)
@@ -314,19 +331,27 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
+        # TODO: Make print a builtin not a statement
+        # TODO: Cache the function if it's used multiple times
+        # TODO: Elide the function if it gets called straight away
         if node.name in an.BUILTINS:
-            function = self.program.start_function()
-            self.program.append_op(bc.Opcode.PUSH_LOCAL)
-            self.program.append_op(1)
-            self.program.append_op(an.BUILTINS[node.name].opcode)
-            self.program.append_op(bc.Opcode.SET_RETURN)
-            self.program.append_op(bc.Opcode.POP)
-            self.program.append_op(bc.Opcode.POP)
-            self.program.append_op(bc.Opcode.LOAD_FP)
-            self.program.append_op(bc.Opcode.LOAD_IP)
-            self.program.end_function(function)
-            self.program.append_op(bc.Opcode.STRUCT)
-            self.program.append_op(1)
+            builtin = an.BUILTINS[node.name]
+            if isinstance(builtin.type_annot, an.FuncTypeAnnot):
+                function = self.program.start_function()
+                for i in range(len(builtin.type_annot.params)):
+                    self.program.append_op(bc.Opcode.PUSH_LOCAL)
+                    self.program.append_op(1 + i)
+                self.program.append_op(an.BUILTINS[node.name].opcode)
+                if builtin.type_annot.return_type != an.BuiltinTypeAnnot.VOID:
+                    self.program.append_op(bc.Opcode.SET_RETURN)
+                for _ in builtin.type_annot.params:
+                    self.program.append_op(bc.Opcode.POP)
+                self.program.append_op(bc.Opcode.POP)
+                self.program.append_op(bc.Opcode.LOAD_FP)
+                self.program.append_op(bc.Opcode.LOAD_IP)
+                self.program.end_function(function)
+                self.program.append_op(bc.Opcode.STRUCT)
+                self.program.append_op(1)
         else:
             self.program.load(node.index_annot)
 

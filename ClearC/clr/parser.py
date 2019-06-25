@@ -477,22 +477,40 @@ def parse_type(parser: Parser) -> Union[ast.AstType, er.CompileError]:
     """
     Parse a type from the parser or return an error.
 
-    AstType : ( "(" AstType ")" | AstFuncType | AstAtomType ) ( "?" )? ;
+    AstType : unit_type ( "|" unit_type )* ;
+    """
+    first = parse_unit_type(parser)
+    if isinstance(first, er.CompileError):
+        return first
+
+    types = [first]
+    while parser.match(lx.TokenType.VERT):
+        next_type = parse_unit_type(parser)
+        if isinstance(next_type, er.CompileError):
+            return next_type
+        types.append(next_type)
+
+    region = er.SourceView.range(first.region, parser.prev().lexeme)
+    return ast.AstUnionType(types, region) if len(types) > 1 else types[0]
+
+
+def parse_unit_type(parser: Parser) -> Union[ast.AstType, er.CompileError]:
+    """
+    Parse a unit type from the parser or return an error.
+
+    unit_type : ( "(" AstType ")" | AstFuncType | AstAtomType ) ( "?" )? ;
     """
     if parser.match(lx.TokenType.LEFT_PAREN):
         start = parser.prev().lexeme
         result = parse_type(parser)
-        if isinstance(result, er.CompileError):
-            return result
-        if not parser.match(lx.TokenType.RIGHT_PAREN):
-            return er.CompileError(
-                message="missing ')' to end type grouping",
-                regions=[parser.curr_region()],
-            )
-        result.region = er.SourceView.range(start, parser.prev().lexeme)
-        return result
-
-    if parser.match(lx.TokenType.FUNC):
+        if not isinstance(result, er.CompileError):
+            if not parser.match(lx.TokenType.RIGHT_PAREN):
+                return er.CompileError(
+                    message="missing ')' to end type grouping",
+                    regions=[parser.curr_region()],
+                )
+            result.region = er.SourceView.range(start, parser.prev().lexeme)
+    elif parser.match(lx.TokenType.FUNC):
         result = finish_func_type(parser)
     else:
         result = parse_atom_type(parser)
@@ -540,6 +558,24 @@ def parse_atom_type(parser: Parser) -> Union[ast.AstAtomType, er.CompileError]:
     if token is None:
         return er.CompileError(message="expected type", regions=[parser.curr_region()])
     return ast.AstAtomType(token)
+
+
+def finish_group_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
+    """
+    Parse a grouped expression from the parser or return an error. Assumes that the opening
+    parenthesis has already been consumed.
+    """
+    opener = parser.prev()
+    expr = parse_expr(parser)
+    if isinstance(expr, er.CompileError):
+        return expr
+    if not parser.match(lx.TokenType.RIGHT_PAREN):
+        return er.CompileError(
+            message="expected ')' to finish expression",
+            regions=[opener.lexeme, expr.region],
+        )
+    expr.region = er.SourceView.range(opener.lexeme, parser.prev().lexeme)
+    return expr
 
 
 def finish_unary_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
@@ -708,7 +744,7 @@ PRATT_TABLE: DefaultDict[lx.TokenType, PrattRule] = collections.defaultdict(
     PrattRule,
     {
         lx.TokenType.LEFT_PAREN: PrattRule(
-            infix=finish_call_expr, precedence=Precedence.CALL
+            prefix=finish_group_expr, infix=finish_call_expr, precedence=Precedence.CALL
         ),
         lx.TokenType.MINUS: PrattRule(
             prefix=finish_unary_expr,
@@ -733,6 +769,18 @@ PRATT_TABLE: DefaultDict[lx.TokenType, PrattRule] = collections.defaultdict(
         ),
         lx.TokenType.NOT_EQUALS: PrattRule(
             infix=finish_binary_expr, precedence=Precedence.EQUALITY
+        ),
+        lx.TokenType.LESS: PrattRule(
+            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+        ),
+        lx.TokenType.GREATER: PrattRule(
+            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+        ),
+        lx.TokenType.LESS_EQUALS: PrattRule(
+            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+        ),
+        lx.TokenType.GREATER_EQUALS: PrattRule(
+            infix=finish_binary_expr, precedence=Precedence.COMPARISON
         ),
         lx.TokenType.STR_LITERAL: PrattRule(prefix=finish_str_expr),
         lx.TokenType.NUM_LITERAL: PrattRule(prefix=finish_num_expr),

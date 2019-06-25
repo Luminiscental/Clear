@@ -31,7 +31,7 @@ hi link clrNumber Constant
 syn match clrInteger '\d\+i'
 hi link clrInteger Constant
 
-syn match clrSymbol '[?\.,<>{}()!+=\*\-;:/]'
+syn match clrSymbol '[?\.,<>{}()!+=\*\-;:/\|]'
 hi link clrSymbol Normal
 
 syn region clrString start="\"" end="\""

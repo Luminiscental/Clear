@@ -2,7 +2,7 @@
 Contains definitions for annotations of the ast.
 """
 
-from typing import Union, List, NamedTuple
+from typing import Union, List, NamedTuple, Set
 
 import enum
 
@@ -10,29 +10,35 @@ import clr.bytecode as bc
 
 # Type Annotations:
 
-TypeAnnot = Union[
-    "UnresolvedTypeAnnot",
-    "BuiltinTypeAnnot",
-    "FuncTypeAnnot",
-    "OptionalTypeAnnot",
-    "UnionTypeAnnot",
-]
+UnitType = Union["UnresolvedTypeAnnot", "BuiltinTypeAnnot", "FuncTypeAnnot"]
 
 
-class UnresolvedTypeAnnot:
+class TypeAnnot:
+    """
+    Base class for type annotations.
+    """
+
+    def expand(self) -> Set[UnitType]:
+        """
+        Expand the type into a set of contained unit types.
+        """
+        raise NotImplementedError()
+
+
+class UnresolvedTypeAnnot(TypeAnnot):
     """
     Type annotation for an unresolved node.
     """
 
-    def __init__(self) -> None:
-        self.unresolved = True
-
     def __str__(self) -> str:
         return "<unresolved>"
 
+    def __hash__(self) -> int:
+        return 73
+
     def __eq__(self, other: object) -> bool:
         if isinstance(other, UnresolvedTypeAnnot):
-            return False
+            return True
         if isinstance(other, BuiltinTypeAnnot):
             return False
         if isinstance(other, FuncTypeAnnot):
@@ -47,9 +53,12 @@ class UnresolvedTypeAnnot:
             return NotImplemented
         return not eq_result
 
+    def expand(self) -> Set[UnitType]:
+        return {self}
+
 
 @enum.unique
-class BuiltinTypeAnnot(enum.Enum):
+class BuiltinTypeAnnot(TypeAnnot, enum.Enum):
     """
     Enumerates the built in type annotations.
     """
@@ -84,8 +93,11 @@ class BuiltinTypeAnnot(enum.Enum):
             return NotImplemented
         return not eq_result
 
+    def expand(self) -> Set[UnitType]:
+        return {self}
 
-class FuncTypeAnnot:
+
+class FuncTypeAnnot(TypeAnnot):
     """
     Type annotation for a function type.
     """
@@ -93,7 +105,6 @@ class FuncTypeAnnot:
     def __init__(self, params: List[TypeAnnot], return_type: TypeAnnot) -> None:
         self.params = params
         self.return_type = return_type
-        self.unresolved = False
 
     def __str__(self) -> str:
         param_str = ", ".join(str(param) for param in self.params)
@@ -119,15 +130,17 @@ class FuncTypeAnnot:
             return NotImplemented
         return not eq_result
 
+    def expand(self) -> Set[UnitType]:
+        return {self}
 
-class OptionalTypeAnnot:
+
+class OptionalTypeAnnot(TypeAnnot):
     """
     Type annotation for an optional type.
     """
 
     def __init__(self, target: TypeAnnot) -> None:
         self.target = target
-        self.unresolved = False
 
     def __str__(self) -> str:
         return f"({self.target})?"
@@ -152,30 +165,32 @@ class OptionalTypeAnnot:
             return NotImplemented
         return not eq_result
 
+    def expand(self) -> Set[UnitType]:
+        result = self.target.expand()
+        result.add(BuiltinTypeAnnot.NIL)
+        return result
 
-# TODO: Support union types externally, e.g. val x int|num = 2i;
 
-
-class UnionTypeAnnot:
+class UnionTypeAnnot(TypeAnnot):
     """
     Type annotation for a sum type.
     """
 
-    def __init__(self, *types: TypeAnnot) -> None:
+    def __init__(self, types: Set[TypeAnnot]) -> None:
         self.types = types
 
     def __str__(self) -> str:
         return " | ".join(str(elem) for elem in self.types)
 
     def __hash__(self) -> int:
-        return hash(self.types) * 23
+        return hash(tuple(self.types)) * 23
 
     def __eq__(self, other: object) -> bool:
         if isinstance(
             other,
             (UnresolvedTypeAnnot, BuiltinTypeAnnot, FuncTypeAnnot, OptionalTypeAnnot),
         ):
-            return len(self.types) == 1 and self.types[0] == other
+            return self.types == {other}
         if isinstance(other, UnionTypeAnnot):
             return self.types == other.types
         return NotImplemented
@@ -185,6 +200,9 @@ class UnionTypeAnnot:
         if eq_result == NotImplemented:
             return NotImplemented
         return not eq_result
+
+    def expand(self) -> Set[UnitType]:
+        return {subsubtype for subtype in self.types for subsubtype in subtype.expand()}
 
 
 class Builtin(NamedTuple):
@@ -203,10 +221,12 @@ BUILTINS = {
         type_annot=FuncTypeAnnot(
             params=[
                 UnionTypeAnnot(
-                    BuiltinTypeAnnot.BOOL,
-                    BuiltinTypeAnnot.INT,
-                    BuiltinTypeAnnot.NIL,
-                    BuiltinTypeAnnot.NUM,
+                    {
+                        BuiltinTypeAnnot.BOOL,
+                        BuiltinTypeAnnot.INT,
+                        BuiltinTypeAnnot.NIL,
+                        BuiltinTypeAnnot.NUM,
+                    }
                 )
             ],
             return_type=BuiltinTypeAnnot.INT,
@@ -217,10 +237,12 @@ BUILTINS = {
         type_annot=FuncTypeAnnot(
             params=[
                 UnionTypeAnnot(
-                    BuiltinTypeAnnot.BOOL,
-                    BuiltinTypeAnnot.INT,
-                    BuiltinTypeAnnot.NIL,
-                    BuiltinTypeAnnot.NUM,
+                    {
+                        BuiltinTypeAnnot.BOOL,
+                        BuiltinTypeAnnot.INT,
+                        BuiltinTypeAnnot.NIL,
+                        BuiltinTypeAnnot.NUM,
+                    }
                 )
             ],
             return_type=BuiltinTypeAnnot.BOOL,
@@ -231,10 +253,12 @@ BUILTINS = {
         type_annot=FuncTypeAnnot(
             params=[
                 UnionTypeAnnot(
-                    BuiltinTypeAnnot.BOOL,
-                    BuiltinTypeAnnot.INT,
-                    BuiltinTypeAnnot.NIL,
-                    BuiltinTypeAnnot.NUM,
+                    {
+                        BuiltinTypeAnnot.BOOL,
+                        BuiltinTypeAnnot.INT,
+                        BuiltinTypeAnnot.NIL,
+                        BuiltinTypeAnnot.NUM,
+                    }
                 )
             ],
             return_type=BuiltinTypeAnnot.NUM,
@@ -245,10 +269,12 @@ BUILTINS = {
         type_annot=FuncTypeAnnot(
             params=[
                 UnionTypeAnnot(
-                    BuiltinTypeAnnot.BOOL,
-                    BuiltinTypeAnnot.INT,
-                    BuiltinTypeAnnot.NIL,
-                    BuiltinTypeAnnot.NUM,
+                    {
+                        BuiltinTypeAnnot.BOOL,
+                        BuiltinTypeAnnot.INT,
+                        BuiltinTypeAnnot.NIL,
+                        BuiltinTypeAnnot.NUM,
+                    }
                 )
             ],
             return_type=BuiltinTypeAnnot.STR,

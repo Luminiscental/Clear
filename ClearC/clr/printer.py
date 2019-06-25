@@ -186,3 +186,12 @@ class AstPrinter(ast.AstVisitor):
         self._append("(")
         node.target.accept(self)
         self._append(")?")
+
+    def union_type(self, node: ast.AstUnionType) -> None:
+        self._append("(")
+        node.types[0].accept(self)
+        self._append(")")
+        for next_type in node.types[1:]:
+            self._append(" | (")
+            next_type.accept(self)
+            self._append(")")
