@@ -258,12 +258,19 @@ class AstNode:
     """
 
     def __init__(self) -> None:
-        # Annotations:
+        # Annotation Defaults:
         self.type_annot: an.TypeAnnot = an.UnresolvedTypeAnnot()
         self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
         self.index_annot: an.IndexAnnot = an.IndexAnnot(
             value=-1, kind=an.IndexAnnotType.UNRESOLVED
         )
+
+        self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
+        self.sequence: List[AstDecl] = []
+        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
+        self.upvalues: List[AstIdentRef] = []
+        self.upvalue_refs: List[an.IndexAnnot] = []
+        self.ref: Optional[AstIdentRef] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         """
@@ -310,6 +317,8 @@ AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 # Specific nodes:
 
+# TODO: mutable values, structs, properties
+
 
 class Ast(AstNode):
     """
@@ -319,9 +328,6 @@ class Ast(AstNode):
     def __init__(self, decls: List[AstDecl]) -> None:
         super().__init__()
         self.decls = decls
-        # Annotations:
-        self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
-        self.sequence: List[AstDecl] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.start(self)
@@ -344,8 +350,6 @@ class AstValueDecl(AstNode):
         self.val_type = val_type
         self.val_init = val_init
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.value_decl(self)
@@ -385,10 +389,6 @@ class AstFuncDecl(AstNode):
         self.return_type = return_type
         self.block = block
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
-        self.upvalues: List[AstIdentRef] = []
-        self.upvalue_refs: List[an.IndexAnnot] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
@@ -403,8 +403,6 @@ class AstPrintStmt(AstNode):
         super().__init__()
         self.expr = expr
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.print_stmt(self)
@@ -419,10 +417,6 @@ class AstBlockStmt(AstNode):
         super().__init__()
         self.decls = decls
         self.region = region
-        # Annotations:
-        self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
-        self.sequence: List[AstDecl] = []
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
@@ -445,8 +439,6 @@ class AstIfStmt(AstNode):
         self.elif_parts = elif_parts
         self.else_part = else_part
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.if_stmt(self)
@@ -464,8 +456,6 @@ class AstWhileStmt(AstNode):
         self.cond = cond
         self.block = block
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.while_stmt(self)
@@ -480,8 +470,6 @@ class AstReturnStmt(AstNode):
         super().__init__()
         self.expr = expr
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.return_stmt(self)
@@ -496,8 +484,6 @@ class AstExprStmt(AstNode):
         super().__init__()
         self.expr = expr
         self.region = region
-        # Annotations:
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.expr_stmt(self)
@@ -590,8 +576,6 @@ class AstIdentExpr(AstExpr):
     def __init__(self, token: lx.Token) -> None:
         super().__init__(token.lexeme)
         self.name = str(token)
-        # Annotations:
-        self.ref: Optional[AstIdentRef] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
@@ -646,8 +630,6 @@ class AstAtomType(AstType):
     def __init__(self, token: lx.Token) -> None:
         super().__init__(token.lexeme)
         self.name = str(token)
-        # Annotations:
-        self.ref: Optional[Union[AstFuncDecl, AstValueDecl, AstParam]] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.atom_type(self)
