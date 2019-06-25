@@ -1,9 +1,8 @@
 
-func fac(num x) num {
-    if (x == 0) {
-        return 1;
-    }
-    return x * fac(x - 1);
+func f() void {
+    g();
 }
 
-print fac(5);
+func g() void {
+    f();
+}

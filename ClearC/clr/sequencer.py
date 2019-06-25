@@ -12,7 +12,7 @@ def _sequence(node: ast.AstDecl) -> None:
         node.scope.sequence.append(node)
 
 
-class SequenceBuilder(ast.ScopeVisitor):
+class SequenceBuilder(ast.FunctionVisitor):
     """
     Ast visitor to annotate the execution order of declarations.
     """
@@ -44,9 +44,9 @@ class SequenceBuilder(ast.ScopeVisitor):
                 message=f"circular dependency for {node.ident}", regions=[node.region]
             )
             return
-        # The function body isn't executed to create the function
-        self.completed.append(node)
+        self.started.append(node)
         super().func_decl(node)
+        self.completed.append(node)
         _sequence(node)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
@@ -77,7 +77,9 @@ class SequenceBuilder(ast.ScopeVisitor):
         super().ident_expr(node)
         # If the ref is None there was already an error
         if node.ref:
-            node.ref.accept(self)
+            # Special case for recursive function calls
+            if node.ref != self._functions[-1]:
+                node.ref.accept(self)
 
 
 class SequenceWriter(ast.DeepVisitor):
