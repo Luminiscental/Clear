@@ -1,19 +1,6 @@
 
-func some_value(int input) (int | num | bool)? {
-    if (input < 0i) {
-        return 3i;
-    } else if (input < 3i) {
-        return 2;
-    } else if (input < 10i) {
-        return input * 2i > 14i;
-    } else {
-        return nil;
+{
+    func x() void {
+        print str(2);
     }
 }
-
-func printer() void {
-    print some_value(5i);
-}
-
-printer();
-// print printer();

@@ -165,7 +165,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
             case CONST_INT: {
 
-                if (disassembleS32("OP_INTEGER", code, length, &index) !=
+                if (disassembleS32("CONST_INT", code, length, &index) !=
                     RESULT_OK) {
 
                     return RESULT_ERR;
@@ -175,7 +175,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
             case CONST_NUM: {
 
-                if (disassembleF64("OP_NUMBER", code, length, &index) !=
+                if (disassembleF64("CONST_NUM", code, length, &index) !=
                     RESULT_OK) {
 
                     return RESULT_ERR;
@@ -185,7 +185,7 @@ Result disassembleCode(uint8_t *code, size_t length) {
 
             case CONST_STR: {
 
-                printf("%-18s ", "OP_STRING");
+                printf("%-18s ", "CONST_STR");
                 index++;
 
                 if (index > length - sizeof(uint8_t)) {

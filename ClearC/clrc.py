@@ -126,6 +126,7 @@ def main() -> None:
         tree.accept(pr.AstPrinter())
         print("--------")
 
+    # Code generation
     assembled = _assemble_code(*cg.generate_code(tree))
 
     with open(dest_file_name, "wb") as dest_file:

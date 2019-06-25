@@ -15,7 +15,6 @@ class UpvalueTracker(ast.FunctionVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
-        # If the ref is None there was already an error
         if node.ref:
             if (
                 # In a function
