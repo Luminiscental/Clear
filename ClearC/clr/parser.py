@@ -652,9 +652,6 @@ def finish_nil_expr(parser: Parser) -> Union[ast.AstNilExpr, er.CompileError]:
     return ast.AstNilExpr(parser.prev())
 
 
-Comparison = Union[bool, "NotImplemented"]
-
-
 @enum.unique
 class Precedence(enum.Enum):
     """
@@ -673,25 +670,17 @@ class Precedence(enum.Enum):
     CALL = 9
     MAX = 10
 
-    def __lt__(self, other: object) -> Comparison:
-        if not isinstance(other, Precedence):
-            return NotImplemented
-        return self.value < other.value
+    def __lt__(self, other: "Precedence") -> bool:
+        return int(self.value) < int(other.value)
 
-    def __le__(self, other: object) -> Comparison:
-        if not isinstance(other, Precedence):
-            return NotImplemented
-        return self.value <= other.value
+    def __le__(self, other: "Precedence") -> bool:
+        return int(self.value) <= int(other.value)
 
-    def __gt__(self, other: object) -> Comparison:
-        if not isinstance(other, Precedence):
-            return NotImplemented
-        return self.value > other.value
+    def __gt__(self, other: "Precedence") -> bool:
+        return int(self.value) > int(other.value)
 
-    def __ge__(self, other: object) -> Comparison:
-        if not isinstance(other, Precedence):
-            return NotImplemented
-        return self.value >= other.value
+    def __ge__(self, other: "Precedence") -> bool:
+        return int(self.value) >= int(other.value)
 
     def next(self) -> "Precedence":
         """

@@ -1,8 +1,4 @@
 
-func f() void {
-    g();
-}
+val x str = str(2);
 
-func g() void {
-    f();
-}
+print x;

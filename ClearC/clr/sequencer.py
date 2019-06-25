@@ -78,7 +78,7 @@ class SequenceBuilder(ast.FunctionVisitor):
         # If the ref is None there was already an error
         if node.ref:
             # Special case for recursive function calls
-            if node.ref != self._functions[-1]:
+            if not self._functions or node.ref != self._functions[-1]:
                 node.ref.accept(self)
 
 

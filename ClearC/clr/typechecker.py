@@ -11,11 +11,6 @@ import clr.annotations as an
 T = TypeVar("T")  # pylint: disable=invalid-name
 R = TypeVar("R")  # pylint: disable=invalid-name
 
-ARITH_UNARY = ["-"]
-ARITH_BINARY = ["+", "-", "*", "/"]
-
-COMP_BINARY = ["==", "!="]
-
 
 def guess_arith_binary(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
     """
@@ -62,6 +57,10 @@ def contains(inner: an.TypeAnnot, outer: an.TypeAnnot) -> bool:
     """
     Checks if the inner type is contained by the outer type (defers to union).
     """
+    # union() doesn't make UnionTypeAnnot instances so check manually
+    if isinstance(outer, an.UnionTypeAnnot):
+        return any(contains(inner, elem) for elem in outer.types)
+
     combined = union(outer, inner)
     if combined is None:
         return False
@@ -206,8 +205,10 @@ class TypeChecker(ast.DeepVisitor):
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)
-        if str(node.operator) in ARITH_UNARY:
-            if node.target.type_annot not in an.ARITH_TYPES:
+        unary_ops = {"-": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT]}
+        operator = str(node.operator)
+        if operator in unary_ops:
+            if node.target.type_annot not in unary_ops[operator]:
                 self.errors.add(
                     message=f"invalid type {node.target.type_annot} "
                     f"for unary operator {node.operator}",
@@ -222,7 +223,22 @@ class TypeChecker(ast.DeepVisitor):
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
-        if str(node.operator) in ARITH_BINARY:
+        typed_binary_ops = {
+            "+": [
+                an.BuiltinTypeAnnot.NUM,
+                an.BuiltinTypeAnnot.INT,
+                an.BuiltinTypeAnnot.STR,
+            ],
+            "-": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT],
+            "*": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT],
+            "/": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT],
+        }
+        untyped_binary_ops = {
+            "==": an.BuiltinTypeAnnot.BOOL,
+            "!=": an.BuiltinTypeAnnot.BOOL,
+        }
+        operator = str(node.operator)
+        if operator in typed_binary_ops:
             if node.left.type_annot != node.right.type_annot:
                 self.errors.add(
                     message=f"mismatched types {node.left.type_annot} and {node.right.type_annot} "
@@ -233,33 +249,15 @@ class TypeChecker(ast.DeepVisitor):
                 node.type_annot = guess_arith_binary(
                     node.left.type_annot, node.right.type_annot
                 )
-            else:
-                # Overloaded concat operator
-                if (
-                    str(node.operator) == "+"
-                    and node.left.type_annot == an.BuiltinTypeAnnot.STR
-                ):
-                    pass
-                elif node.left.type_annot not in an.ARITH_TYPES:
-                    self.errors.add(
-                        message=f"invalid operand type {node.left.type_annot} "
-                        f"for binary operator {node.operator}",
-                        regions=[node.region],
-                    )
+            elif node.left.type_annot not in typed_binary_ops[operator]:
+                self.errors.add(
+                    message=f"invalid operand type {node.left.type_annot} "
+                    f"for binary operator {node.operator}",
+                    regions=[node.region],
+                )
                 node.type_annot = node.left.type_annot
-        elif str(node.operator) in COMP_BINARY:
-
-            def check(side: ast.AstExpr) -> None:
-                if not valid(side.type_annot):
-                    self.errors.add(
-                        message=f"invalid type {side.type_annot} "
-                        f"for comparison operator {node.operator}",
-                        regions=[side.region],
-                    )
-
-            check(node.left)
-            check(node.right)
-            node.type_annot = an.BuiltinTypeAnnot.BOOL
+        elif operator in untyped_binary_ops:
+            node.type_annot = untyped_binary_ops[operator]
         else:
             self.errors.add(
                 message=f"unknown binary operator {node.operator}",
@@ -280,9 +278,10 @@ class TypeChecker(ast.DeepVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
-        # If the ref is None there was already an error
         if node.ref:
             node.type_annot = node.ref.type_annot
+        elif node.name in an.BUILTINS:
+            node.type_annot = an.BUILTINS[node.name].type_annot
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
         super().bool_expr(node)
@@ -313,7 +312,7 @@ class TypeChecker(ast.DeepVisitor):
             )
         else:
             for arg, param in zip(node.args, node.function.type_annot.params):
-                if arg.type_annot != param:
+                if not contains(arg.type_annot, param):
                     self.errors.add(
                         message=f"mismatched type for argument: "
                         f"expected {param} but got {arg.type_annot}",

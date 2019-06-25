@@ -2,11 +2,9 @@
 Definitions for compile errors and tracking/displaying them.
 """
 
-from typing import List, NamedTuple, Union
+from typing import List, NamedTuple
 
 import enum
-
-Comparison = Union[bool, "NotImplemented"]
 
 
 class Severity(enum.Enum):
@@ -18,25 +16,17 @@ class Severity(enum.Enum):
     WARNING = 1
     ERROR = 2
 
-    def __lt__(self, other: object) -> Comparison:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.value < other.value
+    def __lt__(self, other: "Severity") -> bool:
+        return int(self.value) < int(other.value)
 
-    def __le__(self, other: object) -> Comparison:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.value <= other.value
+    def __le__(self, other: "Severity") -> bool:
+        return int(self.value) <= int(other.value)
 
-    def __gt__(self, other: object) -> Comparison:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.value > other.value
+    def __gt__(self, other: "Severity") -> bool:
+        return int(self.value) > int(other.value)
 
-    def __ge__(self, other: object) -> Comparison:
-        if not isinstance(other, Severity):
-            return NotImplemented
-        return self.value >= other.value
+    def __ge__(self, other: "Severity") -> bool:
+        return int(self.value) >= int(other.value)
 
     def __str__(self) -> str:
         return self.name

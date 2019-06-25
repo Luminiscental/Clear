@@ -314,7 +314,21 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
-        self.program.load(node.index_annot)
+        if node.name in an.BUILTINS:
+            function = self.program.start_function()
+            self.program.append_op(bc.Opcode.PUSH_LOCAL)
+            self.program.append_op(1)
+            self.program.append_op(an.BUILTINS[node.name].opcode)
+            self.program.append_op(bc.Opcode.SET_RETURN)
+            self.program.append_op(bc.Opcode.POP)
+            self.program.append_op(bc.Opcode.POP)
+            self.program.append_op(bc.Opcode.LOAD_FP)
+            self.program.append_op(bc.Opcode.LOAD_IP)
+            self.program.end_function(function)
+            self.program.append_op(bc.Opcode.STRUCT)
+            self.program.append_op(1)
+        else:
+            self.program.load(node.index_annot)
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
         super().bool_expr(node)
@@ -327,7 +341,6 @@ class CodeGenerator(ast.FunctionVisitor):
         self.program.append_op(bc.Opcode.PUSH_NIL)
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
-        # TODO: Built-in functions
         super().call_expr(node)
         # Get the ip
         self.program.append_op(bc.Opcode.EXTRACT_FIELD)

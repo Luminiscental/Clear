@@ -107,7 +107,8 @@ class NameResolver(ast.ScopeVisitor):
             node.ref = ref
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        self._resolve_name(node.name, node)
+        if node.name not in an.BUILTINS:
+            self._resolve_name(node.name, node)
 
     def atom_type(self, node: ast.AstAtomType) -> None:
         if node.name not in {annot.value for annot in an.BuiltinTypeAnnot}:
