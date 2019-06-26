@@ -125,9 +125,10 @@ class Opcode(enum.Enum):
     GET_FIELD = 42
     EXTRACT_FIELD = 43
     SET_FIELD = 44
-    REF_LOCAL = 45
-    DEREF = 46
-    SET_REF = 47
+    UNSTRUCT = 45
+    REF_LOCAL = 46
+    DEREF = 47
+    SET_REF = 48
 
     def __str__(self) -> str:
         return "OP_" + self.name

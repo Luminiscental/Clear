@@ -30,6 +30,11 @@ class AstVisitor:
         Visit a value declaration node.
         """
 
+    def binding(self, node: "AstBinding") -> None:
+        """
+        Visit a value binding node.
+        """
+
     def func_decl(self, node: "AstFuncDecl") -> None:
         """
         Visit a function declaration node.
@@ -161,9 +166,11 @@ class DeepVisitor(AstVisitor):
             decl.accept(self)
 
     def value_decl(self, node: "AstValueDecl") -> None:
-        node.val_init.accept(self)
+        for binding in node.bindings:
+            binding.accept(self)
         if node.val_type:
             node.val_type.accept(self)
+        node.val_init.accept(self)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
         for param in node.params:
@@ -298,7 +305,7 @@ class AstNode:
             value=-1, kind=an.IndexAnnotType.UNRESOLVED
         )
 
-        self.names: Dict[str, Union[AstFuncDecl, AstValueDecl, AstParam]] = {}
+        self.names: Dict[str, Union[AstIdentRef]] = {}
         self.sequence: List[AstDecl] = []
         self.scope: Optional[Union[Ast, AstBlockStmt]] = None
         self.upvalues: List[AstIdentRef] = []
@@ -350,7 +357,7 @@ AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 # Specific nodes:
 
-# TODO: Tuples/tuple unpacking, case expr/stmt
+# TODO: case expr/stmt
 
 
 class Ast(AstNode):
@@ -366,6 +373,20 @@ class Ast(AstNode):
         visitor.start(self)
 
 
+class AstBinding(AstNode):
+    """
+    Ast node for a value binding.
+    """
+
+    def __init__(self, name: str, region: er.SourceView) -> None:
+        super().__init__()
+        self.name = name
+        self.region = region
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.binding(self)
+
+
 class AstValueDecl(AstNode):
     """
     Ast node for a value declaration.
@@ -373,13 +394,13 @@ class AstValueDecl(AstNode):
 
     def __init__(
         self,
-        ident: str,
+        bindings: List[AstBinding],
         val_type: Optional[AstType],
         val_init: AstExpr,
         region: er.SourceView,
     ):
         super().__init__()
-        self.ident = ident
+        self.bindings = bindings
         self.val_type = val_type
         self.val_init = val_init
         self.region = region
@@ -600,7 +621,7 @@ class AstStrExpr(AstExpr):
 
 
 # Type alias for identifier declarations
-AstIdentRef = Union[AstFuncDecl, AstValueDecl, AstParam]
+AstIdentRef = Union[AstFuncDecl, AstBinding, AstParam]
 
 
 class AstIdentExpr(AstExpr):

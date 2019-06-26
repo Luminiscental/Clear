@@ -20,7 +20,7 @@ class UpvalueTracker(ast.FunctionVisitor):
                 # In a function
                 self._functions
                 # Not local to the function
-                and node.ref not in self._get_scope().decls
+                and node.ref not in self._get_scope().names.values()
                 # Not global
                 and node.ref not in self._scopes[0].decls
                 # Not a param to the function
@@ -78,9 +78,8 @@ class Indexer(ast.FunctionVisitor):
         self._local_indices.append(0)
         super().start(node)
 
-    def value_decl(self, node: ast.AstValueDecl) -> None:
+    def binding(self, node: ast.AstBinding) -> None:
         node.index_annot = self._declare()
-        super().value_decl(node)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         node.index_annot = self._declare()

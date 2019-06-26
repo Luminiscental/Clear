@@ -1,5 +1,27 @@
 
-func print_coord((num, num) coord) void {
+func add((num, num) a, (num, num) b) num, num {
+    val ax, ay := a;
+    val bx, by := b;
+
+    return ax + bx, ay + by;
 }
 
-print_coord((2, 3));
+func dot((num, num) a, (num, num) b) num {
+    val ax, ay := a;
+    val bx, by := b;
+
+    return ax * bx + ay * by;
+}
+
+func display((num, num) v) str {
+    val x, y := v;
+
+    return "(" + str(x) + ", " + str(y) + ")";
+}
+
+val p := (1, 3);
+val q := (2, 4);
+print display(p) + " + " + display(q) + " = " + display(add(p, q));
+print display(p) + " . " + display(q) + " = " + str(dot(p, q));
+
+val counter, message : int, str = 2i, "Hello, Tuple!";

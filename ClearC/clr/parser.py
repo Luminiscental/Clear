@@ -145,18 +145,35 @@ def parse_decl(parser: Parser) -> Result[ast.AstDecl]:
     return parse_stmt(parser)
 
 
+def parse_binding(parser: Parser) -> Result[ast.AstBinding]:
+    """
+    Parse a value binding from the parser or return an error.
+
+    AstBinding : IDENTIFIER ;
+    """
+    token = parse_token(parser, [lx.TokenType.IDENTIFIER])
+    if token is None:
+        return er.CompileError(
+            message="expected value name", regions=[parser.curr_region()]
+        )
+    return ast.AstBinding(str(token), token.lexeme)
+
+
 def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
     """
     Parse a value declaration from the parser or return an error. Assumes that the "val" token has
     already been consumed.
 
-    AstValueDecl : "val" IDENTIFIER AstType? "=" AstExpr ";" ;
+    AstValueDecl : "val" AstBinding ( ", " AstBinding )* ":" AstType? "=" AstExpr ";" ;
     """
     start = parser.prev().lexeme
-    ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
-    if ident is None:
+    bindings = finish_tuple(parser, parse_binding, end=lx.TokenType.COLON)
+    if isinstance(bindings, er.CompileError):
+        return bindings
+    # There has to be at least one
+    if not bindings:
         return er.CompileError(
-            message="missing value name", regions=[parser.curr_region()]
+            message="expected value name", regions=[parser.prev().lexeme]
         )
 
     val_type = None
@@ -167,7 +184,7 @@ def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
         val_type = val_type_
         if not parser.match(lx.TokenType.EQUALS):
             return er.CompileError(
-                message="missing '=' for value initializer",
+                message="expected '=' for value initializer",
                 regions=[parser.curr_region()],
             )
 
@@ -177,12 +194,12 @@ def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
 
     if not parser.match(lx.TokenType.SEMICOLON):
         return er.CompileError(
-            message="missing ';' to end value initializer",
+            message="expected ';' to end value initializer",
             regions=[parser.prev().lexeme, parser.curr_region()],
         )
 
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstValueDecl(str(ident), val_type, expr, region)
+    return ast.AstValueDecl(bindings, val_type, expr, region)
 
 
 def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
@@ -196,15 +213,15 @@ def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
     ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
     if ident is None:
         return er.CompileError(
-            message="missing function name", regions=[parser.curr_region()]
+            message="expected function name", regions=[parser.curr_region()]
         )
 
     if not parser.match(lx.TokenType.LEFT_PAREN):
         return er.CompileError(
-            message="missing '(' to begin parameters", regions=[parser.curr_region()]
+            message="expected '(' to begin parameters", regions=[parser.curr_region()]
         )
 
-    params = parse_tuple(parser, parse_param)
+    params = finish_tuple(parser, parse_param)
     if isinstance(params, er.CompileError):
         return params
 
@@ -236,20 +253,23 @@ def parse_param(parser: Parser) -> Result[ast.AstParam]:
     param_ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
     if param_ident is None:
         return er.CompileError(
-            message="missing parameter name", regions=[parser.curr_region()]
+            message="expected parameter name", regions=[parser.curr_region()]
         )
     return ast.AstParam(param_type, param_ident)
 
 
-def parse_tuple(
-    parser: Parser, parse_func: Callable[[Parser], Result[T]]
+def finish_tuple(
+    parser: Parser,
+    parse_func: Callable[[Parser], Result[T]],
+    end: lx.TokenType = lx.TokenType.RIGHT_PAREN,
 ) -> Result[List[T]]:
     """
-    Given that the opening '(' has already been consumed, parse the elements of a tuple (a,b,...)
-    form into a list using a parameter function to parse each element.
+    Given that the opening token has already been consumed, parse the elements of a tuple form
+    `<opener> a,b,... <end>` into a list using a parameter function to parse each element. By
+    default the end token is ')'.
     """
     opener = parser.prev()
-    if parser.match(lx.TokenType.RIGHT_PAREN):
+    if parser.match(end):
         return []
 
     first = parse_func(parser)
@@ -257,11 +277,15 @@ def parse_tuple(
         return first
     pairs = [first]
 
-    while not parser.match(lx.TokenType.RIGHT_PAREN):
+    while not parser.match(end):
         if parser.done():
-            return er.CompileError(message="unclosed '('", regions=[opener.lexeme])
+            return er.CompileError(
+                message=f"expected '{end}' before EOF", regions=[opener.lexeme]
+            )
         if not parser.match(lx.TokenType.COMMA):
-            return er.CompileError("missing ',' delimiter", [parser.curr_region()])
+            return er.CompileError(
+                f"expected ',' delimiter or '{end}'", [parser.curr_region()]
+            )
         elem = parse_func(parser)
         if isinstance(elem, er.CompileError):
             return elem
@@ -312,7 +336,7 @@ def finish_print_stmt(parser: Parser) -> Result[ast.AstPrintStmt]:
 
     if not parser.match(lx.TokenType.SEMICOLON):
         return er.CompileError(
-            message="missing ';' to end print statement",
+            message="expected ';' to end print statement",
             regions=[parser.prev().lexeme, parser.curr_region()],
         )
 
@@ -358,14 +382,15 @@ def finish_if_stmt(parser: Parser) -> Result[ast.AstIfStmt]:
     def parse_cond() -> Result[Tuple[ast.AstExpr, ast.AstBlockStmt]]:
         if not parser.match(lx.TokenType.LEFT_PAREN):
             return er.CompileError(
-                message="missing '(' to start condition", regions=[parser.curr_region()]
+                message="expected '(' to start condition",
+                regions=[parser.curr_region()],
             )
         cond = parse_expr(parser)
         if isinstance(cond, er.CompileError):
             return cond
         if not parser.match(lx.TokenType.RIGHT_PAREN):
             return er.CompileError(
-                message="missing ')' to end condition", regions=[parser.curr_region()]
+                message="expected ')' to end condition", regions=[parser.curr_region()]
             )
         if not parser.match(lx.TokenType.LEFT_BRACE):
             return er.CompileError(
@@ -422,7 +447,7 @@ def finish_while_stmt(parser: Parser) -> Result[ast.AstWhileStmt]:
         cond = cond_
         if not parser.match(lx.TokenType.RIGHT_PAREN):
             return er.CompileError(
-                message="missing ')' to end condition", regions=[parser.curr_region()]
+                message="expected ')' to end condition", regions=[parser.curr_region()]
             )
     if not parser.match(lx.TokenType.LEFT_BRACE):
         return er.CompileError(message="expected block", regions=[parser.curr_region()])
@@ -450,7 +475,7 @@ def finish_return_stmt(parser: Parser) -> Result[ast.AstReturnStmt]:
         expr = expr_
         if not parser.match(lx.TokenType.SEMICOLON):
             return er.CompileError(
-                message="missing ';' to end return statement",
+                message="expected ';' to end return statement",
                 regions=[parser.prev().lexeme, parser.curr_region()],
             )
     region = er.SourceView.range(return_token.lexeme, parser.prev().lexeme)
@@ -468,7 +493,7 @@ def parse_expr_stmt(parser: Parser) -> Result[ast.AstExprStmt]:
         return expr
     if not parser.match(lx.TokenType.SEMICOLON):
         return er.CompileError(
-            message="missing ';' to end expression statement",
+            message="expected ';' to end expression statement",
             regions=[parser.prev().lexeme, parser.curr_region()],
         )
     return ast.AstExprStmt(expr, er.SourceView.range(expr.region, parser.prev().lexeme))
@@ -485,7 +510,7 @@ def finish_group_type(parser: Parser) -> Result[ast.AstType]:
         return result
     if not parser.match(lx.TokenType.RIGHT_PAREN):
         return er.CompileError(
-            message="missing ')' to end type grouping",
+            message="expected ')' to end type grouping",
             regions=[start, parser.curr_region()],
         )
     result.region = er.SourceView.range(start, parser.prev().lexeme)
@@ -558,10 +583,10 @@ def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
     start = parser.prev().lexeme
     if not parser.match(lx.TokenType.LEFT_PAREN):
         return er.CompileError(
-            message="missing '(' to begin parameter types",
+            message="expected '(' to begin parameter types",
             regions=[parser.curr_region()],
         )
-    params = parse_tuple(
+    params = finish_tuple(
         parser, lambda parser: parse_type(parser, Precedence.TUPLE.next())
     )
     if isinstance(params, er.CompileError):
@@ -640,7 +665,7 @@ def finish_call_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     Parse a function call expression from the parser or return an error. Assumes that the open
     parenthesis has already been consumed, and takes the function expression as a parameter.
     """
-    args = parse_tuple(
+    args = finish_tuple(
         parser, lambda parser: parse_expr(parser, Precedence.TUPLE.next())
     )
     if isinstance(args, er.CompileError):

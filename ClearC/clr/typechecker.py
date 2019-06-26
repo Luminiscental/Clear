@@ -169,6 +169,7 @@ class TypeChecker(ast.DeepVisitor):
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
+        # Handle overall type
         if node.val_type:
             node.type_annot = node.val_type.type_annot
             if not contains(node.val_init.type_annot, node.type_annot):
@@ -183,6 +184,27 @@ class TypeChecker(ast.DeepVisitor):
                 self.errors.add(
                     message="cannot declare value as void",
                     regions=[node.val_init.region],
+                )
+        # Distribute to bindings
+        if len(node.bindings) == 1:
+            node.bindings[0].type_annot = node.type_annot
+        else:
+            if isinstance(node.type_annot, an.TupleTypeAnnot):
+                types = node.type_annot.types
+                bindings = node.bindings
+                if len(types) != len(bindings):
+                    adjective = "few" if len(types) < len(bindings) else "many"
+                    self.errors.add(
+                        message=f"too {adjective} bindings to unpack tuple of size {len(types)}",
+                        regions=[node.region],
+                    )
+                else:
+                    for subtype, binding in zip(types, bindings):
+                        binding.type_annot = subtype
+            else:
+                self.errors.add(
+                    message=f"cannot unpack non-tuple type {node.type_annot}",
+                    regions=[node.region],
                 )
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:

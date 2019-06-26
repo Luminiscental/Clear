@@ -28,7 +28,7 @@ class SequenceBuilder(ast.FunctionVisitor):
         if node in self.started:
             # TODO: Show the loop somehow.
             self.errors.add(
-                message=f"circular dependency for {node.ident}", regions=[node.region]
+                message=f"circular dependency for value", regions=[node.region]
             )
             return
         self.started.append(node)

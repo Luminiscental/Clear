@@ -29,6 +29,7 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
         (r"=", TokenType.EQUALS),
         (r",", TokenType.COMMA),
         (r";", TokenType.SEMICOLON),
+        (r":", TokenType.COLON),
         (r"\|", TokenType.VERT),
         (r"{", TokenType.LEFT_BRACE),
         (r"}", TokenType.RIGHT_BRACE),
@@ -46,21 +47,23 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
     lexer.run(consume_rules, skip_rules, fallback_rule)
 
     def keywordize(token: "Token") -> "Token":
-        keywords = {
-            "val": TokenType.VAL,
-            "func": TokenType.FUNC,
-            "void": TokenType.VOID,
-            "if": TokenType.IF,
-            "else": TokenType.ELSE,
-            "while": TokenType.WHILE,
-            "return": TokenType.RETURN,
-            "print": TokenType.PRINT,
-            "or": TokenType.OR,
-            "and": TokenType.AND,
-            "true": TokenType.TRUE,
-            "nil": TokenType.NIL,
-            "false": TokenType.FALSE,
+        keyword_set = {
+            TokenType.VAL,
+            TokenType.FUNC,
+            TokenType.VOID,
+            TokenType.IF,
+            TokenType.ELSE,
+            TokenType.WHILE,
+            TokenType.RETURN,
+            TokenType.PRINT,
+            TokenType.OR,
+            TokenType.AND,
+            TokenType.TRUE,
+            TokenType.NIL,
+            TokenType.FALSE,
         }
+
+        keywords = {keyword.value: keyword for keyword in keyword_set}
 
         if token.kind == TokenType.IDENTIFIER:
             lexeme = str(token.lexeme)
@@ -85,46 +88,50 @@ class TokenType(enum.Enum):
     """
 
     # Non-definite tokens
-    IDENTIFIER = enum.auto()
-    INT_LITERAL = enum.auto()
-    NUM_LITERAL = enum.auto()
-    STR_LITERAL = enum.auto()
+    IDENTIFIER = "identifier"
+    INT_LITERAL = "int"
+    NUM_LITERAL = "num"
+    STR_LITERAL = "str"
     # Keywords
-    VAL = enum.auto()
-    FUNC = enum.auto()
-    IF = enum.auto()
-    ELSE = enum.auto()
-    WHILE = enum.auto()
-    RETURN = enum.auto()
-    PRINT = enum.auto()
-    VOID = enum.auto()
-    OR = enum.auto()
-    AND = enum.auto()
-    TRUE = enum.auto()
-    FALSE = enum.auto()
-    NIL = enum.auto()
+    VAL = "val"
+    FUNC = "func"
+    IF = "if"
+    ELSE = "else"
+    WHILE = "while"
+    RETURN = "return"
+    PRINT = "print"
+    VOID = "void"
+    OR = "or"
+    AND = "and"
+    TRUE = "true"
+    FALSE = "false"
+    NIL = "nil"
     # Symbols
-    EQUALS = enum.auto()
-    DOUBLE_EQUALS = enum.auto()
-    NOT_EQUALS = enum.auto()
-    LESS = enum.auto()
-    GREATER = enum.auto()
-    LESS_EQUALS = enum.auto()
-    GREATER_EQUALS = enum.auto()
-    COMMA = enum.auto()
-    SEMICOLON = enum.auto()
-    VERT = enum.auto()
-    LEFT_BRACE = enum.auto()
-    RIGHT_BRACE = enum.auto()
-    LEFT_PAREN = enum.auto()
-    RIGHT_PAREN = enum.auto()
-    QUESTION_MARK = enum.auto()
-    PLUS = enum.auto()
-    MINUS = enum.auto()
-    STAR = enum.auto()
-    SLASH = enum.auto()
+    EQUALS = "="
+    DOUBLE_EQUALS = "=="
+    NOT_EQUALS = "!="
+    LESS = "<"
+    GREATER = ">"
+    LESS_EQUALS = "<="
+    GREATER_EQUALS = ">="
+    COMMA = ","
+    SEMICOLON = ";"
+    COLON = ":"
+    VERT = "|"
+    LEFT_BRACE = "{"
+    RIGHT_BRACE = "}"
+    LEFT_PAREN = "("
+    RIGHT_PAREN = ")"
+    QUESTION_MARK = "?"
+    PLUS = "+"
+    MINUS = "-"
+    STAR = "*"
+    SLASH = "/"
     # Special
-    ERROR = enum.auto()
+    ERROR = "<ERROR>"
+
+    def __str__(self) -> str:
+        return str(self.value)
 
 
 class Token:

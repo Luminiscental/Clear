@@ -185,7 +185,12 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
-        self.program.declare(node.index_annot)
+        if len(node.bindings) == 1:
+            self.program.declare(node.bindings[0].index_annot)
+        else:
+            self.program.append_op(bc.Opcode.UNSTRUCT)
+            for binding in node.bindings:
+                self.program.declare(binding.index_annot)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         function = self.program.start_function()

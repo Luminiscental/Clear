@@ -133,6 +133,7 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         } break;
 
             U8(OP_SET_FIELD)
+            SIMPLE(OP_UNSTRUCT)
 
             U8(OP_REF_LOCAL)
             SIMPLE(OP_DEREF)

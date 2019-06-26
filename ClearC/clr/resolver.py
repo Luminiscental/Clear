@@ -22,8 +22,8 @@ class NameTracker(ast.ScopeVisitor):
             )
         names[name] = node
 
-    def value_decl(self, node: ast.AstValueDecl) -> None:
-        self._set_name(node.ident, node)
+    def binding(self, node: ast.AstBinding) -> None:
+        self._set_name(node.name, node)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         self._set_name(node.ident, node)

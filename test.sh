@@ -28,7 +28,7 @@ else
     pushd build
 
     rm -f CMakeCache.txt
-    cmake ..
+    cmake .. #-DDEBUG_STACK=ON
     make
 
     echo ""

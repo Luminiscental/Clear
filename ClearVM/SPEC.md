@@ -635,7 +635,18 @@ __Opcodes__
     Pops a value off the stack and sets the field at the given index of the struct below to it. If
     the value below isn't a struct or the index is too large this emits an error.
 
-- 0x2d (`OP_REF_LOCAL`)
+- 0x2d (`OP_UNSTRUCT`)
+
+    _Arguments_: none
+
+    _Initial Stack_: `..., struct`
+
+    _Final Stack_: `..., field0, field1, ..., fieldn`
+
+    Pops a struct value and pushes its fields onto the stack. If the popped value isn't a struct
+    this emits an error.
+
+- 0x2e (`OP_REF_LOCAL`)
 
     _Arguments_: `index` (unsigned byte)
 
@@ -646,7 +657,7 @@ __Opcodes__
     Pushes an upvalue referencing the local at the given index (i.e. the value on the stack offset
     from the FP by the index). If the index is above the top of the stack this emits an error.
 
-- 0x2e (`OP_DEREF`)
+- 0x2f (`OP_DEREF`)
 
     _Arguments_: none
 
@@ -656,7 +667,7 @@ __Opcodes__
 
     Pops an upvalue and pushes its referenced value.
 
-- 0x2f (`OP_SET_REF`)
+- 0x30 (`OP_SET_REF`)
 
     _Arguments_: none
 

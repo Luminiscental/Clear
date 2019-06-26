@@ -42,13 +42,20 @@ class AstPrinter(ast.AstVisitor):
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         self._startline()
-        self._append(f"val {node.ident} ")
+        self._append(f"val ")
+        node.bindings[0].accept(self)
+        for binding in node.bindings[1:]:
+            self._append(", ")
+            binding.accept(self)
         if node.val_type:
+            self._append(" : ")
             node.val_type.accept(self)
-            self._append(" ")
-        self._append("= ")
+        self._append(" = ")
         node.val_init.accept(self)
         self._append(";")
+
+    def binding(self, node: ast.AstBinding) -> None:
+        self._append(node.name)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         self._startline()

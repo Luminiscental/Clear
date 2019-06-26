@@ -794,6 +794,28 @@ static Result op_setField(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_unstruct(VM *vm) {
+
+    TRACE(printf("op_unstruct\n");)
+
+    POP(structValue)
+
+    if (structValue.type != VAL_OBJ || structValue.as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Cannot unstruct non-struct value\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
+
+    for (size_t i = 0; i < structObj->fieldCount; i++) {
+
+        PUSH(structObj->fields[i])
+    }
+
+    return RESULT_OK;
+}
+
 static Result op_refLocal(VM *vm) {
 
     TRACE(printf("op_refLocal\n");)
@@ -938,6 +960,7 @@ Result initVM(VM *vm) {
     INSTR(OP_GET_FIELD, op_getField);
     INSTR(OP_EXTRACT_FIELD, op_extractField);
     INSTR(OP_SET_FIELD, op_setField);
+    INSTR(OP_UNSTRUCT, op_unstruct);
 
     INSTR(OP_REF_LOCAL, op_refLocal);
     INSTR(OP_DEREF, op_deref);
