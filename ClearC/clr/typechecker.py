@@ -18,8 +18,8 @@ def group_by(key_func: Callable[[T], K], values: Iterable[T]) -> Dict[K, Set[T]]
 
     e.g.
     > pairs = [(1, 2), (1, -4), (3, 4), (2, 7)]
-    > group_by(lambda pair: pair[0], lambda pair: pair[1], pairs)
-    {1: [2, -4], 2: [7], 3: [4]}
+    > group_by(lambda pair: pair[0], pairs)
+    {1: [(1, 2), (1, -4)], 2: [(2, 7)], 3: [(3, 4)]}
     """
     grouping: Dict[K, Set[T]] = {}
     for value in values:
