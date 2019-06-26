@@ -87,6 +87,7 @@ Value makeUpvalue(VM *vm, Value *from);
 Value makeInt(int32_t unboxed);
 Value makeBool(bool unboxed);
 Value makeNum(double unboxed);
+Value makeNil();
 Value makeIP(uint8_t *unboxed);
 Value makeFP(Value *unboxed);
 

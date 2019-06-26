@@ -171,10 +171,7 @@ static Result op_pushNil(VM *vm) {
 
     TRACE(printf("op_pushNil\n");)
 
-    Value nilValue;
-    nilValue.type = VAL_NIL;
-
-    PUSH(nilValue);
+    PUSH(makeNil()));
 
     return RESULT_OK;
 }

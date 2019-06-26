@@ -104,6 +104,16 @@ Value makeNum(double unboxed) {
     return result;
 }
 
+Value makeNil() {
+
+    Value result;
+
+    result.type = VAL_NIL;
+    result.references = NULL;
+
+    return result;
+}
+
 Value makeIP(uint8_t *unboxed) {
 
     Value result;

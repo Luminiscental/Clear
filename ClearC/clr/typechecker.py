@@ -338,11 +338,6 @@ class TypeChecker(ast.DeepVisitor):
         else:
             for arg, param in zip(node.args, node.function.type_annot.params):
                 if not contains(arg.type_annot, param):
-                    print(
-                        f"arg={arg.type_annot} ; ({repr(arg.type_annot)}), param={param} ; ({repr(param)})"
-                    )
-                    print(f"union = {union(arg.type_annot, param)}")
-                    print(f"contains = {contains(arg.type_annot, param)}")
                     self.errors.add(
                         message=f"mismatched type for argument: "
                         f"expected {param} but got {arg.type_annot}",

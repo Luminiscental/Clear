@@ -212,6 +212,8 @@ class CodeGenerator(ast.FunctionVisitor):
         super().block_stmt(node)
         for _ in node.names:
             self.program.append_op(bc.Opcode.POP)
+        # Reset so they don't get popped again
+        node.names.clear()
 
     def if_stmt(self, node: ast.AstIfStmt) -> None:
         end_jumps = []
