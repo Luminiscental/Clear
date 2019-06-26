@@ -2,7 +2,7 @@
 Contains definitions for annotations of the ast.
 """
 
-from typing import Union, List, NamedTuple, Set, Dict
+from typing import Union, List, NamedTuple, Set, Dict, Tuple
 
 import enum
 
@@ -10,7 +10,9 @@ import clr.bytecode as bc
 
 # Type Annotations:
 
-UnitType = Union["UnresolvedTypeAnnot", "BuiltinTypeAnnot", "FuncTypeAnnot"]
+UnitType = Union[
+    "UnresolvedTypeAnnot", "BuiltinTypeAnnot", "FuncTypeAnnot", "TupleTypeAnnot"
+]
 
 
 class TypeAnnot:
@@ -203,6 +205,41 @@ class UnionTypeAnnot(TypeAnnot):
 
     def expand(self) -> Set[UnitType]:
         return {subsubtype for subtype in self.types for subsubtype in subtype.expand()}
+
+
+class TupleTypeAnnot(TypeAnnot):
+    """
+    Type annotation for a tuple type.
+    """
+
+    def __init__(self, types: Tuple[TypeAnnot, ...]) -> None:
+        self.types = types
+
+    def __str__(self) -> str:
+        inner = ", ".join(str(elem) for elem in self.types)
+        return f"({inner})"
+
+    def __hash__(self) -> int:
+        return hash(self.types) * 73
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, TupleTypeAnnot):
+            return self.types == other.types
+        if isinstance(
+            other,
+            (UnresolvedTypeAnnot, BuiltinTypeAnnot, FuncTypeAnnot, OptionalTypeAnnot),
+        ):
+            return False
+        return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        eq_result = self == other
+        if eq_result == NotImplemented:
+            return NotImplemented
+        return not eq_result
+
+    def expand(self) -> Set[UnitType]:
+        return {self}
 
 
 class Builtin(NamedTuple):

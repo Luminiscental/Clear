@@ -53,6 +53,34 @@ def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
     return result
 
 
+def _take_tuples(
+    types: Iterable[an.UnitType]
+) -> Tuple[Set[an.TupleTypeAnnot], Set[an.UnitType]]:
+    instances = set()
+    without: Set[an.UnitType] = set()
+    for value in types:
+        if isinstance(value, an.TupleTypeAnnot):
+            instances.add(value)
+        else:
+            without.add(value)
+    return instances, without
+
+
+def contract_tuples(tuples: Set[an.TupleTypeAnnot]) -> Set[an.TupleTypeAnnot]:
+    """
+    Contract a set of tuple types. Any group of tuples with the same length can be combined
+    element-wise.
+    """
+    result = set()
+    groups = _group_by(lambda subtype: len(subtype.types), tuples)
+    for elem_count, group in groups.items():
+        union_types = tuple(
+            _union({subtype.types[i] for subtype in group}) for i in range(elem_count)
+        )
+        result.add(an.TupleTypeAnnot(union_types))
+    return result
+
+
 def contract_types(types: Set[an.UnitType]) -> an.TypeAnnot:
     """
     Contracts an expanded set of types into a single type annotation.
@@ -60,14 +88,16 @@ def contract_types(types: Set[an.UnitType]) -> an.TypeAnnot:
     # Unresolved types contaminate the whole union
     if an.UnresolvedTypeAnnot() in types:
         return an.UnresolvedTypeAnnot()
-    # Take out the functions
+    # Contract functions
     funcs, types = _take_functions(types)
-    # Contract them and add back in
     types = types.union(contract_functions(funcs))
+    # Contract tuples
+    tuples, types = _take_tuples(types)
+    types = types.union(contract_tuples(tuples))
     # If there's only one type the union is trivial
     if len(types) == 1:
         return types.pop()
-    # Otherwise make a possibly optional union
+    # Otherwise make a union
     target = an.UnionTypeAnnot({subtype for subtype in types if subtype != an.NIL})
     # If there was a nil it's optional
     if an.NIL in types:

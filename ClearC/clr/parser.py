@@ -486,7 +486,7 @@ def finish_group_type(parser: Parser) -> Result[ast.AstType]:
     if not parser.match(lx.TokenType.RIGHT_PAREN):
         return er.CompileError(
             message="missing ')' to end type grouping",
-            regions=[start, parser.prev().lexeme],
+            regions=[start, parser.curr_region()],
         )
     result.region = er.SourceView.range(start, parser.prev().lexeme)
     return result
