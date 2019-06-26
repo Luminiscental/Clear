@@ -115,6 +115,11 @@ class AstVisitor:
         Visit a function call expression node.
         """
 
+    def tuple_expr(self, node: "AstTupleExpr") -> None:
+        """
+        Visit a tuple expression node.
+        """
+
     def ident_type(self, node: "AstIdentType") -> None:
         """
         Visit an identifier type node.
@@ -209,6 +214,10 @@ class DeepVisitor(AstVisitor):
         node.function.accept(self)
         for arg in node.args:
             arg.accept(self)
+
+    def tuple_expr(self, node: "AstTupleExpr") -> None:
+        for expr in node.exprs:
+            expr.accept(self)
 
     def func_type(self, node: "AstFuncType") -> None:
         for param in node.params:
@@ -646,6 +655,19 @@ class AstCallExpr(AstExpr):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.call_expr(self)
+
+
+class AstTupleExpr(AstExpr):
+    """
+    Ast node for a tuple expression.
+    """
+
+    def __init__(self, exprs: Tuple[AstExpr, ...], region: er.SourceView) -> None:
+        super().__init__(region)
+        self.exprs = exprs
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.tuple_expr(self)
 
 
 class AstIdentType(AstType):

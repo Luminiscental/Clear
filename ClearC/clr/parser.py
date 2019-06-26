@@ -230,7 +230,7 @@ def parse_param(parser: Parser) -> Result[ast.AstParam]:
 
     AstParam : AstType IDENTIFIER ;
     """
-    param_type = parse_type(parser)
+    param_type = parse_type(parser, Precedence.TUPLE.next())  # Don't consume commas
     if isinstance(param_type, er.CompileError):
         return param_type
     param_ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
@@ -502,7 +502,7 @@ def finish_optional_type(parser: Parser, target: ast.AstType) -> Result[ast.AstT
     )
 
 
-# TODO: Maybe unify the way infixes are handled between types and expressions.
+# TODO: Generify and use for expression tuples and stuff.
 def parse_infix_types(
     parser: Parser, operator: lx.TokenType
 ) -> Result[List[ast.AstType]]:
@@ -561,7 +561,9 @@ def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
             message="missing '(' to begin parameter types",
             regions=[parser.curr_region()],
         )
-    params = parse_tuple(parser, parse_type)
+    params = parse_tuple(
+        parser, lambda parser: parse_type(parser, Precedence.TUPLE.next())
+    )
     if isinstance(params, er.CompileError):
         return params
     return_type = parse_type(parser)
@@ -638,11 +640,35 @@ def finish_call_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     Parse a function call expression from the parser or return an error. Assumes that the open
     parenthesis has already been consumed, and takes the function expression as a parameter.
     """
-    args = parse_tuple(parser, parse_expr)
+    args = parse_tuple(
+        parser, lambda parser: parse_expr(parser, Precedence.TUPLE.next())
+    )
     if isinstance(args, er.CompileError):
         return args
     region = er.SourceView.range(lhs.region, parser.prev().lexeme)
     return ast.AstCallExpr(lhs, args, region)
+
+
+def finish_tuple_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
+    """
+    Parse a tuple expression from the parser or return an error. Assumes that the comma has already
+    been consumed, and takes the lhs expression as a parameter.
+    """
+    precedence = EXPR_TABLE[parser.prev().kind].precedence.next()
+    first_expr = parse_expr(parser, precedence)
+    if isinstance(first_expr, er.CompileError):
+        return first_expr
+
+    exprs = [lhs, first_expr]
+    while parser.match(lx.TokenType.COMMA):
+        next_expr = parse_expr(parser, precedence)
+        if isinstance(next_expr, er.CompileError):
+            return next_expr
+        exprs.append(next_expr)
+
+    return ast.AstTupleExpr(
+        tuple(exprs), region=er.SourceView.range(lhs.region, parser.prev().lexeme)
+    )
 
 
 def finish_int_expr(parser: Parser) -> Result[ast.AstIntExpr]:
@@ -720,15 +746,16 @@ class Precedence(enum.Enum):
 
     NONE = 0
     ASSIGNMENT = 1
-    OR = 2
-    AND = 3
-    EQUALITY = 4
-    COMPARISON = 5
-    TERM = 6
-    FACTOR = 7
-    UNARY = 8
-    CALL = 9
-    MAX = 10
+    TUPLE = 2
+    OR = 3
+    AND = 4
+    EQUALITY = 5
+    COMPARISON = 6
+    TERM = 7
+    FACTOR = 8
+    UNARY = 9
+    CALL = 10
+    MAX = 11
 
     def __lt__(self, other: "Precedence") -> bool:
         return int(self.value) < int(other.value)
@@ -787,7 +814,7 @@ TYPE_TABLE: PrattTable[ast.AstType] = collections.defaultdict(
             postfix=finish_union_type, precedence=Precedence.TERM
         ),
         lx.TokenType.COMMA: PrattRule(
-            postfix=finish_tuple_type, precedence=Precedence.FACTOR
+            postfix=finish_tuple_type, precedence=Precedence.TUPLE
         ),
     },
 )
@@ -799,6 +826,9 @@ EXPR_TABLE: PrattTable[ast.AstExpr] = collections.defaultdict(
             prefix=finish_group_expr,
             postfix=finish_call_expr,
             precedence=Precedence.CALL,
+        ),
+        lx.TokenType.COMMA: PrattRule(
+            postfix=finish_tuple_expr, precedence=Precedence.TUPLE
         ),
         lx.TokenType.MINUS: PrattRule(
             prefix=finish_unary_expr,

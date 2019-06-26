@@ -2,4 +2,4 @@
 func print_coord((num, num) coord) void {
 }
 
-print_coord((23));
+print_coord((2, 3));

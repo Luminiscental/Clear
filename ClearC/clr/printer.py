@@ -168,6 +168,15 @@ class AstPrinter(ast.AstVisitor):
                 arg.accept(self)
         self._append(")")
 
+    def tuple_expr(self, node: ast.AstTupleExpr) -> None:
+        self._append("(")
+        if node.exprs:
+            node.exprs[0].accept(self)
+            for expr in node.exprs[1:]:
+                self._append(", ")
+                expr.accept(self)
+        self._append(")")
+
     def ident_type(self, node: ast.AstIdentType) -> None:
         self._append(node.name)
 

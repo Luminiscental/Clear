@@ -387,6 +387,12 @@ class TypeChecker(ast.DeepVisitor):
                     )
         node.type_annot = node.function.type_annot.return_type
 
+    def tuple_expr(self, node: ast.AstTupleExpr) -> None:
+        super().tuple_expr(node)
+        node.type_annot = an.TupleTypeAnnot(
+            tuple(elem.type_annot for elem in node.exprs)
+        )
+
     def ident_type(self, node: ast.AstIdentType) -> None:
         super().ident_type(node)
         if node.ref:

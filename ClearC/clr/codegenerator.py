@@ -331,3 +331,9 @@ class CodeGenerator(ast.FunctionVisitor):
         if isinstance(node.function.type_annot, an.FuncTypeAnnot):  # should be true
             if node.function.type_annot.return_type != an.VOID:
                 self.program.append_op(bc.Opcode.PUSH_RETURN)
+
+    def tuple_expr(self, node: ast.AstTupleExpr) -> None:
+        # Stored in reverse order
+        super().tuple_expr(node)
+        self.program.append_op(bc.Opcode.STRUCT)
+        self.program.append_op(len(node.exprs))
