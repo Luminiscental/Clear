@@ -173,7 +173,7 @@ def assemble_code(
         else:
             if instruction > 255:
                 raise IndexTooLargeError()
-            elif instruction < 0:
+            if instruction < 0:
                 raise NegativeIndexError()
             result.append(instruction)
     return result

@@ -726,7 +726,8 @@ PrefixRule = Callable[[Parser], Result[T]]
 PostfixRule = Callable[[Parser, T], Result[T]]
 
 
-class PrattRule(Generic[T]):
+# https://github.com/python/mypy/issues/685
+class PrattRule(Generic[T]):  # pylint: disable=too-few-public-methods
     """
     Represents a pratt rule for a token type.
     """
