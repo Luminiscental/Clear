@@ -2,14 +2,69 @@
 Module defining an ast visitor to type check.
 """
 
-from typing import Set, List, Callable, Dict, Tuple
+from typing import Set, List, Callable, Dict, Tuple, TypeVar, Iterable
 
 import clr.errors as er
 import clr.ast as ast
 import clr.annotations as an
 
+T = TypeVar("T")  # pylint: disable=invalid-name
+K = TypeVar("K")  # pylint: disable=invalid-name
 
-def contract_union(types: Set[an.UnitType]) -> an.TypeAnnot:
+
+def group_by(key_func: Callable[[T], K], values: Iterable[T]) -> Dict[K, Set[T]]:
+    """
+    Group an iterable by a given key function.
+
+    e.g.
+    > pairs = [(1, 2), (1, -4), (3, 4), (2, 7)]
+    > group_by(lambda pair: pair[0], lambda pair: pair[1], pairs)
+    {1: [2, -4], 2: [7], 3: [4]}
+    """
+    grouping: Dict[K, Set[T]] = {}
+    for value in values:
+        key = key_func(value)
+        if key in grouping:
+            grouping[key].add(value)
+        else:
+            grouping[key] = {value}
+    return grouping
+
+
+def take_functions(
+    types: Iterable[an.UnitType]
+) -> Tuple[Set[an.FuncTypeAnnot], Set[an.UnitType]]:
+    """
+    Split by whether the type is a function type.
+    """
+    instances = set()
+    without: Set[an.UnitType] = set()
+    for value in types:
+        if isinstance(value, an.FuncTypeAnnot):
+            instances.add(value)
+        else:
+            without.add(value)
+    return instances, without
+
+
+def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
+    """
+    Contract a set of function types. Any group of functions that take the same number of
+    parameters can be combined by intersecting the parameter types and unioning the return types.
+    """
+    result = set()
+    groups = group_by(lambda func: len(func.params), funcs)
+    for param_count, group in groups.items():
+        union_return = _union({func.return_type for func in group})
+        union_params = [
+            _intersection({func.params[i] for func in group})
+            for i in range(param_count)
+        ]
+        result.add(an.FuncTypeAnnot(union_params, union_return))
+    return result
+
+
+def contract_types(types: Set[an.UnitType]) -> an.TypeAnnot:
     """
     Contracts an expanded list of types into a single type annotation.
     """
@@ -19,9 +74,12 @@ def contract_union(types: Set[an.UnitType]) -> an.TypeAnnot:
     # If there's only one type the union is trivial
     if len(types) == 1:
         return types.pop()
+    # Take out the functions
+    funcs, types = take_functions(types)
+    types = types.union(contract_functions(funcs))
     # Nil makes the union optional
     if an.BuiltinTypeAnnot.NIL in types:
-        target = contract_union(
+        target = contract_types(
             {subtype for subtype in types if subtype != an.BuiltinTypeAnnot.NIL}
         )
         return an.OptionalTypeAnnot(target)
@@ -29,18 +87,33 @@ def contract_union(types: Set[an.UnitType]) -> an.TypeAnnot:
     return an.UnionTypeAnnot({subtype for subtype in types})
 
 
+def _intersection(types: Set[an.TypeAnnot]) -> an.TypeAnnot:
+    return contract_types(set.intersection(*[unit.expand() for unit in types]))
+
+
+def intersection(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
+    """
+    Returns the simplest type contained in both the lhs and rhs.
+    """
+    return _intersection({lhs, rhs})
+
+
+def _union(types: Set[an.TypeAnnot]) -> an.TypeAnnot:
+    return contract_types(set.union(*[unit.expand() for unit in types]))
+
+
 def union(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
     """
     Returns the simplest type containing both the lhs and rhs.
     """
-    return contract_union(lhs.expand().union(rhs.expand()))
+    return _union({lhs, rhs})
 
 
 def contains(inner: an.TypeAnnot, outer: an.TypeAnnot) -> bool:
     """
     Checks if the inner type is contained by the outer type (defers to union).
     """
-    return union(outer, inner) == contract_union(outer.expand())
+    return union(outer, inner) == contract_types(outer.expand())
 
 
 def valid(type_annot: an.TypeAnnot) -> bool:

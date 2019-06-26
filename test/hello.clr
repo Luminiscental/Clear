@@ -1,6 +1,32 @@
 
-{
-    func x() void {
-        print str(2);
+func general(int? input) int {
+    if (input == nil) {
+        return 2i;
+    } else {
+        return 3i;
     }
 }
+
+func restricted(int input) int? {
+    if (input > 0i) {
+        return input / 2i;
+    } else {
+        return nil;
+    }
+}
+
+func call_restricted(func(int) int? f) void {
+    print f(3i);
+    print f(-2i);
+}
+
+func call_general(func(int?) int f) void {
+    print f(7i);
+    print f(nil);
+}
+
+call_restricted(general);
+call_restricted(restricted);
+
+call_general(general);
+//call_general(restricted);

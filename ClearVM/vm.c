@@ -171,7 +171,7 @@ static Result op_pushNil(VM *vm) {
 
     TRACE(printf("op_pushNil\n");)
 
-    PUSH(makeNil()));
+    PUSH(makeNil());
 
     return RESULT_OK;
 }
