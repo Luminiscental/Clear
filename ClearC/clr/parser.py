@@ -502,24 +502,52 @@ def finish_optional_type(parser: Parser, target: ast.AstType) -> Result[ast.AstT
     )
 
 
+# TODO: Maybe unify the way infixes are handled between types and expressions.
+def parse_infix_types(
+    parser: Parser, operator: lx.TokenType
+) -> Result[List[ast.AstType]]:
+    """
+    Runs a postfix rule repeatedly while the same operator is used.
+    """
+    precedence = TYPE_TABLE[parser.prev().kind].precedence.next()
+    first_type = parse_type(parser, precedence)
+    if isinstance(first_type, er.CompileError):
+        return first_type
+
+    types = [first_type]
+    while parser.match(operator):
+        next_type = parse_type(parser, precedence)
+        if isinstance(next_type, er.CompileError):
+            return next_type
+        types.append(next_type)
+
+    return types
+
+
 def finish_union_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
     """
     Parse a union type from the parser, given the left side. Assumes that the '|' token has already
     been consumed.
     """
-    rhs = parse_type(parser, Precedence.FACTOR)
+    rhs = parse_infix_types(parser, lx.TokenType.VERT)
     if isinstance(rhs, er.CompileError):
         return rhs
-
-    types = [lhs, rhs]
-    while parser.match(lx.TokenType.VERT):
-        next_type = parse_type(parser, Precedence.FACTOR)
-        if isinstance(next_type, er.CompileError):
-            return next_type
-        types.append(next_type)
-
+    types = [lhs] + rhs
     region = er.SourceView.range(types[0].region, types[-1].region)
     return ast.AstUnionType(types, region)
+
+
+def finish_tuple_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
+    """
+    Parse a tuple type from the parser, given the left side. Assumes that the ',' token has already
+    been consumed.
+    """
+    rhs = parse_infix_types(parser, lx.TokenType.COMMA)
+    if isinstance(rhs, er.CompileError):
+        return rhs
+    types = [lhs] + rhs
+    region = er.SourceView.range(types[0].region, types[-1].region)
+    return ast.AstTupleType(tuple(types), region)
 
 
 def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
@@ -757,6 +785,9 @@ TYPE_TABLE: PrattTable[ast.AstType] = collections.defaultdict(
         ),
         lx.TokenType.VERT: PrattRule(
             postfix=finish_union_type, precedence=Precedence.TERM
+        ),
+        lx.TokenType.COMMA: PrattRule(
+            postfix=finish_tuple_type, precedence=Precedence.FACTOR
         ),
     },
 )

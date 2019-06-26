@@ -24,7 +24,7 @@ class TypeAnnot:
         """
         Expand the type into a set of contained unit types.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class UnresolvedTypeAnnot(TypeAnnot):
@@ -41,11 +41,9 @@ class UnresolvedTypeAnnot(TypeAnnot):
     def __eq__(self, other: object) -> bool:
         if isinstance(other, UnresolvedTypeAnnot):
             return True
-        if isinstance(other, BuiltinTypeAnnot):
-            return False
-        if isinstance(other, FuncTypeAnnot):
-            return False
-        if isinstance(other, OptionalTypeAnnot):
+        if isinstance(
+            other, (BuiltinTypeAnnot, FuncTypeAnnot, OptionalTypeAnnot, TupleTypeAnnot)
+        ):
             return False
         return NotImplemented
 
@@ -79,13 +77,12 @@ class BuiltinTypeAnnot(TypeAnnot, enum.Enum):
         return hash(self.value) * 31
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, UnresolvedTypeAnnot):
-            return False
         if isinstance(other, BuiltinTypeAnnot):
             return str(self.value) == str(other.value)
-        if isinstance(other, FuncTypeAnnot):
-            return False
-        if isinstance(other, OptionalTypeAnnot):
+        if isinstance(
+            other,
+            (UnresolvedTypeAnnot, FuncTypeAnnot, OptionalTypeAnnot, TupleTypeAnnot),
+        ):
             return False
         return NotImplemented
 
@@ -116,13 +113,12 @@ class FuncTypeAnnot(TypeAnnot):
         return hash((*self.params, self.return_type)) * 41
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, UnresolvedTypeAnnot):
-            return False
-        if isinstance(other, BuiltinTypeAnnot):
-            return False
         if isinstance(other, FuncTypeAnnot):
             return self.params == other.params and self.return_type == other.return_type
-        if isinstance(other, OptionalTypeAnnot):
+        if isinstance(
+            other,
+            (UnresolvedTypeAnnot, BuiltinTypeAnnot, OptionalTypeAnnot, TupleTypeAnnot),
+        ):
             return False
         return NotImplemented
 
@@ -151,14 +147,13 @@ class OptionalTypeAnnot(TypeAnnot):
         return hash(self.target) * 17
 
     def __eq__(self, other: object) -> bool:
-        if isinstance(other, UnresolvedTypeAnnot):
-            return False
-        if isinstance(other, BuiltinTypeAnnot):
-            return False
-        if isinstance(other, FuncTypeAnnot):
-            return False
         if isinstance(other, OptionalTypeAnnot):
             return self.target == other.target
+        if isinstance(
+            other,
+            (UnresolvedTypeAnnot, BuiltinTypeAnnot, FuncTypeAnnot, TupleTypeAnnot),
+        ):
+            return False
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
@@ -190,7 +185,13 @@ class UnionTypeAnnot(TypeAnnot):
     def __eq__(self, other: object) -> bool:
         if isinstance(
             other,
-            (UnresolvedTypeAnnot, BuiltinTypeAnnot, FuncTypeAnnot, OptionalTypeAnnot),
+            (
+                UnresolvedTypeAnnot,
+                BuiltinTypeAnnot,
+                FuncTypeAnnot,
+                OptionalTypeAnnot,
+                TupleTypeAnnot,
+            ),
         ):
             return self.types == {other}
         if isinstance(other, UnionTypeAnnot):

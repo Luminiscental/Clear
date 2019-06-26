@@ -111,5 +111,5 @@ class SourceView:
         If they view separate sources raises an IncompatibleSourceError.
         """
         if start.source != end.source:
-            raise IncompatibleSourceError()
+            raise IncompatibleSourceError
         return SourceView(source=start.source, start=start.start, end=end.end)

@@ -153,6 +153,8 @@ def valid(type_annot: an.TypeAnnot) -> bool:
         if not type_annot.types:
             return False
         return all(map(valid, type_annot.types))
+    if isinstance(type_annot, an.TupleTypeAnnot):
+        return all(map(valid, type_annot.types))
     return False
 
 
@@ -419,6 +421,16 @@ class TypeChecker(ast.DeepVisitor):
         super().union_type(node)
         node.type_annot = an.UnionTypeAnnot({elem.type_annot for elem in node.types})
         if not valid(node.type_annot) and node.type_annot != an.VOID:
+            self.errors.add(
+                message=f"invalid type {node.type_annot}", regions=[node.region]
+            )
+
+    def tuple_type(self, node: ast.AstTupleType) -> None:
+        super().tuple_type(node)
+        node.type_annot = an.TupleTypeAnnot(
+            tuple(elem.type_annot for elem in node.types)
+        )
+        if not valid(node.type_annot):
             self.errors.add(
                 message=f"invalid type {node.type_annot}", regions=[node.region]
             )

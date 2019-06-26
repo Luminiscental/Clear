@@ -1,8 +1,5 @@
 
 func print_coord((num, num) coord) void {
-    val x, y = coord;
-    print "(" + str(x) + ", " + str(y) + ")";
 }
 
-val coord = (2, 3);
-print_coord(coord);
+print_coord((23));

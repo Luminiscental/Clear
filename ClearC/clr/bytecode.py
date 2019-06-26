@@ -21,13 +21,6 @@ class NegativeIndexError(Exception):
     """
 
 
-class StringTooLongError(Exception):
-    """
-    Custom exception class raised when assembling a constant header with a string constant
-    whose length is too large to fit in a byte.
-    """
-
-
 @enum.unique
 class ConstantType(enum.Enum):
     """
@@ -59,8 +52,6 @@ def pack_constant(constant: Constant) -> PackedConstant:
     if isinstance(constant, float):
         return (ConstantType.NUM, bytearray(struct.pack("d", constant)))
 
-    if len(constant) > 255:
-        raise StringTooLongError()
     arr = bytearray()
     arr.append(len(constant))
     arr.extend(constant.encode())
@@ -72,7 +63,7 @@ def assemble_header(constants: Sequence[PackedConstant]) -> bytearray:
     Takes a sequence of packed constants and assembles a Clear constant header from them.
     """
     if len(constants) > 255:
-        raise IndexTooLargeError()
+        raise IndexTooLargeError
     result = bytearray()
     result.append(len(constants))
     for (constant_type, constant_packed) in constants:
@@ -172,8 +163,8 @@ def assemble_code(
             result.append(instruction.value)
         else:
             if instruction > 255:
-                raise IndexTooLargeError()
+                raise IndexTooLargeError
             if instruction < 0:
-                raise NegativeIndexError()
+                raise NegativeIndexError
             result.append(instruction)
     return result

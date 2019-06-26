@@ -140,6 +140,11 @@ class AstVisitor:
         Visit a union type node.
         """
 
+    def tuple_type(self, node: "AstTupleType") -> None:
+        """
+        Visit a tuple type node.
+        """
+
 
 class DeepVisitor(AstVisitor):
     """
@@ -217,6 +222,10 @@ class DeepVisitor(AstVisitor):
         for subtype in node.types:
             subtype.accept(self)
 
+    def tuple_type(self, node: "AstTupleType") -> None:
+        for subtype in node.types:
+            subtype.accept(self)
+
 
 class ScopeVisitor(DeepVisitor):
     """
@@ -291,7 +300,7 @@ class AstNode:
         """
         Accept a visitor to this node, calling the relevant method of the visitor.
         """
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class AstType(AstNode):
@@ -304,7 +313,7 @@ class AstType(AstNode):
         self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 class AstExpr(AstNode):
@@ -317,7 +326,7 @@ class AstExpr(AstNode):
         self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError()
+        raise NotImplementedError
 
 
 AstStmt = Union[
@@ -704,3 +713,16 @@ class AstUnionType(AstType):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.union_type(self)
+
+
+class AstTupleType(AstType):
+    """
+    Ast node for a tuple type.
+    """
+
+    def __init__(self, types: Tuple[AstType, ...], region: er.SourceView) -> None:
+        super().__init__(region)
+        self.types = types
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.tuple_type(self)

@@ -40,11 +40,13 @@ def _get_filenames() -> Tuple[str, str]:
 
 def _read_source(filename: str) -> str:
     try:
-        with open(filename, "r") as source_file:
-            return source_file.read()
+        source_file = open(filename, "r")
     except FileNotFoundError:
         print(f"No file found for {filename}")
         sys.exit(1)
+
+    with source_file:
+        return source_file.read()
 
 
 def _check_errors(error_name: str, errors: Iterable[er.CompileError]) -> None:
@@ -72,9 +74,6 @@ def _assemble_code(
         sys.exit(1)
     except bc.NegativeIndexError:
         print("Couldn't assemble; some variables were unresolved")
-        sys.exit(1)
-    except bc.StringTooLongError:
-        print("Couldn't assemble; string literal was too long")
         sys.exit(1)
 
 

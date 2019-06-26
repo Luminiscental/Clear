@@ -194,8 +194,8 @@ class Lexer:
 
     def run(
         self,
-        consume_rules: Optional[Iterable[Tuple[str, TokenType]]] = None,
-        skip_rules: Optional[Iterable[str]] = None,
+        consume_rules: Iterable[Tuple[str, TokenType]] = (),
+        skip_rules: Iterable[str] = (),
         fallback: Optional[Tuple[str, TokenType]] = None,
     ) -> None:
         """
@@ -205,11 +205,11 @@ class Lexer:
         it can't consume.
         """
         while not self.done():
-            if skip_rules and any(self.skip(pattern) for pattern in skip_rules):
-                continue
-            if consume_rules and any(
-                self.consume(pattern, kind) for pattern, kind in consume_rules
+            if (
+                not any(self.skip(pattern) for pattern in skip_rules)
+                and not any(
+                    self.consume(pattern, kind) for pattern, kind in consume_rules
+                )
+                and (fallback is None or not self.consume(*fallback))
             ):
-                continue
-            if not fallback or not self.consume(fallback[0], fallback[1]):
                 break

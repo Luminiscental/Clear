@@ -198,3 +198,11 @@ class AstPrinter(ast.AstVisitor):
             self._append(" | (")
             next_type.accept(self)
             self._append(")")
+
+    def tuple_type(self, node: ast.AstTupleType) -> None:
+        self._append("(")
+        node.types[0].accept(self)
+        for next_type in node.types[1:]:
+            self._append(", ")
+            next_type.accept(self)
+        self._append(")")
