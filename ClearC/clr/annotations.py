@@ -2,7 +2,7 @@
 Contains definitions for annotations of the ast.
 """
 
-from typing import Union, List, NamedTuple, Set
+from typing import Union, List, NamedTuple, Set, Dict
 
 import enum
 
@@ -214,77 +214,128 @@ class Builtin(NamedTuple):
     type_annot: TypeAnnot
 
 
-ARITH_TYPES = [BuiltinTypeAnnot.INT, BuiltinTypeAnnot.NUM]
+BOOL = BuiltinTypeAnnot.BOOL
+INT = BuiltinTypeAnnot.INT
+NIL = BuiltinTypeAnnot.NIL
+NUM = BuiltinTypeAnnot.NUM
+VOID = BuiltinTypeAnnot.VOID
+STR = BuiltinTypeAnnot.STR
+
+
 BUILTINS = {
     "int": Builtin(
         opcode=bc.Opcode.INT,
         type_annot=FuncTypeAnnot(
-            params=[
-                UnionTypeAnnot(
-                    {
-                        BuiltinTypeAnnot.BOOL,
-                        BuiltinTypeAnnot.INT,
-                        BuiltinTypeAnnot.NIL,
-                        BuiltinTypeAnnot.NUM,
-                    }
-                )
-            ],
-            return_type=BuiltinTypeAnnot.INT,
+            params=[UnionTypeAnnot({BOOL, INT, NIL, NUM})], return_type=INT
         ),
     ),
     "bool": Builtin(
         opcode=bc.Opcode.BOOL,
         type_annot=FuncTypeAnnot(
-            params=[
-                UnionTypeAnnot(
-                    {
-                        BuiltinTypeAnnot.BOOL,
-                        BuiltinTypeAnnot.INT,
-                        BuiltinTypeAnnot.NIL,
-                        BuiltinTypeAnnot.NUM,
-                    }
-                )
-            ],
-            return_type=BuiltinTypeAnnot.BOOL,
+            params=[UnionTypeAnnot({BOOL, INT, NIL, NUM})], return_type=BOOL
         ),
     ),
     "num": Builtin(
         opcode=bc.Opcode.NUM,
         type_annot=FuncTypeAnnot(
-            params=[
-                UnionTypeAnnot(
-                    {
-                        BuiltinTypeAnnot.BOOL,
-                        BuiltinTypeAnnot.INT,
-                        BuiltinTypeAnnot.NIL,
-                        BuiltinTypeAnnot.NUM,
-                    }
-                )
-            ],
-            return_type=BuiltinTypeAnnot.NUM,
+            params=[UnionTypeAnnot({BOOL, INT, NIL, NUM})], return_type=NUM
         ),
     ),
     "str": Builtin(
         opcode=bc.Opcode.STR,
         type_annot=FuncTypeAnnot(
-            params=[
-                UnionTypeAnnot(
-                    {
-                        BuiltinTypeAnnot.BOOL,
-                        BuiltinTypeAnnot.INT,
-                        BuiltinTypeAnnot.NIL,
-                        BuiltinTypeAnnot.NUM,
-                    }
-                )
-            ],
-            return_type=BuiltinTypeAnnot.STR,
+            params=[UnionTypeAnnot({BOOL, INT, NIL, NUM})], return_type=STR
         ),
     ),
     "clock": Builtin(
-        opcode=bc.Opcode.CLOCK,
-        type_annot=FuncTypeAnnot(params=[], return_type=BuiltinTypeAnnot.NUM),
+        opcode=bc.Opcode.CLOCK, type_annot=FuncTypeAnnot(params=[], return_type=NUM)
     ),
 }
+
+
+class TypedOperatorInfo(NamedTuple):
+    """
+    Named tuple for information about an operator with strict operand typing.
+    """
+
+    overloads: Dict[FuncTypeAnnot, List[bc.Instruction]]
+
+
+class UntypedOperatorInfo(NamedTuple):
+    """
+    Named tuple for information about an operator with non-strict operand typing.
+    """
+
+    return_type: TypeAnnot
+    opcodes: List[bc.Instruction]
+
+
+TYPED_BINARY: Dict[str, TypedOperatorInfo] = {
+    "+": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], INT): [bc.Opcode.INT_ADD],
+            FuncTypeAnnot([NUM, NUM], NUM): [bc.Opcode.NUM_ADD],
+            FuncTypeAnnot([STR, STR], STR): [bc.Opcode.STR_CAT],
+        }
+    ),
+    "-": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], INT): [bc.Opcode.INT_SUB],
+            FuncTypeAnnot([NUM, NUM], NUM): [bc.Opcode.NUM_SUB],
+        }
+    ),
+    "*": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], INT): [bc.Opcode.INT_MUL],
+            FuncTypeAnnot([NUM, NUM], NUM): [bc.Opcode.NUM_MUL],
+        }
+    ),
+    "/": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], INT): [bc.Opcode.INT_DIV],
+            FuncTypeAnnot([NUM, NUM], NUM): [bc.Opcode.NUM_DIV],
+        }
+    ),
+    "<": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], BOOL): [bc.Opcode.INT_LESS],
+            FuncTypeAnnot([NUM, NUM], BOOL): [bc.Opcode.NUM_LESS],
+        }
+    ),
+    ">": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], BOOL): [bc.Opcode.INT_GREATER],
+            FuncTypeAnnot([NUM, NUM], BOOL): [bc.Opcode.NUM_GREATER],
+        }
+    ),
+    "<=": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], BOOL): [bc.Opcode.INT_GREATER, bc.Opcode.NOT],
+            FuncTypeAnnot([NUM, NUM], BOOL): [bc.Opcode.NUM_GREATER, bc.Opcode.NOT],
+        }
+    ),
+    ">=": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT, INT], BOOL): [bc.Opcode.INT_LESS, bc.Opcode.NOT],
+            FuncTypeAnnot([NUM, NUM], BOOL): [bc.Opcode.NUM_LESS, bc.Opcode.NOT],
+        }
+    ),
+}
+UNTYPED_BINARY: Dict[str, UntypedOperatorInfo] = {
+    "==": UntypedOperatorInfo(return_type=BOOL, opcodes=[bc.Opcode.EQUAL]),
+    "!=": UntypedOperatorInfo(
+        return_type=BOOL, opcodes=[bc.Opcode.EQUAL, bc.Opcode.NOT]
+    ),
+}
+TYPED_UNARY: Dict[str, TypedOperatorInfo] = {
+    "-": TypedOperatorInfo(
+        overloads={
+            FuncTypeAnnot([INT], INT): [bc.Opcode.INT_NEG],
+            FuncTypeAnnot([NUM], NUM): [bc.Opcode.NUM_NEG],
+        }
+    )
+}
+UNTYPED_UNARY: Dict[str, UntypedOperatorInfo] = {}
 
 # Return annotations
 

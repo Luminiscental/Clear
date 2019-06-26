@@ -12,15 +12,7 @@ T = TypeVar("T")  # pylint: disable=invalid-name
 K = TypeVar("K")  # pylint: disable=invalid-name
 
 
-def group_by(key_func: Callable[[T], K], values: Iterable[T]) -> Dict[K, Set[T]]:
-    """
-    Group an iterable by a given key function.
-
-    e.g.
-    > pairs = [(1, 2), (1, -4), (3, 4), (2, 7)]
-    > group_by(lambda pair: pair[0], pairs)
-    {1: [(1, 2), (1, -4)], 2: [(2, 7)], 3: [(3, 4)]}
-    """
+def _group_by(key_func: Callable[[T], K], values: Iterable[T]) -> Dict[K, Set[T]]:
     grouping: Dict[K, Set[T]] = {}
     for value in values:
         key = key_func(value)
@@ -31,12 +23,9 @@ def group_by(key_func: Callable[[T], K], values: Iterable[T]) -> Dict[K, Set[T]]
     return grouping
 
 
-def take_functions(
+def _take_functions(
     types: Iterable[an.UnitType]
 ) -> Tuple[Set[an.FuncTypeAnnot], Set[an.UnitType]]:
-    """
-    Split by whether the type is a function type.
-    """
     instances = set()
     without: Set[an.UnitType] = set()
     for value in types:
@@ -53,7 +42,7 @@ def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
     parameters can be combined by intersecting the parameter types and unioning the return types.
     """
     result = set()
-    groups = group_by(lambda func: len(func.params), funcs)
+    groups = _group_by(lambda func: len(func.params), funcs)
     for param_count, group in groups.items():
         union_return = _union({func.return_type for func in group})
         union_params = [
@@ -66,47 +55,46 @@ def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
 
 def contract_types(types: Set[an.UnitType]) -> an.TypeAnnot:
     """
-    Contracts an expanded list of types into a single type annotation.
+    Contracts an expanded set of types into a single type annotation.
     """
     # Unresolved types contaminate the whole union
     if an.UnresolvedTypeAnnot() in types:
         return an.UnresolvedTypeAnnot()
+    # Take out the functions
+    funcs, types = _take_functions(types)
+    # Contract them and add back in
+    types = types.union(contract_functions(funcs))
     # If there's only one type the union is trivial
     if len(types) == 1:
         return types.pop()
-    # Take out the functions
-    funcs, types = take_functions(types)
-    types = types.union(contract_functions(funcs))
-    # Nil makes the union optional
-    if an.BuiltinTypeAnnot.NIL in types:
-        target = contract_types(
-            {subtype for subtype in types if subtype != an.BuiltinTypeAnnot.NIL}
-        )
+    # Otherwise make a possibly optional union
+    target = an.UnionTypeAnnot({subtype for subtype in types if subtype != an.NIL})
+    # If there was a nil it's optional
+    if an.NIL in types:
         return an.OptionalTypeAnnot(target)
-    # Otherwise make a union type
-    return an.UnionTypeAnnot({subtype for subtype in types})
+    return target
 
 
 def _intersection(types: Set[an.TypeAnnot]) -> an.TypeAnnot:
     return contract_types(set.intersection(*[unit.expand() for unit in types]))
 
 
-def intersection(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
+def intersection(*args: an.TypeAnnot) -> an.TypeAnnot:
     """
-    Returns the simplest type contained in both the lhs and rhs.
+    Returns the simplest type contained in all the args.
     """
-    return _intersection({lhs, rhs})
+    return _intersection(set(args))
 
 
 def _union(types: Set[an.TypeAnnot]) -> an.TypeAnnot:
     return contract_types(set.union(*[unit.expand() for unit in types]))
 
 
-def union(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
+def union(*args: an.TypeAnnot) -> an.TypeAnnot:
     """
-    Returns the simplest type containing both the lhs and rhs.
+    Returns the simplest type containing all the args.
     """
-    return _union({lhs, rhs})
+    return _union(set(args))
 
 
 def contains(inner: an.TypeAnnot, outer: an.TypeAnnot) -> bool:
@@ -124,8 +112,7 @@ def valid(type_annot: an.TypeAnnot) -> bool:
         return True
     if isinstance(type_annot, an.FuncTypeAnnot):
         return all(valid(param) for param in type_annot.params) and (
-            valid(type_annot.return_type)
-            or type_annot.return_type == an.BuiltinTypeAnnot.VOID
+            valid(type_annot.return_type) or type_annot.return_type == an.VOID
         )
     if isinstance(type_annot, an.OptionalTypeAnnot):
         return valid(type_annot.target)
@@ -162,7 +149,7 @@ class TypeChecker(ast.DeepVisitor):
                 )
         else:
             node.type_annot = node.val_init.type_annot
-            if node.type_annot == an.BuiltinTypeAnnot.VOID:
+            if node.type_annot == an.VOID:
                 self.errors.add(
                     message="cannot declare value as void",
                     regions=[node.val_init.region],
@@ -174,7 +161,7 @@ class TypeChecker(ast.DeepVisitor):
         node.return_type.accept(self)
         if (
             not valid(node.return_type.type_annot)
-            and node.return_type.type_annot != an.BuiltinTypeAnnot.VOID
+            and node.return_type.type_annot != an.VOID
         ):
             self.errors.add(
                 message=f"invalid return type {node.return_type.type_annot}",
@@ -199,11 +186,7 @@ class TypeChecker(ast.DeepVisitor):
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
         printable_types = an.UnionTypeAnnot(
-            {
-                value
-                for value in an.BuiltinTypeAnnot
-                if value != an.BuiltinTypeAnnot.VOID
-            }
+            {value for value in an.BuiltinTypeAnnot if value != an.VOID}
         )
         if node.expr and not contains(node.expr.type_annot, printable_types):
             self.errors.add(
@@ -212,7 +195,7 @@ class TypeChecker(ast.DeepVisitor):
             )
 
     def _check_cond(self, cond: ast.AstExpr) -> None:
-        if cond.type_annot != an.BuiltinTypeAnnot.BOOL:
+        if cond.type_annot != an.BOOL:
             self.errors.add(
                 message=f"invalid type {cond.type_annot} for condition, expected bool",
                 regions=[cond.region],
@@ -248,7 +231,7 @@ class TypeChecker(ast.DeepVisitor):
                     regions=[node.expr.region],
                 )
         else:
-            if self.expected_returns[-1] != an.BuiltinTypeAnnot.VOID:
+            if self.expected_returns[-1] != an.VOID:
                 self.errors.add(
                     message=f"missing return value in non-void function",
                     regions=[node.region],
@@ -256,15 +239,12 @@ class TypeChecker(ast.DeepVisitor):
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
-        if (
-            not valid(node.expr.type_annot)
-            and node.expr.type_annot != an.BuiltinTypeAnnot.VOID
-        ):
+        if not valid(node.expr.type_annot) and node.expr.type_annot != an.VOID:
             self.errors.add(
                 f"invalid expression type {node.expr.type_annot}",
                 regions=[node.expr.region],
             )
-        if node.expr.type_annot != an.BuiltinTypeAnnot.VOID:
+        if node.expr.type_annot != an.VOID:
             self.errors.add(
                 message=f"unused non-void value",
                 regions=[node.expr.region],
@@ -273,16 +253,23 @@ class TypeChecker(ast.DeepVisitor):
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)
-        unary_ops = {"-": [an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT]}
         operator = str(node.operator)
-        if operator in unary_ops:
-            if node.target.type_annot not in unary_ops[operator]:
+        if operator in an.TYPED_UNARY:
+            for overload, opcodes in an.TYPED_UNARY[operator].overloads.items():
+                if overload.params == [node.target.type_annot]:
+                    node.type_annot = overload.return_type
+                    node.opcodes = opcodes
+                    break
+            else:
                 self.errors.add(
-                    message=f"invalid type {node.target.type_annot} "
+                    message=f"invalid operand type "
+                    f"{node.target.type_annot} "
                     f"for unary operator {node.operator}",
-                    regions=[node.target.region],
+                    regions=[node.region],
                 )
-            node.type_annot = node.target.type_annot
+        elif operator in an.UNTYPED_UNARY:
+            node.type_annot = an.UNTYPED_UNARY[operator].return_type
+            node.opcodes = an.UNTYPED_UNARY[operator].opcodes
         else:
             self.errors.add(
                 message=f"unknown unary operator {node.operator}",
@@ -291,71 +278,23 @@ class TypeChecker(ast.DeepVisitor):
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
-        typed_binary_ops: Dict[
-            str, Tuple[an.TypeAnnot, Callable[[an.TypeAnnot], an.TypeAnnot]]
-        ] = {
-            "+": (
-                an.UnionTypeAnnot(
-                    {
-                        an.BuiltinTypeAnnot.NUM,
-                        an.BuiltinTypeAnnot.INT,
-                        an.BuiltinTypeAnnot.STR,
-                    }
-                ),
-                lambda in_type: in_type,
-            ),
-            "-": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda in_type: in_type,
-            ),
-            "*": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda in_type: in_type,
-            ),
-            "/": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda in_type: in_type,
-            ),
-            "<": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda _: an.BuiltinTypeAnnot.BOOL,
-            ),
-            ">": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda _: an.BuiltinTypeAnnot.BOOL,
-            ),
-            "<=": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda _: an.BuiltinTypeAnnot.BOOL,
-            ),
-            ">=": (
-                an.UnionTypeAnnot({an.BuiltinTypeAnnot.NUM, an.BuiltinTypeAnnot.INT}),
-                lambda _: an.BuiltinTypeAnnot.BOOL,
-            ),
-        }
-        untyped_binary_ops: Dict[str, an.TypeAnnot] = {
-            "==": an.BuiltinTypeAnnot.BOOL,
-            "!=": an.BuiltinTypeAnnot.BOOL,
-        }
         operator = str(node.operator)
-        if operator in typed_binary_ops:
-            if node.left.type_annot != node.right.type_annot:
+        if operator in an.TYPED_BINARY:
+            for overload, opcodes in an.TYPED_BINARY[operator].overloads.items():
+                if overload.params == [node.left.type_annot, node.right.type_annot]:
+                    node.type_annot = overload.return_type
+                    node.opcodes = opcodes
+                    break
+            else:
                 self.errors.add(
-                    message=f"mismatched types {node.left.type_annot} and {node.right.type_annot} "
+                    message=f"invalid operand types "
+                    f"{node.left.type_annot}, {node.right.type_annot} "
                     f"for binary operator {node.operator}",
                     regions=[node.region],
                 )
-            else:
-                if not contains(node.left.type_annot, typed_binary_ops[operator][0]):
-                    self.errors.add(
-                        message=f"invalid operand type {node.left.type_annot} "
-                        f"for binary operator {node.operator}",
-                        regions=[node.region],
-                    )
-            converter = typed_binary_ops[operator][1]
-            node.type_annot = converter(node.left.type_annot)
-        elif operator in untyped_binary_ops:
-            node.type_annot = untyped_binary_ops[operator]
+        elif operator in an.UNTYPED_BINARY:
+            node.type_annot = an.UNTYPED_BINARY[operator].return_type
+            node.opcodes = an.UNTYPED_BINARY[operator].opcodes
         else:
             self.errors.add(
                 message=f"unknown binary operator {node.operator}",
@@ -364,15 +303,15 @@ class TypeChecker(ast.DeepVisitor):
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
         super().int_expr(node)
-        node.type_annot = an.BuiltinTypeAnnot.INT
+        node.type_annot = an.INT
 
     def num_expr(self, node: ast.AstNumExpr) -> None:
         super().num_expr(node)
-        node.type_annot = an.BuiltinTypeAnnot.NUM
+        node.type_annot = an.NUM
 
     def str_expr(self, node: ast.AstStrExpr) -> None:
         super().str_expr(node)
-        node.type_annot = an.BuiltinTypeAnnot.STR
+        node.type_annot = an.STR
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
@@ -383,11 +322,11 @@ class TypeChecker(ast.DeepVisitor):
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
         super().bool_expr(node)
-        node.type_annot = an.BuiltinTypeAnnot.BOOL
+        node.type_annot = an.BOOL
 
     def nil_expr(self, node: ast.AstNilExpr) -> None:
         super().nil_expr(node)
-        node.type_annot = an.BuiltinTypeAnnot.NIL
+        node.type_annot = an.NIL
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)
@@ -446,7 +385,7 @@ class TypeChecker(ast.DeepVisitor):
     def union_type(self, node: ast.AstUnionType) -> None:
         super().union_type(node)
         node.type_annot = an.UnionTypeAnnot({elem.type_annot for elem in node.types})
-        if not valid(node.type_annot) and node.type_annot != an.BuiltinTypeAnnot.VOID:
+        if not valid(node.type_annot) and node.type_annot != an.VOID:
             self.errors.add(
                 message=f"invalid type {node.type_annot}", regions=[node.region]
             )

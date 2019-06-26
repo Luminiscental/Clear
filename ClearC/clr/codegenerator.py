@@ -2,7 +2,7 @@
 Module for generating code from an annotated ast.
 """
 
-from typing import List, Tuple, Optional, Iterator, Dict
+from typing import List, Tuple, Optional, Iterator
 
 import contextlib
 
@@ -190,7 +190,7 @@ class CodeGenerator(ast.FunctionVisitor):
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         function = self.program.start_function()
         super().func_decl(node)
-        if node.return_type.type_annot == an.BuiltinTypeAnnot.VOID:
+        if node.return_type.type_annot == an.VOID:
             self.program.emit_return(node)
         self.program.end_function(function)
         for ref in node.upvalue_refs:
@@ -202,7 +202,7 @@ class CodeGenerator(ast.FunctionVisitor):
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
         if node.expr:
-            not_string = node.expr.type_annot != an.BuiltinTypeAnnot.STR
+            not_string = node.expr.type_annot != an.STR
             self.program.print_value(convert=not_string)
         else:
             self.program.constant("")
@@ -257,68 +257,18 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
-        if node.expr.type_annot != an.BuiltinTypeAnnot.VOID:
+        if node.expr.type_annot != an.VOID:
             self.program.append_op(bc.Opcode.POP)
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
         super().unary_expr(node)
-        unary_ops: Dict[str, Dict[an.TypeAnnot, bc.Instruction]] = {
-            "-": {
-                an.BuiltinTypeAnnot.NUM: bc.Opcode.NUM_NEG,
-                an.BuiltinTypeAnnot.INT: bc.Opcode.INT_NEG,
-            }
-        }
-        operator = str(node.operator)
-        self.program.append_op(unary_ops[operator][node.target.type_annot])
+        for opcode in node.opcodes:
+            self.program.append_op(opcode)
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
-        typed_binary_ops: Dict[str, Dict[an.TypeAnnot, List[bc.Instruction]]] = {
-            "+": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_ADD],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_ADD],
-                an.BuiltinTypeAnnot.STR: [bc.Opcode.STR_CAT],
-            },
-            "-": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_SUB],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_SUB],
-            },
-            "*": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_MUL],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_MUL],
-            },
-            "/": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_DIV],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_DIV],
-            },
-            "<": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_LESS],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_LESS],
-            },
-            ">": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_GREATER],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_GREATER],
-            },
-            "<=": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_GREATER, bc.Opcode.NOT],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_GREATER, bc.Opcode.NOT],
-            },
-            ">=": {
-                an.BuiltinTypeAnnot.NUM: [bc.Opcode.NUM_LESS, bc.Opcode.NOT],
-                an.BuiltinTypeAnnot.INT: [bc.Opcode.INT_LESS, bc.Opcode.NOT],
-            },
-        }
-        untyped_binary_ops: Dict[str, List[bc.Instruction]] = {
-            "==": [bc.Opcode.EQUAL],
-            "!=": [bc.Opcode.EQUAL, bc.Opcode.NOT],
-        }
-        operator = str(node.operator)
-        if operator in typed_binary_ops:
-            for opcode in typed_binary_ops[operator][node.left.type_annot]:
-                self.program.append_op(opcode)
-        else:
-            for opcode in untyped_binary_ops[operator]:
-                self.program.append_op(opcode)
+        for opcode in node.opcodes:
+            self.program.append_op(opcode)
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
         super().int_expr(node)
@@ -345,7 +295,7 @@ class CodeGenerator(ast.FunctionVisitor):
                     self.program.append_op(bc.Opcode.PUSH_LOCAL)
                     self.program.append_op(1 + i)
                 self.program.append_op(an.BUILTINS[node.name].opcode)
-                if builtin.type_annot.return_type != an.BuiltinTypeAnnot.VOID:
+                if builtin.type_annot.return_type != an.VOID:
                     self.program.append_op(bc.Opcode.SET_RETURN)
                 for _ in builtin.type_annot.params:
                     self.program.append_op(bc.Opcode.POP)
@@ -379,5 +329,5 @@ class CodeGenerator(ast.FunctionVisitor):
         self.program.append_op(len(node.args) + 1)
         # Fetch the return value if there is one
         if isinstance(node.function.type_annot, an.FuncTypeAnnot):  # should be true
-            if node.function.type_annot.return_type != an.BuiltinTypeAnnot.VOID:
+            if node.function.type_annot.return_type != an.VOID:
                 self.program.append_op(bc.Opcode.PUSH_RETURN)

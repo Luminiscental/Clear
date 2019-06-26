@@ -7,6 +7,7 @@ from typing import Union, List, Optional, Tuple, Dict
 import clr.errors as er
 import clr.lexer as lx
 import clr.annotations as an
+import clr.bytecode as bc
 
 # Visitor definitions:
 
@@ -509,6 +510,7 @@ class AstUnaryExpr(AstExpr):
         super().__init__(region)
         self.operator = operator
         self.target = target
+        self.opcodes: List[bc.Instruction] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.unary_expr(self)
@@ -526,6 +528,7 @@ class AstBinaryExpr(AstExpr):
         self.operator = operator
         self.left = left
         self.right = right
+        self.opcodes: List[bc.Instruction] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binary_expr(self)
