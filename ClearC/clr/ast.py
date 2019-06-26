@@ -115,9 +115,14 @@ class AstVisitor:
         Visit a function call expression node.
         """
 
-    def atom_type(self, node: "AstAtomType") -> None:
+    def ident_type(self, node: "AstIdentType") -> None:
         """
-        Visit an atomic type node.
+        Visit an identifier type node.
+        """
+
+    def void_type(self, node: "AstVoidType") -> None:
+        """
+        Visit a void type node.
         """
 
     def func_type(self, node: "AstFuncType") -> None:
@@ -327,7 +332,7 @@ AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 # Specific nodes:
 
-# TODO: mutable values, structs, properties
+# TODO: Tuples/tuple unpacking, case expr/stmt
 
 
 class Ast(AstNode):
@@ -634,7 +639,7 @@ class AstCallExpr(AstExpr):
         visitor.call_expr(self)
 
 
-class AstAtomType(AstType):
+class AstIdentType(AstType):
     """
     Ast node for an atomic type.
     """
@@ -644,7 +649,19 @@ class AstAtomType(AstType):
         self.name = str(token)
 
     def accept(self, visitor: AstVisitor) -> None:
-        visitor.atom_type(self)
+        visitor.ident_type(self)
+
+
+class AstVoidType(AstType):
+    """
+    Ast node for a void type.
+    """
+
+    def __init__(self, token: lx.Token) -> None:
+        super().__init__(token.lexeme)
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.void_type(self)
 
 
 class AstFuncType(AstType):

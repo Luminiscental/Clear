@@ -168,8 +168,11 @@ class AstPrinter(ast.AstVisitor):
                 arg.accept(self)
         self._append(")")
 
-    def atom_type(self, node: ast.AstAtomType) -> None:
+    def ident_type(self, node: ast.AstIdentType) -> None:
         self._append(node.name)
+
+    def void_type(self, node: ast.AstVoidType) -> None:
+        self._append("void")
 
     def func_type(self, node: ast.AstFuncType) -> None:
         self._append("func")

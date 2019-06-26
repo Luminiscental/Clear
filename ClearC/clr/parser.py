@@ -11,8 +11,8 @@ from typing import (
     Tuple,
     Callable,
     DefaultDict,
-    NamedTuple,
     TypeVar,
+    Generic,
 )
 
 import enum
@@ -23,14 +23,15 @@ import clr.lexer as lx
 import clr.ast as ast
 
 
-def parse_tokens(tokens: Sequence[lx.Token]) -> Union[ast.Ast, er.CompileError]:
+T = TypeVar("T")  # pylint: disable=invalid-name
+Result = Union[T, er.CompileError]
+
+
+def parse_tokens(tokens: Sequence[lx.Token]) -> Result[ast.Ast]:
     """
     Parses an ast from a list of tokens.
     """
     return parse_ast(Parser(tokens))
-
-
-T = TypeVar("T")  # pylint: disable=invalid-name
 
 
 class Parser:
@@ -105,7 +106,7 @@ def indent(orig: str) -> str:
     return "\n".join(f"    {line}" for line in orig.splitlines())
 
 
-def parse_ast(parser: Parser) -> Union[ast.Ast, er.CompileError]:
+def parse_ast(parser: Parser) -> Result[ast.Ast]:
     """
     Parse the ast from a parser or return an error.
 
@@ -131,7 +132,7 @@ def parse_token(parser: Parser, kinds: Iterable[lx.TokenType]) -> Optional[lx.To
     return None
 
 
-def parse_decl(parser: Parser) -> Union[ast.AstDecl, er.CompileError]:
+def parse_decl(parser: Parser) -> Result[ast.AstDecl]:
     """
     Parse a declaration from the parser or return an error.
 
@@ -144,7 +145,7 @@ def parse_decl(parser: Parser) -> Union[ast.AstDecl, er.CompileError]:
     return parse_stmt(parser)
 
 
-def finish_value_decl(parser: Parser) -> Union[ast.AstValueDecl, er.CompileError]:
+def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
     """
     Parse a value declaration from the parser or return an error. Assumes that the "val" token has
     already been consumed.
@@ -184,7 +185,7 @@ def finish_value_decl(parser: Parser) -> Union[ast.AstValueDecl, er.CompileError
     return ast.AstValueDecl(str(ident), val_type, expr, region)
 
 
-def finish_func_decl(parser: Parser) -> Union[ast.AstFuncDecl, er.CompileError]:
+def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
     """
     Parse a function declaration from the parser or return an error. Assumes that the "func" token
     has already been consumed.
@@ -223,7 +224,7 @@ def finish_func_decl(parser: Parser) -> Union[ast.AstFuncDecl, er.CompileError]:
     return ast.AstFuncDecl(str(ident), params, return_type, block, region)
 
 
-def parse_param(parser: Parser) -> Union[ast.AstParam, er.CompileError]:
+def parse_param(parser: Parser) -> Result[ast.AstParam]:
     """
     Parse a parameter from the parser or return an error.
 
@@ -241,8 +242,8 @@ def parse_param(parser: Parser) -> Union[ast.AstParam, er.CompileError]:
 
 
 def parse_tuple(
-    parser: Parser, parse_func: Callable[[Parser], Union[T, er.CompileError]]
-) -> Union[List[T], er.CompileError]:
+    parser: Parser, parse_func: Callable[[Parser], Result[T]]
+) -> Result[List[T]]:
     """
     Given that the opening '(' has already been consumed, parse the elements of a tuple (a,b,...)
     form into a list using a parameter function to parse each element.
@@ -268,7 +269,7 @@ def parse_tuple(
     return pairs
 
 
-def parse_stmt(parser: Parser) -> Union[ast.AstStmt, er.CompileError]:
+def parse_stmt(parser: Parser) -> Result[ast.AstStmt]:
     """
     Parse a statement from the parser or return an error.
 
@@ -293,7 +294,7 @@ def parse_stmt(parser: Parser) -> Union[ast.AstStmt, er.CompileError]:
     return parse_expr_stmt(parser)
 
 
-def finish_print_stmt(parser: Parser) -> Union[ast.AstPrintStmt, er.CompileError]:
+def finish_print_stmt(parser: Parser) -> Result[ast.AstPrintStmt]:
     """
     Parse a print statement from the parser or return an error. Assumes that the "print" token has
     already been consumed.
@@ -318,7 +319,7 @@ def finish_print_stmt(parser: Parser) -> Union[ast.AstPrintStmt, er.CompileError
     return ast.AstPrintStmt(expr, er.SourceView.range(start, parser.prev().lexeme))
 
 
-def finish_block_stmt(parser: Parser) -> Union[ast.AstBlockStmt, er.CompileError]:
+def finish_block_stmt(parser: Parser) -> Result[ast.AstBlockStmt]:
     """
     Parse a block statement from the parser or return an error. Assumes that the opening brace has
     already been consumed.
@@ -342,7 +343,7 @@ def finish_block_stmt(parser: Parser) -> Union[ast.AstBlockStmt, er.CompileError
     return ast.AstBlockStmt(decls, er.SourceView.range(start, parser.prev().lexeme))
 
 
-def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
+def finish_if_stmt(parser: Parser) -> Result[ast.AstIfStmt]:
     """
     Parse an if statement from the parser or return an error. Assumes that the "if" token has
     already been consumed.
@@ -354,7 +355,7 @@ def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
     """
     start = parser.prev().lexeme
 
-    def parse_cond() -> Union[Tuple[ast.AstExpr, ast.AstBlockStmt], er.CompileError]:
+    def parse_cond() -> Result[Tuple[ast.AstExpr, ast.AstBlockStmt]]:
         if not parser.match(lx.TokenType.LEFT_PAREN):
             return er.CompileError(
                 message="missing '(' to start condition", regions=[parser.curr_region()]
@@ -404,7 +405,7 @@ def finish_if_stmt(parser: Parser) -> Union[ast.AstIfStmt, er.CompileError]:
     )
 
 
-def finish_while_stmt(parser: Parser) -> Union[ast.AstWhileStmt, er.CompileError]:
+def finish_while_stmt(parser: Parser) -> Result[ast.AstWhileStmt]:
     """
     Parse a while statement from the parser or return an error. Assumes the "while" token has
     already been consumed.
@@ -433,7 +434,7 @@ def finish_while_stmt(parser: Parser) -> Union[ast.AstWhileStmt, er.CompileError
     )
 
 
-def finish_return_stmt(parser: Parser) -> Union[ast.AstReturnStmt, er.CompileError]:
+def finish_return_stmt(parser: Parser) -> Result[ast.AstReturnStmt]:
     """
     Parse a return statement from the parser or return an error. Assumes the "return" token has
     already been consumed.
@@ -456,7 +457,7 @@ def finish_return_stmt(parser: Parser) -> Union[ast.AstReturnStmt, er.CompileErr
     return ast.AstReturnStmt(expr, region)
 
 
-def parse_expr_stmt(parser: Parser) -> Union[ast.AstExprStmt, er.CompileError]:
+def parse_expr_stmt(parser: Parser) -> Result[ast.AstExprStmt]:
     """
     Parse an expression statement from the parser or return an error.
 
@@ -473,64 +474,58 @@ def parse_expr_stmt(parser: Parser) -> Union[ast.AstExprStmt, er.CompileError]:
     return ast.AstExprStmt(expr, er.SourceView.range(expr.region, parser.prev().lexeme))
 
 
-def parse_type(parser: Parser) -> Union[ast.AstType, er.CompileError]:
+def finish_group_type(parser: Parser) -> Result[ast.AstType]:
     """
-    Parse a type from the parser or return an error.
-
-    AstType : unit_type ( "|" unit_type )* ;
+    Parse a grouped type from the parser or return an error. Assumes that the opening parenthesis
+    has already been consumed.
     """
-    first = parse_unit_type(parser)
-    if isinstance(first, er.CompileError):
-        return first
+    start = parser.prev().lexeme
+    result = parse_type(parser)
+    if isinstance(result, er.CompileError):
+        return result
+    if not parser.match(lx.TokenType.RIGHT_PAREN):
+        return er.CompileError(
+            message="missing ')' to end type grouping",
+            regions=[start, parser.prev().lexeme],
+        )
+    result.region = er.SourceView.range(start, parser.prev().lexeme)
+    return result
 
-    types = [first]
+
+def finish_optional_type(parser: Parser, target: ast.AstType) -> Result[ast.AstType]:
+    """
+    Parse an optional type from the parser, given the target type. Assumes that the '?' token has
+    already been consumed.
+    """
+    return ast.AstOptionalType(
+        target, er.SourceView.range(target.region, parser.prev().lexeme)
+    )
+
+
+def finish_union_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
+    """
+    Parse a union type from the parser, given the left side. Assumes that the '|' token has already
+    been consumed.
+    """
+    rhs = parse_type(parser, Precedence.FACTOR)
+    if isinstance(rhs, er.CompileError):
+        return rhs
+
+    types = [lhs, rhs]
     while parser.match(lx.TokenType.VERT):
-        next_type = parse_unit_type(parser)
+        next_type = parse_type(parser, Precedence.FACTOR)
         if isinstance(next_type, er.CompileError):
             return next_type
         types.append(next_type)
 
-    region = er.SourceView.range(first.region, parser.prev().lexeme)
-    return ast.AstUnionType(types, region) if len(types) > 1 else types[0]
+    region = er.SourceView.range(types[0].region, types[-1].region)
+    return ast.AstUnionType(types, region)
 
 
-def parse_unit_type(parser: Parser) -> Union[ast.AstType, er.CompileError]:
-    """
-    Parse a unit type from the parser or return an error.
-
-    unit_type : ( "(" AstType ")" | AstFuncType | AstAtomType ) ( "?" )? ;
-    """
-    if parser.match(lx.TokenType.LEFT_PAREN):
-        start = parser.prev().lexeme
-        result = parse_type(parser)
-        if not isinstance(result, er.CompileError):
-            if not parser.match(lx.TokenType.RIGHT_PAREN):
-                return er.CompileError(
-                    message="missing ')' to end type grouping",
-                    regions=[parser.curr_region()],
-                )
-            result.region = er.SourceView.range(start, parser.prev().lexeme)
-    elif parser.match(lx.TokenType.FUNC):
-        result = finish_func_type(parser)
-    else:
-        result = parse_atom_type(parser)
-
-    if isinstance(result, er.CompileError):
-        return result
-
-    if parser.match(lx.TokenType.QUESTION_MARK):
-        result = ast.AstOptionalType(
-            result, er.SourceView.range(result.region, parser.prev().lexeme)
-        )
-    return result
-
-
-def finish_func_type(parser: Parser) -> Union[ast.AstFuncType, er.CompileError]:
+def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
     """
     Parse a function type from the parser or return an error. Assumes that the "func" token has
     already been consumed.
-
-    AstFuncType : "func" "(" ( AstType ( "," AstType )* )? ")" AstType ;
     """
     start = parser.prev().lexeme
     if not parser.match(lx.TokenType.LEFT_PAREN):
@@ -548,19 +543,23 @@ def finish_func_type(parser: Parser) -> Union[ast.AstFuncType, er.CompileError]:
     return ast.AstFuncType(params, return_type, region)
 
 
-def parse_atom_type(parser: Parser) -> Union[ast.AstAtomType, er.CompileError]:
+def finish_ident_type(parser: Parser) -> Result[ast.AstIdentType]:
     """
-    Parse an atom type from the parser or return an error.
-
-    AstAtomType : IDENTIFIER | "void" ;
+    Parse an identifier type from the parser or return an error. Assumes that the identifier token
+    has already been consumed.
     """
-    token = parse_token(parser, [lx.TokenType.IDENTIFIER, lx.TokenType.VOID])
-    if token is None:
-        return er.CompileError(message="expected type", regions=[parser.curr_region()])
-    return ast.AstAtomType(token)
+    return ast.AstIdentType(parser.prev())
 
 
-def finish_group_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
+def finish_void_type(parser: Parser) -> Result[ast.AstVoidType]:
+    """
+    Parse a void type from the parser or return an error. Assumes that the "void" token has already
+    been consumed.
+    """
+    return ast.AstVoidType(parser.prev())
+
+
+def finish_group_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse a grouped expression from the parser or return an error. Assumes that the opening
     parenthesis has already been consumed.
@@ -578,7 +577,7 @@ def finish_group_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
     return expr
 
 
-def finish_unary_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
+def finish_unary_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse a unary expression from the parser or return an error. Assumes that the operator token
     has already been consumed.
@@ -591,15 +590,14 @@ def finish_unary_expr(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
     return ast.AstUnaryExpr(operator, target, region)
 
 
-def finish_binary_expr(
-    parser: Parser, lhs: ast.AstExpr
-) -> Union[ast.AstExpr, er.CompileError]:
+def finish_binary_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     """
     Parse a binary expression from the parser or return an error. Assumes the operator token has
     already been consumed, and takes the lhs expression as a parameter.
     """
     operator = parser.prev()
-    prec = PRATT_TABLE[operator.kind].precedence
+    prec = EXPR_TABLE[operator.kind].precedence
+    # The .next() makes it left associative
     rhs = parse_expr(parser, prec.next())
     if isinstance(rhs, er.CompileError):
         return rhs
@@ -607,9 +605,7 @@ def finish_binary_expr(
     return ast.AstBinaryExpr(operator, lhs, rhs, region)
 
 
-def finish_call_expr(
-    parser: Parser, lhs: ast.AstExpr
-) -> Union[ast.AstExpr, er.CompileError]:
+def finish_call_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     """
     Parse a function call expression from the parser or return an error. Assumes that the open
     parenthesis has already been consumed, and takes the function expression as a parameter.
@@ -621,7 +617,7 @@ def finish_call_expr(
     return ast.AstCallExpr(lhs, args, region)
 
 
-def finish_int_expr(parser: Parser) -> Union[ast.AstIntExpr, er.CompileError]:
+def finish_int_expr(parser: Parser) -> Result[ast.AstIntExpr]:
     """
     Parse an int expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -635,7 +631,7 @@ def finish_int_expr(parser: Parser) -> Union[ast.AstIntExpr, er.CompileError]:
     return ast.AstIntExpr(token)
 
 
-def finish_num_expr(parser: Parser) -> Union[ast.AstNumExpr, er.CompileError]:
+def finish_num_expr(parser: Parser) -> Result[ast.AstNumExpr]:
     """
     Parse a num expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -651,7 +647,7 @@ def finish_num_expr(parser: Parser) -> Union[ast.AstNumExpr, er.CompileError]:
     return ast.AstNumExpr(token)
 
 
-def finish_str_expr(parser: Parser) -> Union[ast.AstStrExpr, er.CompileError]:
+def finish_str_expr(parser: Parser) -> Result[ast.AstStrExpr]:
     """
     Parse a str expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -664,7 +660,7 @@ def finish_str_expr(parser: Parser) -> Union[ast.AstStrExpr, er.CompileError]:
     return ast.AstStrExpr(token)
 
 
-def finish_ident_expr(parser: Parser) -> Union[ast.AstIdentExpr, er.CompileError]:
+def finish_ident_expr(parser: Parser) -> Result[ast.AstIdentExpr]:
     """
     Parse an identifier expression from the parser or return an error. Assumes that the identifier
     has already been consumed.
@@ -672,7 +668,7 @@ def finish_ident_expr(parser: Parser) -> Union[ast.AstIdentExpr, er.CompileError
     return ast.AstIdentExpr(parser.prev())
 
 
-def finish_bool_expr(parser: Parser) -> Union[ast.AstBoolExpr, er.CompileError]:
+def finish_bool_expr(parser: Parser) -> Result[ast.AstBoolExpr]:
     """
     Parse a bool expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -680,7 +676,7 @@ def finish_bool_expr(parser: Parser) -> Union[ast.AstBoolExpr, er.CompileError]:
     return ast.AstBoolExpr(parser.prev())
 
 
-def finish_nil_expr(parser: Parser) -> Union[ast.AstNilExpr, er.CompileError]:
+def finish_nil_expr(parser: Parser) -> Result[ast.AstNilExpr]:
     """
     Parse a nil expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -691,7 +687,7 @@ def finish_nil_expr(parser: Parser) -> Union[ast.AstNilExpr, er.CompileError]:
 @enum.unique
 class Precedence(enum.Enum):
     """
-    Enumerates the different precedences of infix expressions. The values respect the ordering.
+    Enumerates the different precedences of postfix expressions. The values respect the ordering.
     """
 
     NONE = 0
@@ -726,61 +722,89 @@ class Precedence(enum.Enum):
         return Precedence(min(next_value, Precedence.MAX.value))
 
 
-PrefixRule = Callable[[Parser], Union[ast.AstExpr, er.CompileError]]
-InfixRule = Callable[[Parser, ast.AstExpr], Union[ast.AstExpr, er.CompileError]]
+PrefixRule = Callable[[Parser], Result[T]]
+PostfixRule = Callable[[Parser, T], Result[T]]
 
 
-class PrattRule(NamedTuple):
+class PrattRule(Generic[T]):
     """
-    Represents a rule for parsing a token within an expression.
+    Represents a pratt rule for a token type.
     """
 
-    prefix: Optional[PrefixRule] = None
-    infix: Optional[InfixRule] = None
-    precedence: Precedence = Precedence.NONE
+    def __init__(
+        self,
+        prefix: Optional[PrefixRule[T]] = None,
+        postfix: Optional[PostfixRule[T]] = None,
+        precedence: Precedence = Precedence.NONE,
+    ) -> None:
+        self.prefix = prefix
+        self.postfix = postfix
+        self.precedence = precedence
 
 
-PRATT_TABLE: DefaultDict[lx.TokenType, PrattRule] = collections.defaultdict(
+PrattTable = DefaultDict[lx.TokenType, PrattRule[T]]
+
+TYPE_TABLE: PrattTable[ast.AstType] = collections.defaultdict(
+    PrattRule,
+    {
+        lx.TokenType.IDENTIFIER: PrattRule(prefix=finish_ident_type),
+        lx.TokenType.VOID: PrattRule(prefix=finish_void_type),
+        lx.TokenType.FUNC: PrattRule(prefix=finish_func_type),
+        lx.TokenType.LEFT_PAREN: PrattRule(prefix=finish_group_type),
+        lx.TokenType.QUESTION_MARK: PrattRule(
+            postfix=finish_optional_type, precedence=Precedence.CALL
+        ),
+        lx.TokenType.VERT: PrattRule(
+            postfix=finish_union_type, precedence=Precedence.TERM
+        ),
+    },
+)
+
+EXPR_TABLE: PrattTable[ast.AstExpr] = collections.defaultdict(
     PrattRule,
     {
         lx.TokenType.LEFT_PAREN: PrattRule(
-            prefix=finish_group_expr, infix=finish_call_expr, precedence=Precedence.CALL
+            prefix=finish_group_expr,
+            postfix=finish_call_expr,
+            precedence=Precedence.CALL,
         ),
         lx.TokenType.MINUS: PrattRule(
             prefix=finish_unary_expr,
-            infix=finish_binary_expr,
+            postfix=finish_binary_expr,
             precedence=Precedence.TERM,
         ),
         lx.TokenType.PLUS: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.TERM
+            postfix=finish_binary_expr, precedence=Precedence.TERM
         ),
         lx.TokenType.STAR: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.FACTOR
+            postfix=finish_binary_expr, precedence=Precedence.FACTOR
         ),
         lx.TokenType.SLASH: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.FACTOR
+            postfix=finish_binary_expr, precedence=Precedence.FACTOR
         ),
-        lx.TokenType.OR: PrattRule(infix=finish_binary_expr, precedence=Precedence.OR),
+        lx.TokenType.OR: PrattRule(
+            postfix=finish_binary_expr, precedence=Precedence.OR
+        ),
         lx.TokenType.AND: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.AND
+            postfix=finish_binary_expr, precedence=Precedence.AND
         ),
         lx.TokenType.DOUBLE_EQUALS: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.EQUALITY
+            postfix=finish_binary_expr, precedence=Precedence.EQUALITY
         ),
         lx.TokenType.NOT_EQUALS: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.EQUALITY
+            postfix=finish_binary_expr, precedence=Precedence.EQUALITY
         ),
         lx.TokenType.LESS: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+            postfix=finish_binary_expr, precedence=Precedence.COMPARISON
         ),
         lx.TokenType.GREATER: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+            postfix=finish_binary_expr, precedence=Precedence.COMPARISON
         ),
         lx.TokenType.LESS_EQUALS: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+            postfix=finish_binary_expr, precedence=Precedence.COMPARISON
         ),
         lx.TokenType.GREATER_EQUALS: PrattRule(
-            infix=finish_binary_expr, precedence=Precedence.COMPARISON
+            postfix=finish_binary_expr, precedence=Precedence.COMPARISON
         ),
         lx.TokenType.STR_LITERAL: PrattRule(prefix=finish_str_expr),
         lx.TokenType.NUM_LITERAL: PrattRule(prefix=finish_num_expr),
@@ -793,70 +817,90 @@ PRATT_TABLE: DefaultDict[lx.TokenType, PrattRule] = collections.defaultdict(
 )
 
 
-def parse_prefix(parser: Parser) -> Union[ast.AstExpr, er.CompileError]:
+def parse_prefix(parser: Parser, table: PrattTable[T]) -> Result[T]:
     """
-    Parses a prefix expression from a Parser using a pratt table.
+    Parses a prefix element from a Parser using a pratt table.
     """
     start_token = parser.advance()
     if not start_token:
         return er.CompileError(
-            message="unexpected EOF; expected expression",
+            message="unexpected EOF; expected expression or type",
             regions=[parser.curr_region()],
         )
-    rule = PRATT_TABLE[start_token.kind]
+    rule = table[start_token.kind]
     if not rule.prefix:
         return er.CompileError(
-            message="unexpected token; expected expression",
+            message="unexpected token; expected expression or type",
             regions=[start_token.lexeme],
         )
     return rule.prefix(parser)
 
 
-def parse_infix(
-    parser: Parser, expr: ast.AstExpr, precedence: Precedence
-) -> Optional[Union[ast.AstExpr, er.CompileError]]:
+def parse_postfix(
+    parser: Parser, parse: T, precedence: Precedence, table: PrattTable[T]
+) -> Optional[Result[T]]:
     """
-    Given an initial expression and precedence parses an infix expression from a Parser using a
-    pratt table. If there are no infix extensions bound by the precedence returns None.
+    Given an initial parse and precedence parses postfix elements from a Parser using a
+    pratt table. If there are no postfix extensions bound by the precedence returns None.
     """
-    # See if there's an infix token
+    # See if there's a postfix token
     # If not, there's no expression to parse
     token = parser.curr()
     if not token:
         return None
-    rule = PRATT_TABLE[token.kind]
-    if not rule.infix:
+    rule = table[token.kind]
+    if not rule.postfix:
         return None
-    # While the infix token is bound by the precedence of the expression
+    # While the postfix token is bound by the precedence of the expression
     while rule.precedence >= precedence:
-        # Advance past the infix token and run its rule
+        # Advance past the postfix token and run its rule
         parser.advance()
-        if rule.infix:  # Should always be true but mypy can't tell
-            expr_ = rule.infix(parser, expr)
-            if isinstance(expr_, er.CompileError):
-                return expr_
-            expr = expr_
-        # See if there's another infix token
+        if rule.postfix:  # Should always be true but mypy can't tell
+            parse_ = rule.postfix(parser, parse)
+            if isinstance(parse_, er.CompileError):
+                return parse_
+            parse = parse_
+        # See if there's another postfix token
         # If not, the expression is finished
         token = parser.curr()
         if not token:
             break
-        rule = PRATT_TABLE[token.kind]
-        if not rule.infix:
+        rule = table[token.kind]
+        if not rule.postfix:
             break
-    return expr
+    return parse
+
+
+def pratt_parse(
+    parser: Parser, precedence: Precedence, table: PrattTable[T]
+) -> Result[T]:
+    """
+    Runs the pratt parsing algorithm once given a pratt table.
+    """
+    prefix_expr = parse_prefix(parser, table)
+    if isinstance(prefix_expr, er.CompileError):
+        return prefix_expr
+    postfix_parse = parse_postfix(parser, prefix_expr, precedence, table)
+    if postfix_parse is None:
+        return prefix_expr
+    return postfix_parse
+
+
+def parse_type(
+    parser: Parser, precedence: Precedence = Precedence.NONE.next()
+) -> Result[ast.AstType]:
+    """
+    Parse a type from the parser bound by a given precedence.
+    """
+    result = pratt_parse(parser, precedence, TYPE_TABLE)
+    return result
 
 
 def parse_expr(
-    parser: Parser, precedence: Precedence = Precedence.ASSIGNMENT
-) -> Union[ast.AstExpr, er.CompileError]:
+    parser: Parser, precedence: Precedence = Precedence.NONE.next()
+) -> Result[ast.AstExpr]:
     """
-    Parses an expression bound by a given precedence from a Parser using a pratt table.
+    Parse an expression from the parser bound by a given precedence.
     """
-    prefix_expr = parse_prefix(parser)
-    if isinstance(prefix_expr, er.CompileError):
-        return prefix_expr
-    infix_parse = parse_infix(parser, prefix_expr, precedence)
-    if infix_parse is None:
-        return prefix_expr
-    return infix_parse
+    result = pratt_parse(parser, precedence, EXPR_TABLE)
+    return result

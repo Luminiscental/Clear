@@ -115,7 +115,10 @@ def valid(type_annot: an.TypeAnnot) -> bool:
             valid(type_annot.return_type) or type_annot.return_type == an.VOID
         )
     if isinstance(type_annot, an.OptionalTypeAnnot):
-        return valid(type_annot.target)
+        # Don't allow nested optionals
+        return not isinstance(type_annot.target, an.OptionalTypeAnnot) and valid(
+            type_annot.target
+        )
     if isinstance(type_annot, an.UnionTypeAnnot):
         if not type_annot.types:
             return False
@@ -135,11 +138,6 @@ class TypeChecker(ast.DeepVisitor):
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
         if node.val_type:
-            if not valid(node.val_type.type_annot):
-                self.errors.add(
-                    message=f"invalid value type {node.val_type}",
-                    regions=[node.val_type.region],
-                )
             node.type_annot = node.val_type.type_annot
             if not contains(node.val_init.type_annot, node.type_annot):
                 self.errors.add(
@@ -357,12 +355,17 @@ class TypeChecker(ast.DeepVisitor):
                     )
         node.type_annot = node.function.type_annot.return_type
 
-    def atom_type(self, node: ast.AstAtomType) -> None:
-        super().atom_type(node)
-        try:
-            node.type_annot = an.BuiltinTypeAnnot(node.name)
-        except ValueError:
+    def ident_type(self, node: ast.AstIdentType) -> None:
+        super().ident_type(node)
+        if node.ref:
+            # TODO: User types
             self.errors.add(message=f"invalid type {node.name}", regions=[node.region])
+        else:
+            node.type_annot = an.BuiltinTypeAnnot(node.name)
+
+    def void_type(self, node: ast.AstVoidType) -> None:
+        super().void_type(node)
+        node.type_annot = an.VOID
 
     def func_type(self, node: ast.AstFuncType) -> None:
         super().func_type(node)
