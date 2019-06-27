@@ -97,7 +97,9 @@ class Indexer(ast.FunctionVisitor):
         self._param_indices[-1] += 1
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
-        self._local_indices.append(self._local_indices[-1])
+        self._local_indices.append(
+            self._local_indices[-1] if self._local_indices else 0
+        )
         super().block_stmt(node)
         self._local_indices.pop()
 
