@@ -2,7 +2,7 @@
 Contains classes/functions for describing and assembling Clear bytecode.
 """
 
-from typing import Union, Tuple, Sequence, Iterable
+from typing import Union, Tuple, Sequence, Iterable, NamedTuple
 
 import struct
 import enum
@@ -38,24 +38,76 @@ class ConstantType(enum.Enum):
         return "CONST_" + self.name
 
 
-Constant = Union[int, float, str]
 PackedConstant = Tuple[ConstantType, bytearray]
 
 
-def pack_constant(constant: Constant) -> PackedConstant:
+class ClrInt(NamedTuple):
     """
-    Takes a python object and packs it as a Clear constant.
+    Wrapper class for an int constant to have type strict equality.
     """
-    if isinstance(constant, int):
-        return (ConstantType.INT, bytearray(struct.pack("i", constant)))
 
-    if isinstance(constant, float):
-        return (ConstantType.NUM, bytearray(struct.pack("d", constant)))
+    unboxed: int
 
-    arr = bytearray()
-    arr.append(len(constant))
-    arr.extend(constant.encode())
-    return (ConstantType.STR, arr)
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, (ClrNum, ClrStr)):
+            return False
+        if isinstance(other, ClrInt):
+            return self.unboxed == other.unboxed
+        return NotImplemented
+
+    def pack(self) -> PackedConstant:
+        """
+        Pack the constant into its assembly.
+        """
+        return ConstantType.INT, bytearray(struct.pack("i", self.unboxed))
+
+
+class ClrNum(NamedTuple):
+    """
+    Wrapper class for a num constant to have type strict equality.
+    """
+
+    unboxed: float
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, (ClrInt, ClrStr)):
+            return False
+        if isinstance(other, ClrNum):
+            return self.unboxed == other.unboxed
+        return NotImplemented
+
+    def pack(self) -> PackedConstant:
+        """
+        Pack the constant into its assembly.
+        """
+        return ConstantType.NUM, bytearray(struct.pack("d", self.unboxed))
+
+
+class ClrStr(NamedTuple):
+    """
+    Wrapper class for a str constant to have type strict equality.
+    """
+
+    unboxed: str
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, (ClrInt, ClrNum)):
+            return False
+        if isinstance(other, ClrStr):
+            return self.unboxed == other.unboxed
+        return NotImplemented
+
+    def pack(self) -> PackedConstant:
+        """
+        Pack the constant into its assembly.
+        """
+        arr = bytearray()
+        arr.append(len(self.unboxed))
+        arr.extend(self.unboxed.encode())
+        return ConstantType.STR, arr
+
+
+Constant = Union[ClrInt, ClrNum, ClrStr]
 
 
 def assemble_header(constants: Sequence[PackedConstant]) -> bytearray:
@@ -158,7 +210,7 @@ def assemble_code(
     Takes a sequence of constants and an iterable of instructions and assembles them into a
     Clear bytecode program.
     """
-    result = assemble_header([pack_constant(constant) for constant in constants])
+    result = assemble_header([constant.pack() for constant in constants])
     for instruction in instructions:
         if isinstance(instruction, Opcode):
             result.append(instruction.value)

@@ -4,6 +4,8 @@ Module defining a visitor to index identifiers of an ast.
 
 from typing import List
 
+import copy
+
 import clr.ast as ast
 import clr.annotations as an
 
@@ -69,14 +71,10 @@ class Indexer(ast.FunctionVisitor):
                     kind=an.IndexAnnotType.UPVALUE,
                 )
         # Not an upvalue so load from the declaration
-        result = ref.index_annot
+        result = copy.copy(ref.index_annot)  # Copy because we may mutate the value
         if result.kind == an.IndexAnnotType.LOCAL and self._functions:
             result.value += 1 + len(self._functions[-1].params)
         return result
-
-    def start(self, node: ast.Ast) -> None:
-        self._local_indices.append(0)
-        super().start(node)
 
     def binding(self, node: ast.AstBinding) -> None:
         node.index_annot = self._declare()

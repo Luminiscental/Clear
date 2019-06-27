@@ -1,0 +1,141 @@
+
+// TODO: Actual tests !!!
+
+// TODO: Case expressions
+
+{
+    func display_int(int x) str {
+        return "int <" + str(x) + ">";
+    }
+
+    func display_num(num x) str {
+        return "num <" + str(x) + ">";
+    }
+
+    val x : int | num = 2i;
+    print case x {
+        int: display_int(x),
+        num: display_num(x)
+    };
+
+    func nop() void {}
+
+    case x {
+        int: nop()
+        //,-3
+    };
+
+    case 3 {
+        num: (2, 3),
+        4i
+    };
+
+    val y : (int | num)? = 3;
+    print case y {
+        int: "y was an int",
+        num: "y was a num",
+        "y was nil"
+    };
+}
+
+// TODO: Lambdas
+
+{
+    val doubler, two := func(int x) 2i * x, 2i;
+    print doubler(two);
+
+    func maker() func() num {
+        val x = 2;
+        return func() x;
+    }
+    val user = maker();
+    print user();
+}
+
+// TODO: Structs
+
+{
+    struct Point {
+        int x;
+        int y;
+    }
+
+    print Point { x=2, y=3 }.y;
+}
+
+// TODO: Defaults
+
+{
+    struct Index {
+        int value = -1i;
+    }
+
+    print Index {}.value;
+    print Index { value=2i }.value;
+}
+
+// TODO: Methods
+
+{
+    struct Error {
+        str message;
+
+        func display() void {
+            print this.message;
+        }
+    }
+
+    Error { message="oops" }.display();
+}
+
+// TODO: Properties
+
+{
+    prop Shape {
+        num area;
+        func() void print_name;
+    }
+
+    prop Long {
+        num length;
+    }
+
+    struct Square {
+        num length;
+        func print_name() void {
+            print "square";
+        }
+    } with Shape as {
+        area = this.length * this.length;
+        //print_name = this.print_name;
+    } with Long as {}
+
+    func display(Shape shape) void {
+        shape.print_name();
+        print shape.area;
+    }
+
+    display(Square { length=2 });
+}
+
+// TODO: Property methods
+
+{
+    prop Displayable {
+        func() str show;
+    } with {
+        func display() void {
+            print this.show();
+        }
+    }
+
+    struct Message {
+        str value;
+
+        func show() str {
+            return this.value;
+        }
+    } with Displayable as {}
+
+    Message { value="hi" }.display();
+}

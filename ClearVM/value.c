@@ -396,9 +396,7 @@ void printValue(Value value) {
 
                     UpvalueObject upvalueObj = *(UpvalueObject *)obj.ptr;
 
-                    printf("upvalue <");
-                    printValue(*upvalueObj.ptr);
-                    printf(">");
+                    printf("upvalue <%p>", upvalueObj.ptr);
 
                 } break;
             }

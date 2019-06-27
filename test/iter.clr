@@ -1,117 +1,51 @@
+// 
+// {
+//     prop Iterable {
+//         T value;
+//         func() Iterable? next;
+//     } with {
+//         func iter(func(T) void consumer) void {
+//             consumer(this.value);
+//             case this.next() as n {
+//                 Iterable: n.iter(consumer)
+//             };
+//         }
+//     }
+// 
+//     struct Loop {
+//     } with Iterable as {
+//         next = func() this;
+//     }
+// 
+//     struct Range {
+//         int start;
+//         int end;
+// 
+//         func next() Iterable? {
+//             if (this.start == this.end) {
+//                 return nil;
+//             } else {
+//                 return Range { start=this.start + 1i, end=this.end };
+//             }
+//         }
+//     } with Iterable as {}
+// 
+//     Range { start=1i, end=5i }.iter(print_int);
+// }
 
-// TODO: Really need generics
 
-// TODO: import semantics, standard lib
-
-// sequence core:
-
-struct IntSeq {
-    func() int? next,
-
-    func for_seq(func(int) void consume) void {
-        val current = next();
-        current? consume(current);
-        current? for_seq(consume);
-    }
-
-    func map_seq(func(int) int mapping) IntSeq {
-        func iterator() int? {
-            val current = next();
-            return current? mapping(current) : nil;
+{
+    func for(int start, int end, func(int) void consumer) void {
+        if (start >= end) {
+            return;
         }
-        return IntSeq { next=iterator };
+        consumer(start);
+        for(start + 1i, end, consumer);
     }
 
-    func fold_seq(func(int, int) int folder, int init) int {
-        val current = next();
-        return current? fold_seq(folder, folder(init, current))
-                      : init;
-    }
-
-    func take_seq(int limit) IntSeq {
-        var index = 0i;
-        func iterator() int? {
-            val current = next();
-            index = index + 1i;
-
-            val result = if (index <= limit) {
-                current
-            } else {
-                nil
-            };
-
-            return result;
-        }
-        return IntSeq { next=iterator };
-    }
-}
-
-// sequence usage:
-
-func range(int min, int max) IntSeq {
-    var counter = min;
-
-    func iterator() int? {
-        if (counter < max) {
-            val old = counter;
-            counter = counter + 1i;
-            return old;
-        } else {
-            return nil;
-        }
-    }
-
-    return IntSeq { next=iterator };
-}
-
-func arithmetic(int start, int difference) IntSeq {
-    var current = start;
-
-    func iterator() int? {
-        val old = current;
-        current = current + difference;
-        return old;
-    }
-
-    return IntSeq { next=iterator };
-}
-
-func repeat(int value) IntSeq {
-    func iterator() int? {
-        return value;
-    }
-
-    return IntSeq { next=iterator };
-}
-
-func repeatn(int value, int times) IntSeq {
-    return repeat(value).take_seq(times);
+    for(1i, 7i, print_int);
 }
 
 func print_int(int x) void {
     print x;
 }
-
-print "[2...10] = ";
-range(2i, 10i)
-    .for_seq(print_int);
-print;
-
-val sum = range(-3i, 6i)
-    .map_seq(func(int x) x * x)
-    .fold_seq(func(int a, int b) a + b, 0i);
-
-print "sum n^2 for n in [-3...6] = " + str(sum);
-print;
-
-val prod = repeatn(5i, 6i).fold_seq(func(int a, int b) a + b, 0i);
-print "5 * 6 = " + str(prod);
-print;
-
-print "[3,6...] = ";
-arithmetic(3i, 3i)
-    .take_seq(10i)
-    .for_seq(print_int);
-print "...";
-print;
-

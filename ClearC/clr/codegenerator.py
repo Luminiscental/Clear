@@ -210,7 +210,7 @@ class CodeGenerator(ast.FunctionVisitor):
             not_string = node.expr.type_annot != an.STR
             self.program.print_value(convert=not_string)
         else:
-            self.program.constant("")
+            self.program.constant(bc.ClrStr(""))
             self.program.print_value(convert=False)
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
@@ -277,15 +277,15 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
         super().int_expr(node)
-        self.program.constant(node.value)
+        self.program.constant(bc.ClrInt(node.value))
 
     def num_expr(self, node: ast.AstNumExpr) -> None:
         super().num_expr(node)
-        self.program.constant(node.value)
+        self.program.constant(bc.ClrNum(node.value))
 
     def str_expr(self, node: ast.AstStrExpr) -> None:
         super().str_expr(node)
-        self.program.constant(node.value)
+        self.program.constant(bc.ClrStr(node.value))
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         super().ident_expr(node)
