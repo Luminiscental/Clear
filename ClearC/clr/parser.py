@@ -527,34 +527,12 @@ def finish_optional_type(parser: Parser, target: ast.AstType) -> Result[ast.AstT
     )
 
 
-# TODO: Generify and use for expression tuples and stuff.
-def parse_infix_types(
-    parser: Parser, operator: lx.TokenType
-) -> Result[List[ast.AstType]]:
-    """
-    Runs a postfix rule repeatedly while the same operator is used.
-    """
-    precedence = TYPE_TABLE[parser.prev().kind].precedence.next()
-    first_type = parse_type(parser, precedence)
-    if isinstance(first_type, er.CompileError):
-        return first_type
-
-    types = [first_type]
-    while parser.match(operator):
-        next_type = parse_type(parser, precedence)
-        if isinstance(next_type, er.CompileError):
-            return next_type
-        types.append(next_type)
-
-    return types
-
-
 def finish_union_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
     """
     Parse a union type from the parser, given the left side. Assumes that the '|' token has already
     been consumed.
     """
-    rhs = parse_infix_types(parser, lx.TokenType.VERT)
+    rhs = parse_many_infix(parser, lx.TokenType.VERT, TYPE_TABLE, expected="type")
     if isinstance(rhs, er.CompileError):
         return rhs
     types = [lhs] + rhs
@@ -567,7 +545,7 @@ def finish_tuple_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
     Parse a tuple type from the parser, given the left side. Assumes that the ',' token has already
     been consumed.
     """
-    rhs = parse_infix_types(parser, lx.TokenType.COMMA)
+    rhs = parse_many_infix(parser, lx.TokenType.COMMA, TYPE_TABLE, expected="type")
     if isinstance(rhs, er.CompileError):
         return rhs
     types = [lhs] + rhs
@@ -781,21 +759,14 @@ def finish_tuple_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     Parse a tuple expression from the parser or return an error. Assumes that the comma has already
     been consumed, and takes the lhs expression as a parameter.
     """
-    precedence = EXPR_TABLE[parser.prev().kind].precedence.next()
-    first_expr = parse_expr(parser, precedence)
-    if isinstance(first_expr, er.CompileError):
-        return first_expr
-
-    exprs = [lhs, first_expr]
-    while parser.match(lx.TokenType.COMMA):
-        next_expr = parse_expr(parser, precedence)
-        if isinstance(next_expr, er.CompileError):
-            return next_expr
-        exprs.append(next_expr)
-
-    return ast.AstTupleExpr(
-        tuple(exprs), region=er.SourceView.range(lhs.region, parser.prev().lexeme)
+    rhs = parse_many_infix(
+        parser, lx.TokenType.COMMA, EXPR_TABLE, expected="expression"
     )
+    if isinstance(rhs, er.CompileError):
+        return rhs
+    exprs = [lhs] + rhs
+    region = er.SourceView.range(exprs[0].region, exprs[-1].region)
+    return ast.AstTupleExpr(tuple(exprs), region)
 
 
 def finish_int_expr(parser: Parser) -> Result[ast.AstIntExpr]:
@@ -1076,6 +1047,27 @@ def pratt_parse(
     if postfix_parse is None:
         return prefix_expr
     return postfix_parse
+
+
+def parse_many_infix(
+    parser: Parser, operator: lx.TokenType, table: PrattTable[T], expected: str
+) -> Result[List[T]]:
+    """
+    Runs a postfix rule repeatedly while the same operator is used.
+    """
+    precedence = table[parser.prev().kind].precedence.next()
+    first = pratt_parse(parser, precedence, table, expected)
+    if isinstance(first, er.CompileError):
+        return first
+
+    result = [first]
+    while parser.match(operator):
+        next_elem = pratt_parse(parser, precedence, table, expected)
+        if isinstance(next_elem, er.CompileError):
+            return next_elem
+        result.append(next_elem)
+
+    return result
 
 
 def parse_type(
