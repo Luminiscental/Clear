@@ -2,7 +2,7 @@
 Module for generating code from an annotated ast.
 """
 
-from typing import List, Tuple, Optional, Iterator, Dict, TypeVar
+from typing import List, Tuple, Optional, Iterator, Dict
 
 import contextlib
 
@@ -10,6 +10,7 @@ import clr.ast as ast
 import clr.annotations as an
 import clr.bytecode as bc
 import clr.typechecker as tc
+import clr.util as util
 
 
 def generate_code(tree: ast.Ast) -> Tuple[List[bc.Constant], List[bc.Instruction]]:
@@ -257,19 +258,6 @@ class Program:
         self.append_op(bc.Opcode.PRINT)
 
 
-Elem = TypeVar("Elem")
-
-
-def breakafter(value: Elem, iterator: Iterator[Elem]) -> Iterator[Elem]:
-    """
-    Break after reaching the given value in an iterator.
-    """
-    for element in iterator:
-        yield element
-        if element == value:
-            break
-
-
 class CodeGenerator(ast.FunctionVisitor):
     """
     Ast visitor to build up a program from the annotated ast.
@@ -282,7 +270,7 @@ class CodeGenerator(ast.FunctionVisitor):
     def _return(self, node: ast.AstFuncDecl) -> None:
         # If the function block is in scope pop all the names in it
         if node.block in self._scopes:
-            scopes = breakafter(node.block, reversed(self._scopes))
+            scopes = util.break_after(node.block, reversed(self._scopes))
             for scope in scopes:
                 for _ in scope.names:
                     self.program.append_op(bc.Opcode.POP)

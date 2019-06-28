@@ -2,38 +2,12 @@
 Module defining an ast visitor to type check.
 """
 
-from typing import Set, List, Callable, Dict, Tuple, TypeVar, Iterable
+from typing import Set, List, Dict
 
 import clr.errors as er
 import clr.ast as ast
 import clr.annotations as an
-
-T = TypeVar("T")  # pylint: disable=invalid-name
-K = TypeVar("K")  # pylint: disable=invalid-name
-
-
-def _group_by(key_func: Callable[[T], K], values: Iterable[T]) -> Dict[K, Set[T]]:
-    grouping: Dict[K, Set[T]] = {}
-    for value in values:
-        key = key_func(value)
-        if key in grouping:
-            grouping[key].add(value)
-        else:
-            grouping[key] = {value}
-    return grouping
-
-
-def _take_functions(
-    types: Iterable[an.UnitType]
-) -> Tuple[Set[an.FuncTypeAnnot], Set[an.UnitType]]:
-    instances = set()
-    without: Set[an.UnitType] = set()
-    for value in types:
-        if isinstance(value, an.FuncTypeAnnot):
-            instances.add(value)
-        else:
-            without.add(value)
-    return instances, without
+import clr.util as util
 
 
 def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
@@ -42,7 +16,7 @@ def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
     parameters can be combined by intersecting the parameter types and unioning the return types.
     """
     result = set()
-    groups = _group_by(lambda func: len(func.params), funcs)
+    groups = util.group_by(lambda func: len(func.params), funcs)
     for param_count, group in groups.items():
         union_return = _union({func.return_type for func in group})
         union_params = [
@@ -53,26 +27,13 @@ def contract_functions(funcs: Set[an.FuncTypeAnnot]) -> Set[an.FuncTypeAnnot]:
     return result
 
 
-def _take_tuples(
-    types: Iterable[an.UnitType]
-) -> Tuple[Set[an.TupleTypeAnnot], Set[an.UnitType]]:
-    instances = set()
-    without: Set[an.UnitType] = set()
-    for value in types:
-        if isinstance(value, an.TupleTypeAnnot):
-            instances.add(value)
-        else:
-            without.add(value)
-    return instances, without
-
-
 def contract_tuples(tuples: Set[an.TupleTypeAnnot]) -> Set[an.TupleTypeAnnot]:
     """
     Contract a set of tuple types. Any group of tuples with the same length can be combined
     element-wise.
     """
     result = set()
-    groups = _group_by(lambda subtype: len(subtype.types), tuples)
+    groups = util.group_by(lambda subtype: len(subtype.types), tuples)
     for elem_count, group in groups.items():
         union_types = tuple(
             _union({subtype.types[i] for subtype in group}) for i in range(elem_count)
@@ -89,10 +50,10 @@ def contract_types(types: Set[an.UnitType]) -> an.TypeAnnot:
     if an.UnresolvedTypeAnnot() in types:
         return an.UnresolvedTypeAnnot()
     # Contract functions
-    funcs, types = _take_functions(types)
+    funcs, types = util.split_instances(an.FuncTypeAnnot, types)
     types = types.union(contract_functions(funcs))
     # Contract tuples
-    tuples, types = _take_tuples(types)
+    tuples, types = util.split_instances(an.TupleTypeAnnot, types)
     types = types.union(contract_tuples(tuples))
     # If there's only one type the union is trivial
     if len(types) == 1:
