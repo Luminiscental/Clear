@@ -115,6 +115,11 @@ class AstVisitor:
         Visit a nil literal.
         """
 
+    def case_expr(self, node: "AstCaseExpr") -> None:
+        """
+        Visit a case expression.
+        """
+
     def call_expr(self, node: "AstCallExpr") -> None:
         """
         Visit a function call expression node.
@@ -217,6 +222,15 @@ class DeepVisitor(AstVisitor):
         node.left.accept(self)
         node.right.accept(self)
 
+    def case_expr(self, node: "AstCaseExpr") -> None:
+        node.target.accept(self)
+        node.binding.accept(self)
+        for case_type, case_value in node.cases:
+            case_type.accept(self)
+            case_value.accept(self)
+        if node.fallback:
+            node.fallback.accept(self)
+
     def call_expr(self, node: "AstCallExpr") -> None:
         node.function.accept(self)
         for arg in node.args:
@@ -250,12 +264,12 @@ class ScopeVisitor(DeepVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self._scopes: List[Union["AstBlockStmt", "Ast"]] = []
+        self._scopes: List[Union["AstBlockStmt", "Ast", "AstCaseExpr"]] = []
 
-    def _get_scope(self) -> Union["AstBlockStmt", "Ast"]:
+    def _get_scope(self) -> Union["AstBlockStmt", "Ast", "AstCaseExpr"]:
         return self._scopes[-1]
 
-    def _push_scope(self, node: Union["AstBlockStmt", "Ast"]) -> None:
+    def _push_scope(self, node: Union["AstBlockStmt", "Ast", "AstCaseExpr"]) -> None:
         self._scopes.append(node)
 
     def _pop_scope(self) -> None:
@@ -269,6 +283,11 @@ class ScopeVisitor(DeepVisitor):
     def block_stmt(self, node: "AstBlockStmt") -> None:
         self._push_scope(node)
         super().block_stmt(node)
+        self._pop_scope()
+
+    def case_expr(self, node: "AstCaseExpr") -> None:
+        self._push_scope(node)
+        super().case_expr(node)
         self._pop_scope()
 
 
@@ -307,7 +326,7 @@ class AstNode:
 
         self.names: Dict[str, Union[AstIdentRef]] = {}
         self.sequence: List[AstDecl] = []
-        self.scope: Optional[Union[Ast, AstBlockStmt]] = None
+        self.scope: Optional[Union[Ast, AstBlockStmt, AstCaseExpr]] = None
         self.upvalues: List[AstIdentRef] = []
         self.upvalue_refs: List[an.IndexAnnot] = []
         self.ref: Optional[AstIdentRef] = None
@@ -660,6 +679,29 @@ class AstNilExpr(AstExpr):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.nil_expr(self)
+
+
+class AstCaseExpr(AstExpr):
+    """
+    Ast node for a case expression.
+    """
+
+    def __init__(
+        self,
+        target: AstExpr,
+        binding: AstBinding,
+        cases: List[Tuple[AstType, AstExpr]],
+        fallback: Optional[AstExpr],
+        region: er.SourceView,
+    ) -> None:
+        super().__init__(region)
+        self.target = target
+        self.binding = binding
+        self.cases = cases
+        self.fallback = fallback
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.case_expr(self)
 
 
 class AstCallExpr(AstExpr):

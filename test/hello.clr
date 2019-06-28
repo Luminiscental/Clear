@@ -1,26 +1,7 @@
 
-func fac(int n) num {
-    func helper(int n, num acc) num {
-        if (n == 0i) {
-            return acc;
-        }
-        return helper(n - 1i, num(n) * acc);
-    }
-    return helper(n, 1);
-}
-
-val start := clock();
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-fac(100i);
-val end := clock();
-
-val avgTime := (end - start) / 10;
-print "100! avg calc time = " + str(avgTime) + "s";
+val x : num? = nil;
+print x;
+print case x {
+    num: str(x),
+    else: "nil"
+};

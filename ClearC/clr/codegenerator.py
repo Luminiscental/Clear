@@ -323,6 +323,12 @@ class CodeGenerator(ast.FunctionVisitor):
         super().nil_expr(node)
         self.program.append_op(bc.Opcode.PUSH_NIL)
 
+    def case_expr(self, node: ast.AstCaseExpr) -> None:
+        node.target.accept(self)
+        for case_type, case_value in node.cases:
+            # TODO: Type tags for functions aaaaaaaaaaaaaaaaaaaaa
+            raise Exception("shit")
+
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)
         # Get the ip

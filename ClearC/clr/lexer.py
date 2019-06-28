@@ -61,6 +61,8 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
             TokenType.TRUE,
             TokenType.NIL,
             TokenType.FALSE,
+            TokenType.AS,
+            TokenType.CASE,
         }
 
         keywords = {keyword.value: keyword for keyword in keyword_set}
@@ -106,6 +108,8 @@ class TokenType(enum.Enum):
     TRUE = "true"
     FALSE = "false"
     NIL = "nil"
+    AS = "as"
+    CASE = "case"
     # Symbols
     EQUALS = "="
     DOUBLE_EQUALS = "=="

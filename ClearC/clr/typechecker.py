@@ -127,6 +127,13 @@ def union(*args: an.TypeAnnot) -> an.TypeAnnot:
     return _union(set(args))
 
 
+def difference(lhs: an.TypeAnnot, rhs: an.TypeAnnot) -> an.TypeAnnot:
+    """
+    Returns the difference type.
+    """
+    return contract_types(set.difference(lhs.expand(), rhs.expand()))
+
+
 def contains(inner: an.TypeAnnot, outer: an.TypeAnnot) -> bool:
     """
     Checks if the inner type is contained by the outer type (defers to union).
@@ -237,10 +244,14 @@ class TypeChecker(ast.DeepVisitor):
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
-        printable_types = an.UnionTypeAnnot(
-            {value for value in an.BuiltinTypeAnnot if value != an.VOID}
+        convertable = union(
+            *(value for value in an.BuiltinTypeAnnot if value not in (an.VOID, an.STR))
         )
-        if node.expr and not contains(node.expr.type_annot, printable_types):
+        if (
+            node.expr
+            and not contains(node.expr.type_annot, convertable)
+            and not node.expr.type_annot == an.STR
+        ):
             self.errors.add(
                 message=f"unprintable type {node.expr.type_annot}",
                 regions=[node.region],
@@ -379,6 +390,50 @@ class TypeChecker(ast.DeepVisitor):
     def nil_expr(self, node: ast.AstNilExpr) -> None:
         super().nil_expr(node)
         node.type_annot = an.NIL
+
+    def case_expr(self, node: ast.AstCaseExpr) -> None:
+        node.target.accept(self)
+        covered: Dict[an.TypeAnnot, ast.AstType] = {}
+        result: an.TypeAnnot = an.UnionTypeAnnot(set())
+        for case_type, case_value in node.cases:
+            case_type.accept(self)
+            if not contains(case_type.type_annot, node.target.type_annot):
+                self.errors.add(
+                    message=f"invalid case {case_type.type_annot} for type {node.target.type_annot}",
+                    regions=[case_type.region, node.target.region],
+                )
+            duplicates = [
+                covered_annot
+                for covered_annot in covered
+                if contains(case_type.type_annot, covered_annot)
+            ]
+            if duplicates:
+                self.errors.add(
+                    message=f"duplicate case {case_type.type_annot}",
+                    regions=[case_type.region]
+                    + [covered[covered_annot].region for covered_annot in duplicates],
+                )
+            covered[case_type.type_annot] = case_type
+            node.binding.type_annot = case_type.type_annot
+            case_value.accept(self)
+            result = union(result, case_value.type_annot)
+        covered_type = union(*covered.keys())
+        complete = contains(node.target.type_annot, covered_type)
+        diff_type = difference(node.target.type_annot, covered_type)
+        if node.fallback:
+            if complete:
+                self.errors.add(
+                    message=f"redundant fallback", regions=[node.fallback.region]
+                )
+            node.binding.type_annot = diff_type
+            node.fallback.accept(self)
+            result = union(result, node.fallback.type_annot)
+        elif not complete:
+            self.errors.add(
+                message=f"incomplete case expression, missing case(s) for {diff_type}",
+                regions=[node.region],
+            )
+        node.type_annot = result
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)

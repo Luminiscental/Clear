@@ -660,6 +660,79 @@ def finish_binary_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     return ast.AstBinaryExpr(operator, lhs, rhs, region)
 
 
+def finish_case_expr(parser: Parser) -> Result[ast.AstExpr]:
+    """
+    Parse a case expression from the parser or return an error. Assumes that the "case" token has
+    already been consumed.
+    """
+    start = parser.prev().lexeme
+    target = parse_expr(parser)
+    if isinstance(target, er.CompileError):
+        return target
+
+    if parser.match(lx.TokenType.AS):
+        binding = parse_binding(parser)
+        if isinstance(binding, er.CompileError):
+            return binding
+    else:
+        if isinstance(target, ast.AstIdentExpr):
+            # `case x {` is sugar for `case x as x {`
+            binding = ast.AstBinding(target.name, target.region)
+        else:
+            return er.CompileError(
+                message=f"missing case binding for non-identifier target expression",
+                regions=[target.region],
+            )
+
+    if not parser.match(lx.TokenType.LEFT_BRACE):
+        return er.CompileError(
+            message="expected '{' to open case block", regions=[parser.curr_region()]
+        )
+    opener = parser.prev()
+    cases: List[Tuple[ast.AstType, ast.AstExpr]] = []
+    fallback: Optional[ast.AstExpr] = None
+    while not parser.match(lx.TokenType.RIGHT_BRACE):
+        if parser.done():
+            return er.CompileError(
+                message="unclosed '{'", regions=[opener.lexeme, parser.curr_region()]
+            )
+        if fallback:
+            return er.CompileError(
+                message="invalid case after fallback case, expected '}'",
+                regions=[parser.curr_region()],
+            )
+        if cases and not parser.match(lx.TokenType.COMMA):
+            return er.CompileError(
+                message=f"expected ',' to delimit cases", regions=[parser.curr_region()]
+            )
+        if parser.match(lx.TokenType.ELSE):
+            if not parser.match(lx.TokenType.COLON):
+                return er.CompileError(
+                    message="expected ':' before fallback value",
+                    regions=[parser.curr_region()],
+                )
+            fallback_ = parse_expr(parser, precedence=Precedence.TUPLE.next())
+            if isinstance(fallback_, er.CompileError):
+                return fallback_
+            fallback = fallback_
+        else:
+            case_type = parse_type(parser)
+            if isinstance(case_type, er.CompileError):
+                return case_type
+            if not parser.match(lx.TokenType.COLON):
+                return er.CompileError(
+                    message="expected ':' before fallback value",
+                    regions=[parser.curr_region()],
+                )
+            case_value = parse_expr(parser, precedence=Precedence.TUPLE.next())
+            if isinstance(case_value, er.CompileError):
+                return case_value
+            cases.append((case_type, case_value))
+
+    region = er.SourceView.range(start, parser.prev().lexeme)
+    return ast.AstCaseExpr(target, binding, cases, fallback, region)
+
+
 def finish_call_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     """
     Parse a function call expression from the parser or return an error. Assumes that the open
@@ -874,6 +947,9 @@ EXPR_TABLE: PrattTable[ast.AstExpr] = collections.defaultdict(
         ),
         lx.TokenType.AND: PrattRule(
             postfix=finish_binary_expr, precedence=Precedence.AND
+        ),
+        lx.TokenType.CASE: PrattRule(
+            prefix=finish_case_expr, precedence=Precedence.CALL
         ),
         lx.TokenType.DOUBLE_EQUALS: PrattRule(
             postfix=finish_binary_expr, precedence=Precedence.EQUALITY

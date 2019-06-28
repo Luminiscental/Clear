@@ -87,8 +87,10 @@ class AstPrinter(ast.AstVisitor):
         self._startline()
         self._append("{")
         self._indent += 1
+
         for decl in node.decls:
             decl.accept(self)
+
         self._indent -= 1
         self._startline()
         self._append("}")
@@ -164,6 +166,37 @@ class AstPrinter(ast.AstVisitor):
 
     def nil_expr(self, node: ast.AstNilExpr) -> None:
         self._append("nil")
+
+    def case_expr(self, node: ast.AstCaseExpr) -> None:
+        self._append("case ")
+        node.target.accept(self)
+        self._append(" as ")
+        node.binding.accept(self)
+
+        self._append(" {")
+        self._indent += 1
+        self._startline()
+
+        first = True
+        for case_type, case_value in node.cases:
+            if not first:
+                self._append(",")
+                self._startline()
+            else:
+                first = False
+            case_type.accept(self)
+            self._append(": ")
+            case_value.accept(self)
+        if node.fallback:
+            if not first:
+                self._append(",")
+                self._startline()
+            self._append("else: ")
+            node.fallback.accept(self)
+
+        self._indent -= 1
+        self._startline()
+        self._append("}")
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         node.function.accept(self)

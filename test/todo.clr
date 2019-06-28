@@ -1,40 +1,27 @@
 
 // TODO: Actual tests !!!
 
-// TODO: Case expressions
+// TODO: Cases
 
 {
-    func display_int(int x) str {
-        return "int <" + str(x) + ">";
+    func make(bool x) int | num {
+        if (x) {
+            return 2i;
+        } else {
+            return 3;
+        }
     }
 
-    func display_num(num x) str {
-        return "num <" + str(x) + ">";
-    }
-
-    val x : int | num = 2i;
-    print case x {
-        int: display_int(x),
-        num: display_num(x)
+    print make(true);
+    print case make(true) as value {
+        int: num(value),
+        num: value,
     };
 
-    func nop() void {}
-
-    case x {
-        int: nop()
-        //,-3
-    };
-
-    case 3 {
-        num: (2, 3),
-        4i
-    };
-
-    val y : (int | num)? = 3;
-    print case y {
-        int: "y was an int",
-        num: "y was a num",
-        "y was nil"
+    print make(false);
+    print case make(false) as value {
+        int: num(value),
+        num: value,
     };
 }
 
