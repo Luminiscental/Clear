@@ -35,12 +35,6 @@ class UnresolvedType:
             return not self == other
         return NotImplemented
 
-    def valid(self) -> bool:
-        """
-        Returns whether this is a valid type for a value to have.
-        """
-        return False
-
 
 @enum.unique
 class BuiltinType(enum.Enum):
@@ -296,7 +290,10 @@ def valid(check_type: Type) -> bool:
     """
     if not check_type.units:
         return False
-    return all(unit.valid() for unit in check_type.units)
+    return all(
+        not isinstance(unit, UnresolvedType) and unit.valid()
+        for unit in check_type.units
+    )
 
 
 NIL = Type({BuiltinType.NIL})
