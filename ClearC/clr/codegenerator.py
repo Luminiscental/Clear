@@ -8,8 +8,8 @@ import contextlib
 
 import clr.ast as ast
 import clr.annotations as an
+import clr.types as ts
 import clr.bytecode as bc
-import clr.typechecker as tc
 import clr.util as util
 
 
@@ -30,7 +30,7 @@ class Program:
     def __init__(self) -> None:
         self.code: List[bc.Instruction] = []
         self.constants: List[bc.Constant] = []
-        self.type_tags: List[an.TypeAnnot] = []
+        self.type_tags: List[ts.Type] = []
 
     def declare(self, index_annot: an.IndexAnnot) -> None:
         """
@@ -47,15 +47,15 @@ class Program:
         """
         self.code.append(opcode)
 
-    def match_type(self, index_annot: an.IndexAnnot, type_annot: an.TypeAnnot) -> None:
+    def match_type(self, index_annot: an.IndexAnnot, type_annot: ts.Type) -> None:
         """
         Checks if the given value is of the given type.
         """
-        value_types: Dict[an.TypeAnnot, bc.ValueType] = {
-            an.BOOL: bc.ValueType.BOOL,
-            an.NIL: bc.ValueType.NIL,
-            an.INT: bc.ValueType.INT,
-            an.NUM: bc.ValueType.NUM,
+        value_types: Dict[ts.UnitType, bc.ValueType] = {
+            ts.BuiltinType.BOOL: bc.ValueType.BOOL,
+            ts.BuiltinType.NIL: bc.ValueType.NIL,
+            ts.BuiltinType.INT: bc.ValueType.INT,
+            ts.BuiltinType.NUM: bc.ValueType.NUM,
         }
 
         self.load(index_annot)
@@ -70,7 +70,7 @@ class Program:
             end_jumps.append(self.begin_jump())
 
         # Check against all the subtypes
-        for subtype in type_annot.expand():
+        for subtype in type_annot.units:
             if subtype in value_types:
                 # If it's a value type just use IS_VAL_TYPE
                 self.append_op(bc.Opcode.IS_VAL_TYPE)
@@ -82,20 +82,20 @@ class Program:
                 self.append_op(bc.Opcode.IS_VAL_TYPE)
                 self.append_op(bc.ValueType.OBJ.value)
                 with self.condition(True):
-                    if subtype == an.STR:
+                    if subtype == ts.STR:
                         # Check for strings with IS_OBJ_TYPE
                         self.append_op(bc.Opcode.IS_OBJ_TYPE)
                         self.append_op(bc.ObjectType.STRING.value)
                         with self.condition(True):
                             end_true()
-                    if isinstance(subtype, (an.FuncTypeAnnot, an.TupleTypeAnnot)):
+                    if isinstance(subtype, (ts.FunctionType, ts.TupleType)):
                         # Other types are type tagged structs, make sure it's a struct
                         self.append_op(bc.Opcode.IS_OBJ_TYPE)
                         self.append_op(bc.ObjectType.STRUCT.value)
                         with self.condition(True):
                             # Check against all the type tags that are contained in the match
                             for i, tag in enumerate(self.type_tags):
-                                if tc.contains(subtype, tag):
+                                if subtype in tag.units:
                                     # Get the tag from the struct
                                     self.append_op(bc.Opcode.EXTRACT_FIELD)
                                     self.append_op(0)
@@ -116,7 +116,7 @@ class Program:
 
     @contextlib.contextmanager
     def function(
-        self, upvalue_refs: List[an.IndexAnnot], type_annot: an.TypeAnnot
+        self, upvalue_refs: List[an.IndexAnnot], type_annot: ts.Type
     ) -> Iterator[None]:
         """
         Handles the context of creating a function.
@@ -132,7 +132,7 @@ class Program:
                 self.upvalue(ref)
 
     @contextlib.contextmanager
-    def struct(self, type_annot: an.TypeAnnot, field_count: int) -> Iterator[None]:
+    def struct(self, type_annot: ts.Type, field_count: int) -> Iterator[None]:
         """
         Handles the context of creating a type tagged struct.
         """
@@ -293,14 +293,14 @@ class CodeGenerator(ast.FunctionVisitor):
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         with self.program.function(node.upvalue_refs, node.type_annot):
             super().func_decl(node)
-            if node.return_type.type_annot == an.VOID:
+            if node.return_type.type_annot == ts.VOID:
                 self._return(node)
         self.program.declare(node.index_annot)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
         if node.expr:
-            not_string = node.expr.type_annot != an.STR
+            not_string = node.expr.type_annot != ts.STR
             self.program.print_value(convert=not_string)
         else:
             self.program.constant(bc.ClrStr(""))
@@ -355,7 +355,7 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
-        if node.expr.type_annot != an.VOID:
+        if node.expr.type_annot != ts.VOID:
             self.program.append_op(bc.Opcode.POP)
 
     def unary_expr(self, node: ast.AstUnaryExpr) -> None:
@@ -385,17 +385,18 @@ class CodeGenerator(ast.FunctionVisitor):
         # TODO: Make print a builtin not a statement
         # TODO: Cache the function if it's used multiple times
         # TODO: Elide the function if it gets called straight away
-        if node.name in an.BUILTINS:
-            builtin = an.BUILTINS[node.name]
-            if isinstance(builtin.type_annot, an.FuncTypeAnnot):
+        if node.name in ts.BUILTINS:
+            builtin = ts.BUILTINS[node.name]
+            as_func = builtin.type_annot.get_function()
+            if as_func is not None:
                 with self.program.function([], builtin.type_annot):
-                    for i in range(len(builtin.type_annot.params)):
+                    for i in range(len(as_func.parameters)):
                         self.program.append_op(bc.Opcode.PUSH_LOCAL)
                         self.program.append_op(1 + i)
-                    self.program.append_op(an.BUILTINS[node.name].opcode)
-                    if builtin.type_annot.return_type != an.VOID:
+                    self.program.append_op(ts.BUILTINS[node.name].opcode)
+                    if as_func.return_type != ts.VOID:
                         self.program.append_op(bc.Opcode.SET_RETURN)
-                    for _ in builtin.type_annot.params:
+                    for _ in as_func.parameters:
                         self.program.append_op(bc.Opcode.POP)
                     self.program.append_op(bc.Opcode.POP)
                     self.program.append_op(bc.Opcode.LOAD_FP)
@@ -423,14 +424,14 @@ class CodeGenerator(ast.FunctionVisitor):
                 # If it does replace the target with the value and jump to the end
                 case_value.accept(self)
                 self.program.append_op(
-                    bc.Opcode.SQUASH if node.type_annot != an.VOID else bc.Opcode.POP
+                    bc.Opcode.SQUASH if node.type_annot != ts.VOID else bc.Opcode.POP
                 )
                 end_jumps.append(self.program.begin_jump())
         # If we haven't jumped to the end there should be a fallback
         if node.fallback:
             node.fallback.accept(self)
             self.program.append_op(
-                bc.Opcode.SQUASH if node.type_annot != an.VOID else bc.Opcode.POP
+                bc.Opcode.SQUASH if node.type_annot != ts.VOID else bc.Opcode.POP
             )
         for jump in end_jumps:
             self.program.end_jump(jump)
@@ -445,8 +446,9 @@ class CodeGenerator(ast.FunctionVisitor):
         self.program.append_op(bc.Opcode.CALL)
         self.program.append_op(len(node.args) + 1)
         # Fetch the return value if there is one
-        if isinstance(node.function.type_annot, an.FuncTypeAnnot):  # should be true
-            if node.function.type_annot.return_type != an.VOID:
+        as_func = node.function.type_annot.get_function()
+        if as_func is not None:  # Should be true
+            if as_func.return_type != ts.VOID:
                 self.program.append_op(bc.Opcode.PUSH_RETURN)
 
     def tuple_expr(self, node: ast.AstTupleExpr) -> None:

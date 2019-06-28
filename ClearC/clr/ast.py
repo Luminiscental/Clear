@@ -7,6 +7,7 @@ from typing import Union, List, Optional, Tuple, Dict
 import clr.errors as er
 import clr.lexer as lx
 import clr.annotations as an
+import clr.types as ts
 import clr.bytecode as bc
 
 # Visitor definitions:
@@ -324,7 +325,7 @@ class AstNode:
 
     def __init__(self) -> None:
         # Annotation Defaults:
-        self.type_annot: an.TypeAnnot = an.UnresolvedTypeAnnot()
+        self.type_annot: ts.Type = ts.UNRESOLVED
         self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
         self.index_annot: an.IndexAnnot = an.IndexAnnot(
             value=-1, kind=an.IndexAnnotType.UNRESOLVED

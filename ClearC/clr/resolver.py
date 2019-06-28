@@ -5,7 +5,7 @@ Module for name resolution visitors / functions.
 from typing import Union, Optional
 
 import clr.ast as ast
-import clr.annotations as an
+import clr.types as ts
 
 
 class NameTracker(ast.ScopeVisitor):
@@ -107,9 +107,9 @@ class NameResolver(ast.ScopeVisitor):
             node.ref = ref
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        if node.name not in an.BUILTINS:
+        if node.name not in ts.BUILTINS:
             self._resolve_name(node.name, node)
 
     def ident_type(self, node: ast.AstIdentType) -> None:
-        if node.name not in {annot.value for annot in an.BuiltinTypeAnnot}:
+        if node.name not in {annot.value for annot in ts.BuiltinType}:
             self._resolve_name(node.name, node)

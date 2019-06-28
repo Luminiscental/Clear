@@ -4,6 +4,7 @@ Defines a visitor to check the control flow of fuctions, verifying if they alway
 
 import clr.ast as ast
 import clr.annotations as an
+import clr.types as ts
 import clr.errors as er
 
 
@@ -16,7 +17,7 @@ class FlowChecker(ast.DeepVisitor):
         super().func_decl(node)
         # TODO: Show how rather than just highlighting the whole function
         if (
-            node.return_type.type_annot != an.VOID
+            node.return_type.type_annot != ts.VOID
             and node.block.return_annot != an.ReturnAnnot.ALWAYS
         ):
             self.errors.add(
