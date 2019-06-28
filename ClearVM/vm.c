@@ -455,6 +455,19 @@ static Result op_pop(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_squash(VM *vm) {
+
+    TRACE(printf("op_squash\n");)
+
+    POP(value)
+
+    PEEK(replaced, 0)
+
+    *replaced = value;
+
+    return RESULT_OK;
+}
+
 UNARY_OP(intNeg, makeInt(-a.as.s32))
 UNARY_OP(numNeg, makeNum(-a.as.f64))
 
@@ -794,28 +807,6 @@ static Result op_setField(VM *vm) {
     return RESULT_OK;
 }
 
-static Result op_unstruct(VM *vm) {
-
-    TRACE(printf("op_unstruct\n");)
-
-    POP(structValue)
-
-    if (structValue.type != VAL_OBJ || structValue.as.obj->type != OBJ_STRUCT) {
-
-        printf("|| Cannot unstruct non-struct value\n");
-        return RESULT_ERR;
-    }
-
-    StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
-
-    for (size_t i = 0; i < structObj->fieldCount; i++) {
-
-        PUSH(structObj->fields[i])
-    }
-
-    return RESULT_OK;
-}
-
 static Result op_refLocal(VM *vm) {
 
     TRACE(printf("op_refLocal\n");)
@@ -872,6 +863,32 @@ static Result op_setRef(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_isValType(VM *vm) {
+
+    TRACE(printf("op_isValType\n");)
+
+    READ(val_type)
+
+    PEEK(value, 0)
+
+    PUSH(makeBool(value->type == val_type))
+
+    return RESULT_OK;
+}
+
+static Result op_isObjType(VM *vm) {
+
+    TRACE(printf("op_isObjType\n");)
+
+    READ(obj_type)
+
+    PEEK(value, 0)
+
+    PUSH(makeBool(value->as.obj->type == obj_type))
+
+    return RESULT_OK;
+}
+
 #undef BINARY_OP
 #undef UNARY_OP
 #undef READ
@@ -922,9 +939,10 @@ Result initVM(VM *vm) {
     INSTR(OP_NUM, op_num);
     INSTR(OP_STR, op_str);
     INSTR(OP_CLOCK, op_clock);
-
     INSTR(OP_PRINT, op_print);
+
     INSTR(OP_POP, op_pop);
+    INSTR(OP_SQUASH, op_squash);
 
     INSTR(OP_INT_NEG, op_intNeg);
     INSTR(OP_NUM_NEG, op_numNeg);
@@ -960,11 +978,13 @@ Result initVM(VM *vm) {
     INSTR(OP_GET_FIELD, op_getField);
     INSTR(OP_EXTRACT_FIELD, op_extractField);
     INSTR(OP_SET_FIELD, op_setField);
-    INSTR(OP_UNSTRUCT, op_unstruct);
 
     INSTR(OP_REF_LOCAL, op_refLocal);
     INSTR(OP_DEREF, op_deref);
     INSTR(OP_SET_REF, op_setRef);
+
+    INSTR(OP_IS_VAL_TYPE, op_isValType);
+    INSTR(OP_IS_OBJ_TYPE, op_isObjType);
 
 #undef INSTR
 

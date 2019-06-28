@@ -1,7 +1,23 @@
 
-val x : num? = nil;
-print x;
-print case x {
-    num: str(x),
-    else: "nil"
+func a() void {
+    print "a()";
+}
+
+func b(int x) void {
+    print "b(" + str(x) + ")";
+}
+
+val c := 2, "two";
+
+val test : (bool | num)? = 3;
+val user := case test as condition {
+    bool: a,
+    num: c,
+    else: b
+};
+
+case user {
+    func() void: user(),
+    func(int) void: user(3i),
+    num, str: b(4i)
 };

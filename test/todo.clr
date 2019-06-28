@@ -1,30 +1,6 @@
 
 // TODO: Actual tests !!!
 
-// TODO: Cases
-
-{
-    func make(bool x) int | num {
-        if (x) {
-            return 2i;
-        } else {
-            return 3;
-        }
-    }
-
-    print make(true);
-    print case make(true) as value {
-        int: num(value),
-        num: value,
-    };
-
-    print make(false);
-    print case make(false) as value {
-        int: num(value),
-        num: value,
-    };
-}
-
 // TODO: Lambdas
 
 {

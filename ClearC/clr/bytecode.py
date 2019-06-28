@@ -22,6 +22,38 @@ class NegativeIndexError(Exception):
 
 
 @enum.unique
+class ValueType(enum.Enum):
+    """
+    Enumerates the value types of the vm.
+    """
+
+    BOOL = 0
+    NIL = 1
+    OBJ = 2
+    INT = 3
+    NUM = 4
+    IP = 5
+    FP = 6
+
+    def __str__(self) -> str:
+        return f"VAL_{self.name}"
+
+
+@enum.unique
+class ObjectType(enum.Enum):
+    """
+    Enumerates the object types of the vm.
+    """
+
+    STRING = 0
+    STRUCT = 1
+    UPVALUE = 2
+
+    def __str__(self) -> str:
+        return f"OBJ_{self.name}"
+
+
+@enum.unique
 class ConstantType(enum.Enum):
     """
     Enumerates all constant types for the constant header. The value is the byte that
@@ -35,7 +67,7 @@ class ConstantType(enum.Enum):
     STR = 2
 
     def __str__(self) -> str:
-        return "CONST_" + self.name
+        return f"CONST_{self.name}"
 
 
 PackedConstant = Tuple[ConstantType, bytearray]
@@ -147,40 +179,42 @@ class Opcode(enum.Enum):
     CLOCK = 12
     PRINT = 13
     POP = 14
-    INT_NEG = 15
-    NUM_NEG = 16
-    INT_ADD = 17
-    NUM_ADD = 18
-    INT_SUB = 19
-    NUM_SUB = 20
-    INT_MUL = 21
-    NUM_MUL = 22
-    INT_DIV = 23
-    NUM_DIV = 24
-    STR_CAT = 25
-    NOT = 26
-    INT_LESS = 27
-    NUM_LESS = 28
-    INT_GREATER = 29
-    NUM_GREATER = 30
-    EQUAL = 31
-    JUMP = 32
-    JUMP_IF_FALSE = 33
-    LOOP = 34
-    FUNCTION = 35
-    CALL = 36
-    LOAD_IP = 37
-    LOAD_FP = 38
-    SET_RETURN = 39
-    PUSH_RETURN = 40
-    STRUCT = 41
-    GET_FIELD = 42
-    EXTRACT_FIELD = 43
-    SET_FIELD = 44
-    UNSTRUCT = 45
+    SQUASH = 15
+    INT_NEG = 16
+    NUM_NEG = 17
+    INT_ADD = 18
+    NUM_ADD = 19
+    INT_SUB = 20
+    NUM_SUB = 21
+    INT_MUL = 22
+    NUM_MUL = 23
+    INT_DIV = 24
+    NUM_DIV = 25
+    STR_CAT = 26
+    NOT = 27
+    INT_LESS = 28
+    NUM_LESS = 29
+    INT_GREATER = 30
+    NUM_GREATER = 31
+    EQUAL = 32
+    JUMP = 33
+    JUMP_IF_FALSE = 34
+    LOOP = 35
+    FUNCTION = 36
+    CALL = 37
+    LOAD_IP = 38
+    LOAD_FP = 39
+    SET_RETURN = 40
+    PUSH_RETURN = 41
+    STRUCT = 42
+    GET_FIELD = 43
+    EXTRACT_FIELD = 44
+    SET_FIELD = 45
     REF_LOCAL = 46
     DEREF = 47
     SET_REF = 48
+    IS_VAL_TYPE = 49
+    IS_OBJ_TYPE = 50
 
     def __str__(self) -> str:
         return "OP_" + self.name

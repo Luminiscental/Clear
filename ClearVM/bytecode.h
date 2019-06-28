@@ -36,54 +36,58 @@ typedef enum {
 
     // Actions
     OP_POP = 14,
+    OP_SQUASH = 15,
 
     // Arithmetic operators
-    OP_INT_NEG = 15,
-    OP_NUM_NEG = 16,
-    OP_INT_ADD = 17,
-    OP_NUM_ADD = 18,
-    OP_INT_SUB = 19,
-    OP_NUM_SUB = 20,
-    OP_INT_MUL = 21,
-    OP_NUM_MUL = 22,
-    OP_INT_DIV = 23,
-    OP_NUM_DIV = 24,
-    OP_STR_CAT = 25,
-    OP_NOT = 26,
+    OP_INT_NEG = 16,
+    OP_NUM_NEG = 17,
+    OP_INT_ADD = 18,
+    OP_NUM_ADD = 19,
+    OP_INT_SUB = 20,
+    OP_NUM_SUB = 21,
+    OP_INT_MUL = 22,
+    OP_NUM_MUL = 23,
+    OP_INT_DIV = 24,
+    OP_NUM_DIV = 25,
+    OP_STR_CAT = 26,
+    OP_NOT = 27,
 
     // Comparison operators
-    OP_INT_LESS = 27,
-    OP_NUM_LESS = 28,
-    OP_INT_GREATER = 29,
-    OP_NUM_GREATER = 30,
-    OP_EQUAL = 31,
+    OP_INT_LESS = 28,
+    OP_NUM_LESS = 29,
+    OP_INT_GREATER = 30,
+    OP_NUM_GREATER = 31,
+    OP_EQUAL = 32,
 
     // Control flow
-    OP_JUMP = 32,
-    OP_JUMP_IF_FALSE = 33,
-    OP_LOOP = 34,
+    OP_JUMP = 33,
+    OP_JUMP_IF_FALSE = 34,
+    OP_LOOP = 35,
 
     // Functions
-    OP_FUNCTION = 35,
-    OP_CALL = 36,
-    OP_LOAD_IP = 37,
-    OP_LOAD_FP = 38,
-    OP_SET_RETURN = 39,
-    OP_PUSH_RETURN = 40,
+    OP_FUNCTION = 36,
+    OP_CALL = 37,
+    OP_LOAD_IP = 38,
+    OP_LOAD_FP = 39,
+    OP_SET_RETURN = 40,
+    OP_PUSH_RETURN = 41,
 
     // Structs
-    OP_STRUCT = 41,
-    OP_GET_FIELD = 42,
-    OP_EXTRACT_FIELD = 43,
-    OP_SET_FIELD = 44,
-    OP_UNSTRUCT = 45,
+    OP_STRUCT = 42,
+    OP_GET_FIELD = 43,
+    OP_EXTRACT_FIELD = 44,
+    OP_SET_FIELD = 45,
 
     // Upvalues
     OP_REF_LOCAL = 46,
     OP_DEREF = 47,
     OP_SET_REF = 48,
 
-    OP_COUNT = 49
+    // Types
+    OP_IS_VAL_TYPE = 49,
+    OP_IS_OBJ_TYPE = 50,
+
+    OP_COUNT = 51
 
 } OpCode;
 

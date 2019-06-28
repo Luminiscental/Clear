@@ -423,7 +423,9 @@ class TypeChecker(ast.DeepVisitor):
         if node.fallback:
             if complete:
                 self.errors.add(
-                    message=f"redundant fallback", regions=[node.fallback.region]
+                    message=f"redundant fallback",
+                    regions=[node.fallback.region],
+                    severity=er.Severity.WARNING,
                 )
             node.binding.type_annot = diff_type
             node.fallback.accept(self)

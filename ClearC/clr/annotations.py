@@ -10,6 +10,8 @@ import clr.bytecode as bc
 
 # Type Annotations:
 
+# TODO: Separate module for types and clean things up so __eq__ is never wrong and stuff
+
 UnitType = Union[
     "UnresolvedTypeAnnot", "BuiltinTypeAnnot", "FuncTypeAnnot", "TupleTypeAnnot"
 ]

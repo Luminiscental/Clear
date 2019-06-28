@@ -89,9 +89,10 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         SIMPLE(OP_NUM)
         SIMPLE(OP_STR)
         SIMPLE(OP_CLOCK)
-
         SIMPLE(OP_PRINT)
+
         SIMPLE(OP_POP)
+        SIMPLE(OP_SQUASH)
 
         SIMPLE(OP_INT_NEG)
         SIMPLE(OP_NUM_NEG)
@@ -133,11 +134,13 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         } break;
 
             U8(OP_SET_FIELD)
-            SIMPLE(OP_UNSTRUCT)
 
             U8(OP_REF_LOCAL)
             SIMPLE(OP_DEREF)
             SIMPLE(OP_SET_REF)
+
+            U8(OP_IS_VAL_TYPE)
+            U8(OP_IS_OBJ_TYPE)
 
 #undef U8
 #undef SIMPLE

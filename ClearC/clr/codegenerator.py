@@ -2,13 +2,14 @@
 Module for generating code from an annotated ast.
 """
 
-from typing import List, Tuple, Optional, Iterator
+from typing import List, Tuple, Optional, Iterator, Dict, TypeVar
 
 import contextlib
 
 import clr.ast as ast
 import clr.annotations as an
 import clr.bytecode as bc
+import clr.typechecker as tc
 
 
 def generate_code(tree: ast.Ast) -> Tuple[List[bc.Constant], List[bc.Instruction]]:
@@ -28,6 +29,7 @@ class Program:
     def __init__(self) -> None:
         self.code: List[bc.Instruction] = []
         self.constants: List[bc.Constant] = []
+        self.type_tags: List[an.TypeAnnot] = []
 
     def declare(self, index_annot: an.IndexAnnot) -> None:
         """
@@ -44,20 +46,103 @@ class Program:
         """
         self.code.append(opcode)
 
-    def start_function(self) -> int:
+    def match_type(self, index_annot: an.IndexAnnot, type_annot: an.TypeAnnot) -> None:
         """
-        Start a function, returns an index that is used by end_function.
+        Checks if the given value is of the given type.
         """
-        self.code.append(bc.Opcode.FUNCTION)
-        self.code.append(0)
-        return len(self.code) - 1
+        value_types: Dict[an.TypeAnnot, bc.ValueType] = {
+            an.BOOL: bc.ValueType.BOOL,
+            an.NIL: bc.ValueType.NIL,
+            an.INT: bc.ValueType.INT,
+            an.NUM: bc.ValueType.NUM,
+        }
 
-    def end_function(self, size_index: int) -> None:
+        self.load(index_annot)
+        end_jumps = []
+
+        def end_true() -> None:
+            # Pop the target value
+            self.append_op(bc.Opcode.POP)
+            # Push the result
+            self.append_op(bc.Opcode.PUSH_TRUE)
+            # Jump to the end
+            end_jumps.append(self.begin_jump())
+
+        # Check against all the subtypes
+        for subtype in type_annot.expand():
+            if subtype in value_types:
+                # If it's a value type just use IS_VAL_TYPE
+                self.append_op(bc.Opcode.IS_VAL_TYPE)
+                self.append_op(value_types[subtype].value)
+                with self.condition(True):
+                    end_true()
+            else:
+                # Otherwise make sure it's an object
+                self.append_op(bc.Opcode.IS_VAL_TYPE)
+                self.append_op(bc.ValueType.OBJ.value)
+                with self.condition(True):
+                    if subtype == an.STR:
+                        # Check for strings with IS_OBJ_TYPE
+                        self.append_op(bc.Opcode.IS_OBJ_TYPE)
+                        self.append_op(bc.ObjectType.STRING.value)
+                        with self.condition(True):
+                            end_true()
+                    if isinstance(subtype, (an.FuncTypeAnnot, an.TupleTypeAnnot)):
+                        # Other types are type tagged structs, make sure it's a struct
+                        self.append_op(bc.Opcode.IS_OBJ_TYPE)
+                        self.append_op(bc.ObjectType.STRUCT.value)
+                        with self.condition(True):
+                            # Check against all the type tags that are contained in the match
+                            for i, tag in enumerate(self.type_tags):
+                                if tc.contains(subtype, tag):
+                                    # Get the tag from the struct
+                                    self.append_op(bc.Opcode.EXTRACT_FIELD)
+                                    self.append_op(0)
+                                    self.append_op(0)
+                                    # Compare it
+                                    self.constant(bc.ClrInt(i))
+                                    self.append_op(bc.Opcode.EQUAL)
+                                    with self.condition(True):
+                                        end_true()
+        # If we didn't jump to the end then none of the type checks matched and the result is false
+        # Pop the target value
+        self.append_op(bc.Opcode.POP)
+        # Push the result
+        self.append_op(bc.Opcode.PUSH_FALSE)
+        # End the jumps for true results after the false result
+        for jump in end_jumps:
+            self.end_jump(jump)
+
+    @contextlib.contextmanager
+    def function(
+        self, upvalue_refs: List[an.IndexAnnot], type_annot: an.TypeAnnot
+    ) -> Iterator[None]:
         """
-        End a function, patches the size argument using the passed index.
+        Handles the context of creating a function.
         """
-        size = bc.size(self.code[size_index + 1 :])
-        self.code[size_index] = size
+        with self.struct(type_annot, field_count=1 + len(upvalue_refs)):
+            self.append_op(bc.Opcode.FUNCTION)
+            idx = len(self.code)
+            self.append_op(0)
+            yield
+            size = bc.size(self.code[idx + 1 :])
+            self.code[idx] = size
+            for ref in upvalue_refs:
+                self.upvalue(ref)
+
+    @contextlib.contextmanager
+    def struct(self, type_annot: an.TypeAnnot, field_count: int) -> Iterator[None]:
+        """
+        Handles the context of creating a type tagged struct.
+        """
+        if type_annot in self.type_tags:
+            self.constant(bc.ClrInt(self.type_tags.index(type_annot)))
+        else:
+            self.constant(bc.ClrInt(len(self.type_tags)))
+            self.type_tags.append(type_annot)
+        yield
+        self.append_op(bc.Opcode.STRUCT)
+        self.append_op(field_count + 1)
 
     @contextlib.contextmanager
     def condition(self, condition: bool) -> Iterator[None]:
@@ -74,13 +159,13 @@ class Program:
         by end_jump.
         """
         if condition is None:
-            self.code.append(bc.Opcode.JUMP)
+            self.append_op(bc.Opcode.JUMP)
         else:
             if condition:
-                self.code.append(bc.Opcode.NOT)
-            self.code.append(bc.Opcode.JUMP_IF_FALSE)
+                self.append_op(bc.Opcode.NOT)
+            self.append_op(bc.Opcode.JUMP_IF_FALSE)
         index = len(self.code)
-        self.code.append(0)
+        self.append_op(0)
         return index
 
     def end_jump(self, index: int) -> None:
@@ -100,48 +185,46 @@ class Program:
         """
         Given a target index loops back to the instrucion at that index.
         """
-        self.code.append(bc.Opcode.LOOP)
+        self.append_op(bc.Opcode.LOOP)
         index = len(self.code)
-        self.code.append(0)
+        self.append_op(0)
         size = bc.size(self.code[target + 1 :])
         self.code[index] = size
 
-    def emit_return(self, function: ast.AstFuncDecl) -> None:
+    def emit_return(self) -> None:
         """
         Returns from the function call.
         """
-        # TODO: POPN
-        for _ in range(1 + len(function.block.names)):
-            self.code.append(bc.Opcode.POP)
-        self.code.append(bc.Opcode.LOAD_FP)
-        self.code.append(bc.Opcode.LOAD_IP)
+        self.append_op(bc.Opcode.POP)
+        self.append_op(bc.Opcode.LOAD_FP)
+        self.append_op(bc.Opcode.LOAD_IP)
 
     def get_upvalue(self, index: int) -> None:
         """
         Get an upvalue from the function.
         """
         # Load the function struct
-        self.code.append(bc.Opcode.PUSH_LOCAL)
-        self.code.append(0)
+        self.append_op(bc.Opcode.PUSH_LOCAL)
+        self.append_op(0)
         # If it's not the recursion upvalue get it from the struct
         if index != 0:
-            self.code.append(bc.Opcode.GET_FIELD)
-            self.code.append(index)
+            self.append_op(bc.Opcode.GET_FIELD)
+            self.append_op(1 + index)
 
     def load(self, index_annot: an.IndexAnnot) -> None:
         """
         Load a value given its index.
         """
         if index_annot.kind == an.IndexAnnotType.GLOBAL:
-            self.code.append(bc.Opcode.PUSH_GLOBAL)
-            self.code.append(index_annot.value)
+            self.append_op(bc.Opcode.PUSH_GLOBAL)
+            self.append_op(index_annot.value)
         elif index_annot.kind == an.IndexAnnotType.UPVALUE:
             self.get_upvalue(index_annot.value)
             if index_annot.value != 0:
-                self.code.append(bc.Opcode.DEREF)
+                self.append_op(bc.Opcode.DEREF)
         else:
-            self.code.append(bc.Opcode.PUSH_LOCAL)
-            self.code.append(index_annot.value)
+            self.append_op(bc.Opcode.PUSH_LOCAL)
+            self.append_op(index_annot.value)
 
     def upvalue(self, index_annot: an.IndexAnnot) -> None:
         """
@@ -150,8 +233,8 @@ class Program:
         if index_annot.kind == an.IndexAnnotType.UPVALUE:
             self.get_upvalue(index_annot.value)
         else:
-            self.code.append(bc.Opcode.REF_LOCAL)
-            self.code.append(index_annot.value)
+            self.append_op(bc.Opcode.REF_LOCAL)
+            self.append_op(index_annot.value)
 
     def constant(self, value: bc.Constant) -> None:
         """
@@ -162,16 +245,29 @@ class Program:
         else:
             index = len(self.constants)
             self.constants.append(value)
-        self.code.append(bc.Opcode.PUSH_CONST)
-        self.code.append(index)
+        self.append_op(bc.Opcode.PUSH_CONST)
+        self.append_op(index)
 
     def print_value(self, convert: bool) -> None:
         """
         Print a temporary value, possibly converting to a string first.
         """
         if convert:
-            self.code.append(bc.Opcode.STR)
-        self.code.append(bc.Opcode.PRINT)
+            self.append_op(bc.Opcode.STR)
+        self.append_op(bc.Opcode.PRINT)
+
+
+Elem = TypeVar("Elem")
+
+
+def breakafter(value: Elem, iterator: Iterator[Elem]) -> Iterator[Elem]:
+    """
+    Break after reaching the given value in an iterator.
+    """
+    for element in iterator:
+        yield element
+        if element == value:
+            break
 
 
 class CodeGenerator(ast.FunctionVisitor):
@@ -183,25 +279,34 @@ class CodeGenerator(ast.FunctionVisitor):
         super().__init__()
         self.program = Program()
 
+    def _return(self, node: ast.AstFuncDecl) -> None:
+        # If the function block is in scope pop all the names in it
+        if node.block in self._scopes:
+            scopes = breakafter(node.block, reversed(self._scopes))
+            for scope in scopes:
+                for _ in scope.names:
+                    self.program.append_op(bc.Opcode.POP)
+        # Emit the return
+        self.program.emit_return()
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
         if len(node.bindings) == 1:
             self.program.declare(node.bindings[0].index_annot)
         else:
-            self.program.append_op(bc.Opcode.UNSTRUCT)
-            for binding in node.bindings:
+            # TODO: Add an opcode so we don't have to abuse the return store here
+            self.program.append_op(bc.Opcode.SET_RETURN)
+            for i, binding in enumerate(node.bindings):
+                self.program.append_op(bc.Opcode.PUSH_RETURN)
+                self.program.append_op(bc.Opcode.GET_FIELD)
+                self.program.append_op(1 + i)
                 self.program.declare(binding.index_annot)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        function = self.program.start_function()
-        super().func_decl(node)
-        if node.return_type.type_annot == an.VOID:
-            self.program.emit_return(node)
-        self.program.end_function(function)
-        for ref in node.upvalue_refs:
-            self.program.upvalue(ref)
-        self.program.append_op(bc.Opcode.STRUCT)
-        self.program.append_op(len(node.upvalue_refs) + 1)
+        with self.program.function(node.upvalue_refs, node.type_annot):
+            super().func_decl(node)
+            if node.return_type.type_annot == an.VOID:
+                self._return(node)
         self.program.declare(node.index_annot)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
@@ -258,7 +363,7 @@ class CodeGenerator(ast.FunctionVisitor):
         super().return_stmt(node)
         if node.expr:
             self.program.append_op(bc.Opcode.SET_RETURN)
-        self.program.emit_return(self._functions[-1])
+        self._return(self._functions[-1])
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         super().expr_stmt(node)
@@ -295,21 +400,18 @@ class CodeGenerator(ast.FunctionVisitor):
         if node.name in an.BUILTINS:
             builtin = an.BUILTINS[node.name]
             if isinstance(builtin.type_annot, an.FuncTypeAnnot):
-                function = self.program.start_function()
-                for i in range(len(builtin.type_annot.params)):
-                    self.program.append_op(bc.Opcode.PUSH_LOCAL)
-                    self.program.append_op(1 + i)
-                self.program.append_op(an.BUILTINS[node.name].opcode)
-                if builtin.type_annot.return_type != an.VOID:
-                    self.program.append_op(bc.Opcode.SET_RETURN)
-                for _ in builtin.type_annot.params:
+                with self.program.function([], builtin.type_annot):
+                    for i in range(len(builtin.type_annot.params)):
+                        self.program.append_op(bc.Opcode.PUSH_LOCAL)
+                        self.program.append_op(1 + i)
+                    self.program.append_op(an.BUILTINS[node.name].opcode)
+                    if builtin.type_annot.return_type != an.VOID:
+                        self.program.append_op(bc.Opcode.SET_RETURN)
+                    for _ in builtin.type_annot.params:
+                        self.program.append_op(bc.Opcode.POP)
                     self.program.append_op(bc.Opcode.POP)
-                self.program.append_op(bc.Opcode.POP)
-                self.program.append_op(bc.Opcode.LOAD_FP)
-                self.program.append_op(bc.Opcode.LOAD_IP)
-                self.program.end_function(function)
-                self.program.append_op(bc.Opcode.STRUCT)
-                self.program.append_op(1)
+                    self.program.append_op(bc.Opcode.LOAD_FP)
+                    self.program.append_op(bc.Opcode.LOAD_IP)
         else:
             self.program.load(node.index_annot)
 
@@ -325,16 +427,32 @@ class CodeGenerator(ast.FunctionVisitor):
 
     def case_expr(self, node: ast.AstCaseExpr) -> None:
         node.target.accept(self)
+        end_jumps = []
         for case_type, case_value in node.cases:
-            # TODO: Type tags for functions aaaaaaaaaaaaaaaaaaaaa
-            raise Exception("shit")
+            # Check if the type matches
+            self.program.match_type(node.binding.index_annot, case_type.type_annot)
+            with self.program.condition(True):
+                # If it does replace the target with the value and jump to the end
+                case_value.accept(self)
+                self.program.append_op(
+                    bc.Opcode.SQUASH if node.type_annot != an.VOID else bc.Opcode.POP
+                )
+                end_jumps.append(self.program.begin_jump())
+        # If we haven't jumped to the end there should be a fallback
+        if node.fallback:
+            node.fallback.accept(self)
+            self.program.append_op(
+                bc.Opcode.SQUASH if node.type_annot != an.VOID else bc.Opcode.POP
+            )
+        for jump in end_jumps:
+            self.program.end_jump(jump)
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)
         # Get the ip
         self.program.append_op(bc.Opcode.EXTRACT_FIELD)
         self.program.append_op(len(node.args))
-        self.program.append_op(0)
+        self.program.append_op(1 + 0)
         # Make the new frame
         self.program.append_op(bc.Opcode.CALL)
         self.program.append_op(len(node.args) + 1)
@@ -344,7 +462,5 @@ class CodeGenerator(ast.FunctionVisitor):
                 self.program.append_op(bc.Opcode.PUSH_RETURN)
 
     def tuple_expr(self, node: ast.AstTupleExpr) -> None:
-        # Stored in reverse order
-        super().tuple_expr(node)
-        self.program.append_op(bc.Opcode.STRUCT)
-        self.program.append_op(len(node.exprs))
+        with self.program.struct(node.type_annot, field_count=len(node.exprs)):
+            super().tuple_expr(node)

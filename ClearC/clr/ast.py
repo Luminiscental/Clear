@@ -286,8 +286,14 @@ class ScopeVisitor(DeepVisitor):
         self._pop_scope()
 
     def case_expr(self, node: "AstCaseExpr") -> None:
+        node.target.accept(self)
         self._push_scope(node)
-        super().case_expr(node)
+        node.binding.accept(self)
+        for case_type, case_value in node.cases:
+            case_type.accept(self)
+            case_value.accept(self)
+        if node.fallback:
+            node.fallback.accept(self)
         self._pop_scope()
 
 
@@ -375,8 +381,6 @@ AstStmt = Union[
 AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 # Specific nodes:
-
-# TODO: case expr/stmt
 
 
 class Ast(AstNode):

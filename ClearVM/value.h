@@ -9,9 +9,9 @@
 
 typedef enum {
 
-    OBJ_STRING,
-    OBJ_STRUCT,
-    OBJ_UPVALUE
+    OBJ_STRING = 0,
+    OBJ_STRUCT = 1,
+    OBJ_UPVALUE = 2
 
 } ObjectType;
 
@@ -25,13 +25,13 @@ struct sObjectValue {
 
 typedef enum {
 
-    VAL_BOOL,
-    VAL_NIL,
-    VAL_OBJ,
-    VAL_INT,
-    VAL_NUM,
-    VAL_IP,
-    VAL_FP
+    VAL_BOOL = 0,
+    VAL_NIL = 1,
+    VAL_OBJ = 2,
+    VAL_INT = 3,
+    VAL_NUM = 4,
+    VAL_IP = 5,
+    VAL_FP = 6
 
 } ValueType;
 

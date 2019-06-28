@@ -45,37 +45,37 @@ The values on the stack contain a type flag and a union of data specific to each
 
 __Value Types__
 
-- `VAL_BOOL` : Boolean type values represent a `true` or `false` value. They can be created from
+- 0x0 (`VAL_BOOL`) : Boolean type values represent a `true` or `false` value. They can be created from
     `OP_PUSH_TRUE` or `OP_PUSH_FALSE` instructions.
 
-- `VAL_NIL` : Nil type values are all considered the same, representing a singleton `nil` value.
+- 0x1 (`VAL_NIL`) : Nil type values are all considered the same, representing a singleton `nil` value.
     They can be created from `OP_PUSH_NIL` instructions.
 
-- `VAL_OBJ` : Object type values are references to heap allocated objects, they contain a further
+- 0x2 (`VAL_OBJ`) : Object type values are references to heap allocated objects, they contain a further
     flag for what type of object is referenced.
 
-- `VAL_INT` : Integer type values represent a 32-bit signed integer. They can be loaded as
+- 0x3 (`VAL_INT`) : Integer type values represent a 32-bit signed integer. They can be loaded as
     constants or as the result of arithmetic operations or the `OP_INT` cast instruction.
 
-- `VAL_NUM` : Number type values represent a 64-bit double-precision floating-point value. They
+- 0x4 (`VAL_NUM`) : Number type values represent a 64-bit double-precision floating-point value. They
     can be loaded as constants or as the result of arithmetic operations or the `OP_NUM` cast
     instruction.
 
-- `VAL_IP` : IP (instruction pointer) type values represent a pointer to a part of the program
+- 0x5 (`VAL_IP`) : IP (instruction pointer) type values represent a pointer to a part of the program
     being run. They can be created from `OP_FUNCTION` or `OP_CALL` instructions.
 
-- `VAL_FP` : FP (frame pointer) type values represent a pointer to a Value on the stack. They can
+- 0x6 (`VAL_FP`) : FP (frame pointer) type values represent a pointer to a Value on the stack. They can
     be created from `OP_CALL` instructions.
 
 __Object Types__
 
-- `OBJ_STRING` : string objects represent a UTF-8 string of characters. They can be loaded as
+- 0x0 (`OBJ_STRING`) : string objects represent a UTF-8 string of characters. They can be loaded as
     constants or created from `OP_STR_CAT` or `OP_STR` instructions.
 
-- `OBJ_STRUCT` : struct objects contain an array of values with a known runtime length.
+- 0x1 (`OBJ_STRUCT`) : struct objects contain an array of values with a known runtime length.
     They can be created from `OP_STRUCT` instructions.
 
-- `OBJ_UPVALUE` : upvalue objects contain a pointer to a referenced value, which is either on the
+- 0x2 (`OBJ_UPVALUE`) : upvalue objects contain a pointer to a referenced value, which is either on the
     stack or stored within the upvalue object. They can be created from `OP_REF_LOCAL`
     instructions.
 
@@ -103,7 +103,7 @@ __Opcodes__
 
 - 0x00 (`OP_PUSH_CONST`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -114,7 +114,7 @@ __Opcodes__
 
 - 0x01 (`OP_PUSH_TRUE`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `...`
 
@@ -124,7 +124,7 @@ __Opcodes__
 
 - 0x02 (`OP_PUSH_FALSE`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `...`
 
@@ -134,7 +134,7 @@ __Opcodes__
 
 - 0x03 (`OP_PUSH_NIL`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `...`
 
@@ -144,7 +144,7 @@ __Opcodes__
 
 - 0x04 (`OP_SET_GLOBAL`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `..., value`
 
@@ -155,7 +155,7 @@ __Opcodes__
 
 - 0x05 (`OP_PUSH_GLOBAL`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -166,7 +166,7 @@ __Opcodes__
 
 - 0x06 (`OP_SET_LOCAL`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `..., value`
 
@@ -178,7 +178,7 @@ __Opcodes__
 
 - 0x07 (`OP_PUSH_LOCAL`)
 
-    _Arguments_: `index`
+    _Parameters_: `index`
 
     _Initial Stack_: `...`
 
@@ -190,7 +190,7 @@ __Opcodes__
 
 - 0x08 (`OP_INT`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., value`
 
@@ -211,7 +211,7 @@ __Opcodes__
 
 - 0x09 (`OP_BOOL`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., value`
 
@@ -232,7 +232,7 @@ __Opcodes__
 
 - 0x0a (`OP_NUM`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., value`
 
@@ -253,7 +253,7 @@ __Opcodes__
 
 - 0x0b (`OP_STR`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., value`
 
@@ -274,7 +274,7 @@ __Opcodes__
 
 - 0x0c (`OP_CLOCK`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `...`
 
@@ -284,7 +284,7 @@ __Opcodes__
 
 - 0x0d (`OP_PRINT`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., str`
 
@@ -295,7 +295,7 @@ __Opcodes__
 
 - 0x0e (`OP_POP`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., value`
 
@@ -303,9 +303,19 @@ __Opcodes__
 
     Pops a value off the stack.
 
-- 0x0f (`OP_INT_NEG`)
+- 0x0f (`OP_SQUASH`)
 
-    _Arguments_: none
+    _Parameters_: none
+
+    _Initial Stack_: `..., a, b`
+
+    _Final Stack_: `..., b`
+
+    Pops two values then pushes the second one back onto the stack.
+
+- 0x10 (`OP_INT_NEG`)
+
+    _Parameters_: none
 
     _Initial Stack_: `..., n`
 
@@ -314,9 +324,9 @@ __Opcodes__
     Pops an `int` type value off the stack, and pushes it's integer negation. If the value is not
     an integer value of the produced integer is undefined.
 
-- 0x10 (`OP_NUM_NEG`)
+- 0x11 (`OP_NUM_NEG`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., x`
 
@@ -325,9 +335,9 @@ __Opcodes__
     Pops a `num` type value off the stack, and pushes it's negation. If the value is not a number
     the value of the produced number is undefined.
 
-- 0x11 (`OP_INT_ADD`)
+- 0x12 (`OP_INT_ADD`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -336,9 +346,9 @@ __Opcodes__
     Pops an `int` value off the stack, and adds it to the `int` value below. If either value is not
     an integer the value of the produced integer is undefined.
 
-- 0x12 (`OP_NUM_ADD`)
+- 0x13 (`OP_NUM_ADD`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -347,9 +357,9 @@ __Opcodes__
     Pops a `num` value off the stack, and adds it to the `num` value below. If either value is not
     a number the value of the produced number is undefined.
 
-- 0x13 (`OP_INT_SUB`)
+- 0x14 (`OP_INT_SUB`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -358,9 +368,9 @@ __Opcodes__
     Pops an `int` value off the stack, and subtracts it from the `int` value below. If either value is not
     an integer the value of the produced integer is undefined.
 
-- 0x14 (`OP_NUM_SUB`)
+- 0x15 (`OP_NUM_SUB`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -369,9 +379,9 @@ __Opcodes__
     Pops a `num` value off the stack, and subtracts it from the `num` value below. If either value is not
     a number the value of the produced number is undefined.
 
-- 0x15 (`OP_INT_MUL`)
+- 0x16 (`OP_INT_MUL`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -380,9 +390,9 @@ __Opcodes__
     Pops an `int` value off the stack, and multiplies it with the `int` value below. If either value is not
     an integer the value of the produced integer is undefined.
 
-- 0x16 (`OP_NUM_MUL`)
+- 0x17 (`OP_NUM_MUL`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -391,9 +401,9 @@ __Opcodes__
     Pops a `num` value off the stack, and multiplies it with the `num` value below. If either value is not
     a number the value of the produced number is undefined.
 
-- 0x17 (`OP_INT_DIV`)
+- 0x18 (`OP_INT_DIV`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -402,9 +412,9 @@ __Opcodes__
     Pops an `int` value off the stack, and divides the `int` value below by it (integer division). If either value is not
     an integer the value of the produced integer is undefined.
 
-- 0x18 (`OP_MUL_DIV`)
+- 0x19 (`OP_MUL_DIV`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -413,9 +423,9 @@ __Opcodes__
     Pops a `num` value off the stack, and divides the `num` value below by it. If either value is not
     a number the value of the produced number is undefined.
 
-- 0x19 (`OP_STR_CAT`)
+- 0x1a (`OP_STR_CAT`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -424,9 +434,9 @@ __Opcodes__
     Pops two `str` values off the stack and pushes their concatenation. If either value is not a
     string this emits an error.
 
-- 0x1a (`OP_NOT`)
+- 0x1b (`OP_NOT`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., b`
 
@@ -435,9 +445,9 @@ __Opcodes__
     Pops a `bool` value off the stack and pushes its negation. If the value is not a boolean the
     value of the produced boolean is undefined.
 
-- 0x1b (`OP_INT_LESS`)
+- 0x1c (`OP_INT_LESS`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -447,9 +457,9 @@ __Opcodes__
     than the integer above. If either value is not an integer the value of the produced boolean is
     undefined.
 
-- 0x1c (`OP_NUM_LESS`)
+- 0x1d (`OP_NUM_LESS`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -459,9 +469,9 @@ __Opcodes__
     than the number above. If either value is not a number the value of the produced boolean is
     undefined.
 
-- 0x1d (`OP_INT_GREATER`)
+- 0x1e (`OP_INT_GREATER`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -471,9 +481,9 @@ __Opcodes__
     greater than the integer above. If either value is not an integer the value of the produced
     boolean is undefined.
 
-- 0x1e (`OP_NUM_GREATER`)
+- 0x1f (`OP_NUM_GREATER`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -483,9 +493,9 @@ __Opcodes__
     greater than the number above. If either value is not a number the value of the produced
     boolean is undefined.
 
-- 0x1f (`OP_EQUAL`)
+- 0x20 (`OP_EQUAL`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., a, b`
 
@@ -495,9 +505,9 @@ __Opcodes__
     different types are unequal, numbers are compared with a precision of 7 decimal places, string
     objects are compared fully, and non-string pointer types are compared for identity.
 
-- 0x20 (`OP_JUMP`)
+- 0x21 (`OP_JUMP`)
 
-    _Arguments_: `offset` (unsigned byte)
+    _Parameters_: `offset` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -506,9 +516,9 @@ __Opcodes__
     Increases the IP by the given offset. If the resulting IP is outside of the program code this
     emits an error.
 
-- 0x21 (`OP_JUMP_IF_FALSE`)
+- 0x22 (`OP_JUMP_IF_FALSE`)
 
-    _Arguments_: `offset` (unsigned byte)
+    _Parameters_: `offset` (unsigned byte)
 
     _Initial Stack_: `..., flag`
 
@@ -517,9 +527,9 @@ __Opcodes__
     Pops a bool value off the stack, if the boolean is false acts like `OP_JUMP`. If the value is
     not a boolean whether the jump occurs is undefined.
 
-- 0x22 (`OP_LOOP`)
+- 0x23 (`OP_LOOP`)
 
-    _Arguments_: `offset` (unsigned byte)
+    _Parameters_: `offset` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -528,9 +538,9 @@ __Opcodes__
     Decreases the IP by the given offset. If the resulting IP is outside of the program code this
     emits an error.
 
-- 0x23 (`OP_FUNCTION`)
+- 0x24 (`OP_FUNCTION`)
 
-    _Arguments_: `offset` (unsigned byte)
+    _Parameters_: `offset` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -538,9 +548,9 @@ __Opcodes__
 
     Given an offset, pushes the current IP onto the stack then increments the IP by the offset.
 
-- 0x24 (`OP_CALL`)
+- 0x25 (`OP_CALL`)
 
-    _Arguments_: `args` (unsigned byte)
+    _Parameters_: `args` (unsigned byte)
 
     _Initial Stack_: `..., arg0, arg1, ..., argn, ip`
 
@@ -550,9 +560,9 @@ __Opcodes__
     the current IP and FP followed by the arguments and loads the popped IP. If the top value is
     not an IP value this emits an error.
 
-- 0x25 (`OP_LOAD_IP`)
+- 0x26 (`OP_LOAD_IP`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., ip`
 
@@ -561,9 +571,9 @@ __Opcodes__
     Pops an IP value off the stack and copies it into the vm's IP. If the value is not an IP this
     emits an error.
 
-- 0x26 (`OP_LOAD_FP`)
+- 0x27 (`OP_LOAD_FP`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., fp`
 
@@ -572,9 +582,9 @@ __Opcodes__
     Pops an FP value off the stack and copies it into the vm's FP. If the value is not an FP this
     emits an error.
 
-- 0x27 (`OP_SET_RETURN`)
+- 0x28 (`OP_SET_RETURN`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., value`
 
@@ -582,9 +592,9 @@ __Opcodes__
 
     Pops a value off the stack and puts it in the return store.
 
-- 0x28 (`OP_PUSH_RETURN`)
+- 0x29 (`OP_PUSH_RETURN`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `...`
 
@@ -592,9 +602,9 @@ __Opcodes__
 
     Pushes the return store value onto the stack.
 
-- 0x29 (`OP_STRUCT`)
+- 0x2a (`OP_STRUCT`)
 
-    _Arguments_: `fields` (unsigned byte)
+    _Parameters_: `fields` (unsigned byte)
 
     _Initial Stack_: `..., arg0, arg1, ..., argn`
 
@@ -602,9 +612,9 @@ __Opcodes__
 
     Pops the given number of field values off the stack and pushes a struct of them.
 
-- 0x2a (`OP_GET_FIELD`)
+- 0x2b (`OP_GET_FIELD`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `..., struct`
 
@@ -613,9 +623,9 @@ __Opcodes__
     Pops a struct value off the stack and pushes its field at the given index. If the popped value
     isn't a struct or the index is too large this emits an error.
 
-- 0x2b (`OP_EXTRACT_FIELD`)
+- 0x2c (`OP_EXTRACT_FIELD`)
 
-    _Arguments_: `offset` (unsigned byte), `index` (unsigned byte)
+    _Parameters_: `offset` (unsigned byte), `index` (unsigned byte)
 
     _Initial Stack_: `..., struct, ...`
 
@@ -624,9 +634,9 @@ __Opcodes__
     Peeks down the stack by the given offset and pushes the field of the peeked struct value at the
     given index. If the peeked value is not a struct or the index is too large this emits an error.
 
-- 0x2c (`OP_SET_FIELD`)
+- 0x2d (`OP_SET_FIELD`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `..., struct, value`
 
@@ -635,20 +645,9 @@ __Opcodes__
     Pops a value off the stack and sets the field at the given index of the struct below to it. If
     the value below isn't a struct or the index is too large this emits an error.
 
-- 0x2d (`OP_UNSTRUCT`)
-
-    _Arguments_: none
-
-    _Initial Stack_: `..., struct`
-
-    _Final Stack_: `..., field0, field1, ..., fieldn`
-
-    Pops a struct value and pushes its fields onto the stack. If the popped value isn't a struct
-    this emits an error.
-
 - 0x2e (`OP_REF_LOCAL`)
 
-    _Arguments_: `index` (unsigned byte)
+    _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `...`
 
@@ -659,7 +658,7 @@ __Opcodes__
 
 - 0x2f (`OP_DEREF`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., upvalue`
 
@@ -669,13 +668,35 @@ __Opcodes__
 
 - 0x30 (`OP_SET_REF`)
 
-    _Arguments_: none
+    _Parameters_: none
 
     _Initial Stack_: `..., upvalue, value`
 
     _Final Stack_: `...`
 
     Pops a value then an upvalue and sets the upvalues reference to the popped value.
+
+- 0x31 (`OP_IS_VAL_TYPE`)
+
+    _Parameters_: `type`
+
+    _Initial Stack_: `..., value`
+
+    _Final Stack_: `..., value, bool`
+
+    Peeks at the top of the stack and pushes a boolean for whether its type is equal to the
+    argument.
+
+- 0x32 (`OP_IS_OBJ_TYPE`)
+
+    _Parameters_: `type`
+
+    _Initial Stack_: `..., value`
+
+    _Final Stack_: `..., value, bool`
+
+    Peeks at the top of the stack and pushes a boolean for whether its object type is equal to the
+    argument. If the value is not an object the value of the pushed boolean is undefined.
 
 ## Examples
 
