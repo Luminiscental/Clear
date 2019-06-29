@@ -131,6 +131,11 @@ class AstVisitor:
         Visit a tuple expression node.
         """
 
+    def lambda_expr(self, node: "AstLambdaExpr") -> None:
+        """
+        Visit a lambda expression.
+        """
+
     def ident_type(self, node: "AstIdentType") -> None:
         """
         Visit an identifier type node.
@@ -167,6 +172,9 @@ class DeepVisitor(AstVisitor):
     Ast visitor that propogates to all nodes for a convenient base class.
     """
 
+    def _decl(self, node: "AstDecl") -> None:
+        pass
+
     def start(self, node: "Ast") -> None:
         for decl in node.decls:
             decl.accept(self)
@@ -177,12 +185,14 @@ class DeepVisitor(AstVisitor):
         if node.val_type:
             node.val_type.accept(self)
         node.val_init.accept(self)
+        self._decl(node)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
         for param in node.params:
             param.accept(self)
         node.return_type.accept(self)
         node.block.accept(self)
+        self._decl(node)
 
     def param(self, node: "AstParam") -> None:
         node.param_type.accept(self)
@@ -190,10 +200,12 @@ class DeepVisitor(AstVisitor):
     def print_stmt(self, node: "AstPrintStmt") -> None:
         if node.expr:
             node.expr.accept(self)
+        self._decl(node)
 
     def block_stmt(self, node: "AstBlockStmt") -> None:
         for decl in node.decls:
             decl.accept(self)
+        self._decl(node)
 
     def if_stmt(self, node: "AstIfStmt") -> None:
         node.if_part[0].accept(self)
@@ -203,18 +215,22 @@ class DeepVisitor(AstVisitor):
             block.accept(self)
         if node.else_part:
             node.else_part.accept(self)
+        self._decl(node)
 
     def while_stmt(self, node: "AstWhileStmt") -> None:
         if node.cond:
             node.cond.accept(self)
         node.block.accept(self)
+        self._decl(node)
 
     def return_stmt(self, node: "AstReturnStmt") -> None:
         if node.expr:
             node.expr.accept(self)
+        self._decl(node)
 
     def expr_stmt(self, node: "AstExprStmt") -> None:
         node.expr.accept(self)
+        self._decl(node)
 
     def unary_expr(self, node: "AstUnaryExpr") -> None:
         node.target.accept(self)
@@ -241,6 +257,11 @@ class DeepVisitor(AstVisitor):
         for expr in node.exprs:
             expr.accept(self)
 
+    def lambda_expr(self, node: "AstLambdaExpr") -> None:
+        for param in node.params:
+            param.accept(self)
+        node.value.accept(self)
+
     def func_type(self, node: "AstFuncType") -> None:
         for param in node.params:
             param.accept(self)
@@ -258,6 +279,9 @@ class DeepVisitor(AstVisitor):
             subtype.accept(self)
 
 
+AstScope = Union["AstBlockStmt", "Ast", "AstCaseExpr", "AstLambdaExpr"]
+
+
 class ScopeVisitor(DeepVisitor):
     """
     Ast visitor base class to keep track of the current scope.
@@ -265,12 +289,12 @@ class ScopeVisitor(DeepVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self._scopes: List[Union["AstBlockStmt", "Ast", "AstCaseExpr"]] = []
+        self._scopes: List[AstScope] = []
 
-    def _get_scope(self) -> Union["AstBlockStmt", "Ast", "AstCaseExpr"]:
+    def _get_scope(self) -> AstScope:
         return self._scopes[-1]
 
-    def _push_scope(self, node: Union["AstBlockStmt", "Ast", "AstCaseExpr"]) -> None:
+    def _push_scope(self, node: AstScope) -> None:
         self._scopes.append(node)
 
     def _pop_scope(self) -> None:
@@ -281,10 +305,23 @@ class ScopeVisitor(DeepVisitor):
         super().start(node)
         self._pop_scope()
 
+    def func_decl(self, node: "AstFuncDecl") -> None:
+        self._push_scope(node.block)
+        for param in node.params:
+            param.accept(self)
+        # Visit the block manually so it doesn't get an extra scope
+        for decl in node.block.decls:
+            decl.accept(self)
+        self._pop_scope()
+        self._decl(node)
+
     def block_stmt(self, node: "AstBlockStmt") -> None:
         self._push_scope(node)
-        super().block_stmt(node)
+        # Don't delegate to super, we want _decl to be called in the right scope
+        for decl in node.decls:
+            decl.accept(self)
         self._pop_scope()
+        self._decl(node)
 
     def case_expr(self, node: "AstCaseExpr") -> None:
         node.target.accept(self)
@@ -297,6 +334,14 @@ class ScopeVisitor(DeepVisitor):
             node.fallback.accept(self)
         self._pop_scope()
 
+    def lambda_expr(self, node: "AstLambdaExpr") -> None:
+        self._push_scope(node)
+        super().lambda_expr(node)
+        self._pop_scope()
+
+
+AstFunction = Union["AstFuncDecl", "AstLambdaExpr"]
+
 
 class FunctionVisitor(ScopeVisitor):
     """
@@ -305,12 +350,31 @@ class FunctionVisitor(ScopeVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self._functions: List["AstFuncDecl"] = []
+        self._functions: List[AstFunction] = []
+
+    def _get_function(self) -> AstFunction:
+        return self._functions[-1]
+
+    def _push_function(self, function: AstFunction) -> None:
+        self._functions.append(function)
+
+    def _pop_function(self) -> None:
+        self._functions.pop()
 
     def func_decl(self, node: "AstFuncDecl") -> None:
-        self._functions.append(node)
-        super().func_decl(node)
-        self._functions.pop()
+        self._push_function(node)
+        # Don't delegate to super, we want _decl to be called in the right scope
+        for param in node.params:
+            param.accept(self)
+        node.return_type.accept(self)
+        node.block.accept(self)
+        self._pop_function()
+        self._decl(node)
+
+    def lambda_expr(self, node: "AstLambdaExpr") -> None:
+        self._push_function(node)
+        super().lambda_expr(node)
+        self._pop_function()
 
 
 # Node definitions:
@@ -324,6 +388,7 @@ class AstNode:
     """
 
     def __init__(self) -> None:
+        # TODO: Move these to only be on nodes that need them
         # Annotation Defaults:
         self.type_annot: ts.Type = ts.UNRESOLVED
         self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
@@ -333,9 +398,9 @@ class AstNode:
 
         self.names: Dict[str, Union[AstIdentRef]] = {}
         self.sequence: List[AstDecl] = []
-        self.scope: Optional[Union[Ast, AstBlockStmt, AstCaseExpr]] = None
+        self.scope: Optional[AstScope] = None
         self.upvalues: List[AstIdentRef] = []
-        self.upvalue_refs: List[an.IndexAnnot] = []
+        self.upvalue_indices: List[an.IndexAnnot] = []
         self.ref: Optional[AstIdentRef] = None
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -736,6 +801,23 @@ class AstTupleExpr(AstExpr):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.tuple_expr(self)
+
+
+class AstLambdaExpr(AstExpr):
+    """
+    Ast node for a lambda expression.
+    """
+
+    def __init__(
+        self, params: List[AstParam], value: AstExpr, region: er.SourceView
+    ) -> None:
+        super().__init__(region)
+        self.params = params
+        self.value = value
+        self.region = region
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.lambda_expr(self)
 
 
 class AstIdentType(AstType):

@@ -1,23 +1,19 @@
 
-func a() void {
-    print "a()";
+{
+    func a() void {
+        print "a()";
+    }
+    {
+        func x() int {
+            val b := 3i;
+            {
+                val a := 7i;
+                return b;
+            }
+            return 3i;
+        }
+        print x();
+        a();
+    }
+    val b := 3;
 }
-
-func b(int x) void {
-    print "b(" + str(x) + ")";
-}
-
-val c := 2, "two", -5i * 3i;
-
-val test : (bool | num)? = 3;
-val user := case test as condition {
-    bool: a,
-    num: c,
-    else: b
-};
-
-case user {
-    func() void: user(),
-    func(int) void: user(3i),
-    num, str, int: b(4i)
-};

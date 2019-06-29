@@ -363,7 +363,7 @@ class UntypedOperatorInfo(NamedTuple):
     opcodes: List[bc.Instruction]
 
 
-TYPED_BINARY: Dict[str, TypedOperatorInfo] = {
+TYPED_OPERATORS: Dict[str, TypedOperatorInfo] = {
     "+": TypedOperatorInfo(
         overloads={
             FunctionType([INT, INT], INT): [bc.Opcode.INT_ADD],
@@ -375,6 +375,8 @@ TYPED_BINARY: Dict[str, TypedOperatorInfo] = {
         overloads={
             FunctionType([INT, INT], INT): [bc.Opcode.INT_SUB],
             FunctionType([NUM, NUM], NUM): [bc.Opcode.NUM_SUB],
+            FunctionType([INT], INT): [bc.Opcode.INT_NEG],
+            FunctionType([NUM], NUM): [bc.Opcode.NUM_NEG],
         }
     ),
     "*": TypedOperatorInfo(
@@ -414,18 +416,9 @@ TYPED_BINARY: Dict[str, TypedOperatorInfo] = {
         }
     ),
 }
-UNTYPED_BINARY: Dict[str, UntypedOperatorInfo] = {
+UNTYPED_OPERATORS: Dict[str, UntypedOperatorInfo] = {
     "==": UntypedOperatorInfo(return_type=BOOL, opcodes=[bc.Opcode.EQUAL]),
     "!=": UntypedOperatorInfo(
         return_type=BOOL, opcodes=[bc.Opcode.EQUAL, bc.Opcode.NOT]
     ),
 }
-TYPED_UNARY: Dict[str, TypedOperatorInfo] = {
-    "-": TypedOperatorInfo(
-        overloads={
-            FunctionType([INT], INT): [bc.Opcode.INT_NEG],
-            FunctionType([NUM], NUM): [bc.Opcode.NUM_NEG],
-        }
-    )
-}
-UNTYPED_UNARY: Dict[str, UntypedOperatorInfo] = {}

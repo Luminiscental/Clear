@@ -112,7 +112,8 @@ def main() -> None:
         ("Type", tc.TypeChecker()),
         ("Control Flow", fc.FlowChecker()),
         ("Indexing", ix.UpvalueTracker()),
-        ("Indexing", ix.Indexer()),
+        ("Indexing", ix.IndexBuilder()),
+        ("Indexing", ix.IndexWriter()),
     ]
 
     for name, visitor in subpasses:

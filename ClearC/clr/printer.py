@@ -217,6 +217,17 @@ class AstPrinter(ast.AstVisitor):
                 expr.accept(self)
         self._append(")")
 
+    def lambda_expr(self, node: ast.AstLambdaExpr) -> None:
+        self._append("func(")
+        if node.params:
+            node.params[0].accept(self)
+            for param in node.params[1:]:
+                self._append(", ")
+                param.accept(self)
+        self._append(") (")
+        node.value.accept(self)
+        self._append(")")
+
     def ident_type(self, node: ast.AstIdentType) -> None:
         self._append(node.name)
 

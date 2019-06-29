@@ -769,6 +769,26 @@ def finish_tuple_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     return ast.AstTupleExpr(tuple(exprs), region)
 
 
+def finish_lambda_expr(parser: Parser) -> Result[ast.AstExpr]:
+    """
+    Parse a lambda expression from the parser or return an error. Assumes that the "func" token has
+    already been consumed.
+    """
+    start = parser.prev().lexeme
+    if not parser.match(lx.TokenType.LEFT_PAREN):
+        return er.CompileError(
+            message=f"expected '(' to start parameters", regions=[parser.curr_region()]
+        )
+    params = finish_tuple(parser, parse_param)
+    if isinstance(params, er.CompileError):
+        return params
+    value = parse_expr(parser, precedence=Precedence.TUPLE.next())
+    if isinstance(value, er.CompileError):
+        return value
+    region = er.SourceView.range(start, parser.prev().lexeme)
+    return ast.AstLambdaExpr(params, value, region)
+
+
 def finish_int_expr(parser: Parser) -> Result[ast.AstIntExpr]:
     """
     Parse an int expression from the parser or return an error. Assumes that the literal token has
@@ -920,6 +940,7 @@ TYPE_TABLE: PrattTable[ast.AstType] = collections.defaultdict(
 EXPR_TABLE: PrattTable[ast.AstExpr] = collections.defaultdict(
     PrattRule,
     {
+        lx.TokenType.FUNC: PrattRule(prefix=finish_lambda_expr),
         lx.TokenType.LEFT_PAREN: PrattRule(
             prefix=finish_group_expr,
             postfix=finish_call_expr,

@@ -2,14 +2,14 @@
 Module for sequencing visitors / functions.
 """
 
-from typing import List, Union
+from typing import List, Union, Iterator
+
+import contextlib
 
 import clr.ast as ast
 
 
-def _sequence(node: ast.AstDecl) -> None:
-    if node.scope:
-        node.scope.sequence.append(node)
+AstNameDecl = Union[ast.AstValueDecl, ast.AstFuncDecl]
 
 
 class SequenceBuilder(ast.FunctionVisitor):
@@ -19,66 +19,45 @@ class SequenceBuilder(ast.FunctionVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self.started: List[Union[ast.AstValueDecl, ast.AstFuncDecl]] = []
-        self.completed: List[Union[ast.AstValueDecl, ast.AstFuncDecl]] = []
+        self.started: List[AstNameDecl] = []
+        self.completed: List[AstNameDecl] = []
+
+    def _decl(self, node: ast.AstDecl) -> None:
+        if node.scope:
+            node.scope.sequence.append(node)
+
+    def _start(self, node: AstNameDecl) -> bool:
+        if node in self.completed:
+            return False
+        if node in self.started:
+            self.errors.add(
+                message="circular dependency for value", regions=[node.region]
+            )
+            return False
+        return True
+
+    @contextlib.contextmanager
+    def _name_decl(self, node: AstNameDecl) -> Iterator[None]:
+        self.started.append(node)
+        yield
+        self.completed.append(node)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
-        if node in self.completed:
-            return
-        if node in self.started:
-            # TODO: Show the loop somehow.
-            self.errors.add(
-                message=f"circular dependency for value", regions=[node.region]
-            )
-            return
-        self.started.append(node)
-        super().value_decl(node)
-        self.completed.append(node)
-        _sequence(node)
+        if self._start(node):
+            with self._name_decl(node):
+                super().value_decl(node)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        if node in self.completed:
-            return
-        if node in self.started:
-            self.errors.add(
-                message=f"circular dependency for {node.ident}", regions=[node.region]
-            )
-            return
-        self.started.append(node)
-        super().func_decl(node)
-        self.completed.append(node)
-        _sequence(node)
-
-    def print_stmt(self, node: ast.AstPrintStmt) -> None:
-        super().print_stmt(node)
-        _sequence(node)
-
-    def block_stmt(self, node: ast.AstBlockStmt) -> None:
-        super().block_stmt(node)
-        _sequence(node)
-
-    def if_stmt(self, node: ast.AstIfStmt) -> None:
-        super().if_stmt(node)
-        _sequence(node)
-
-    def while_stmt(self, node: ast.AstWhileStmt) -> None:
-        super().while_stmt(node)
-        _sequence(node)
-
-    def return_stmt(self, node: ast.AstReturnStmt) -> None:
-        super().return_stmt(node)
-        _sequence(node)
-
-    def expr_stmt(self, node: ast.AstExprStmt) -> None:
-        super().expr_stmt(node)
-        _sequence(node)
+        if self._start(node):
+            with self._name_decl(node):
+                super().func_decl(node)
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        super().ident_expr(node)
-        # If the ref is None there was already an error
         if node.ref:
             # Special case for recursive function calls
-            if not self._functions or node.ref != self._functions[-1]:
+            if self._functions and node.ref == self._functions[-1]:
+                pass
+            else:
                 node.ref.accept(self)
 
 

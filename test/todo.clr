@@ -1,18 +1,31 @@
 
 // TODO: Actual tests !!!
 
-// TODO: Lambdas
+// TODO: Decorators
 
 {
-    val doubler, two := func(int x) 2i * x, 2i;
-    print doubler(two);
-
-    func maker() func() num {
-        val x = 2;
-        return func() x;
+    func timeit(func() void f) func() void {
+        func timed() void {
+            val start := clock();
+            f();
+            val end := clock();
+            print "took " + str(end - start) + "s";
+        }
+        return timed;
     }
-    val user = maker();
-    print user();
+
+    @timeit
+    func do_fac() void {
+        func fac(int n) int {
+            if (n == 0i) {
+                return 1i;
+            }
+            return n * fac(n - 1i);
+        }
+        print fac(12i);
+    }
+
+    do_fac();
 }
 
 // TODO: Structs

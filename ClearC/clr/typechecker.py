@@ -2,7 +2,7 @@
 Module defining an ast visitor to type check.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Union
 
 import clr.errors as er
 import clr.ast as ast
@@ -31,7 +31,7 @@ class TypeChecker(ast.DeepVisitor):
                 )
         else:
             node.type_annot = node.val_init.type_annot
-            if node.type_annot == ts.VOID:
+            if not ts.valid(node.type_annot):
                 self.errors.add(
                     message="cannot declare value as void",
                     regions=[node.val_init.region],
@@ -47,18 +47,16 @@ class TypeChecker(ast.DeepVisitor):
                     regions=[node.region],
                 )
             else:
-                bindings = node.bindings
-                if len(as_tuple.elements) != len(bindings):
+                if len(as_tuple.elements) != len(node.bindings):
                     adjective = (
-                        "few" if len(as_tuple.elements) < len(bindings) else "many"
+                        "few" if len(as_tuple.elements) < len(node.bindings) else "many"
                     )
                     self.errors.add(
                         message=f"too {adjective} bindings to unpack tuple of size {len(as_tuple.elements)}",
                         regions=[node.region],
                     )
-                else:
-                    for subtype, binding in zip(as_tuple.elements, bindings):
-                        binding.type_annot = subtype
+                for subtype, binding in zip(as_tuple.elements, node.bindings):
+                    binding.type_annot = subtype
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         for param in node.params:
@@ -91,14 +89,13 @@ class TypeChecker(ast.DeepVisitor):
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         super().print_stmt(node)
         str_func = ts.BUILTINS["str"].type_annot.get_function()
-        if str_func is None:
-            raise Exception("Expected str builtin to be a function")
-        printable = ts.union((str_func.parameters[0], ts.STR))
-        if node.expr and not ts.contains(node.expr.type_annot, printable):
-            self.errors.add(
-                message=f"unprintable type {node.expr.type_annot}",
-                regions=[node.region],
-            )
+        if str_func is not None:  # Should be true
+            printable = ts.union((str_func.parameters[0], ts.STR))
+            if node.expr and not ts.contains(node.expr.type_annot, printable):
+                self.errors.add(
+                    message=f"unprintable type {node.expr.type_annot}",
+                    regions=[node.region],
+                )
 
     def _check_cond(self, cond: ast.AstExpr) -> None:
         if cond.type_annot != ts.BOOL:
@@ -157,112 +154,87 @@ class TypeChecker(ast.DeepVisitor):
                 severity=er.Severity.WARNING,
             )
 
-    def unary_expr(self, node: ast.AstUnaryExpr) -> None:
-        super().unary_expr(node)
-        operator = str(node.operator)
-        if operator in ts.TYPED_UNARY:
-            for overload, opcodes in ts.TYPED_UNARY[operator].overloads.items():
-                if overload.parameters == [node.target.type_annot]:
-                    node.type_annot = overload.return_type
-                    node.opcodes = opcodes
-                    break
+    def _operator(
+        self,
+        args: List[ts.Type],
+        operator: str,
+        node: Union[ast.AstUnaryExpr, ast.AstBinaryExpr],
+    ) -> None:
+        if operator in ts.TYPED_OPERATORS:
+            for overload, opcodes in ts.TYPED_OPERATORS[operator].overloads.items():
+                node.type_annot = overload.return_type
+                node.opcodes = opcodes
+                break
             else:
+                types = ", ".join(str(arg) for arg in args)
                 self.errors.add(
-                    message=f"invalid operand type "
-                    f"{node.target.type_annot} "
-                    f"for unary operator {node.operator}",
+                    message=f"invalid operand types {types} for operator {operator}",
                     regions=[node.region],
                 )
-        elif operator in ts.UNTYPED_UNARY:
-            node.type_annot = ts.UNTYPED_UNARY[operator].return_type
-            node.opcodes = ts.UNTYPED_UNARY[operator].opcodes
+        elif operator in ts.UNTYPED_OPERATORS:
+            node.type_annot = ts.UNTYPED_OPERATORS[operator].return_type
+            node.opcodes = ts.UNTYPED_OPERATORS[operator].opcodes
         else:
             self.errors.add(
-                message=f"unknown unary operator {node.operator}",
-                regions=[node.operator.lexeme],
+                message=f"unknown operator {operator}", regions=[node.operator.lexeme]
             )
+
+    def unary_expr(self, node: ast.AstUnaryExpr) -> None:
+        super().unary_expr(node)
+        self._operator([node.target.type_annot], str(node.operator), node)
 
     def binary_expr(self, node: ast.AstBinaryExpr) -> None:
         super().binary_expr(node)
-        operator = str(node.operator)
-        if operator in ts.TYPED_BINARY:
-            for overload, opcodes in ts.TYPED_BINARY[operator].overloads.items():
-                if overload.parameters == [node.left.type_annot, node.right.type_annot]:
-                    node.type_annot = overload.return_type
-                    node.opcodes = opcodes
-                    break
-            else:
-                self.errors.add(
-                    message=f"invalid operand types "
-                    f"{node.left.type_annot}, {node.right.type_annot} "
-                    f"for binary operator {node.operator}",
-                    regions=[node.region],
-                )
-        elif operator in ts.UNTYPED_BINARY:
-            node.type_annot = ts.UNTYPED_BINARY[operator].return_type
-            node.opcodes = ts.UNTYPED_BINARY[operator].opcodes
-        else:
-            self.errors.add(
-                message=f"unknown binary operator {node.operator}",
-                regions=[node.operator.lexeme],
-            )
+        self._operator(
+            [node.left.type_annot, node.right.type_annot], str(node.operator), node
+        )
 
     def int_expr(self, node: ast.AstIntExpr) -> None:
-        super().int_expr(node)
         node.type_annot = ts.INT
 
     def num_expr(self, node: ast.AstNumExpr) -> None:
-        super().num_expr(node)
         node.type_annot = ts.NUM
 
     def str_expr(self, node: ast.AstStrExpr) -> None:
-        super().str_expr(node)
         node.type_annot = ts.STR
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        super().ident_expr(node)
         if node.ref:
             node.type_annot = node.ref.type_annot
-        elif node.name in ts.BUILTINS:
+        else:
             node.type_annot = ts.BUILTINS[node.name].type_annot
 
     def bool_expr(self, node: ast.AstBoolExpr) -> None:
-        super().bool_expr(node)
         node.type_annot = ts.BOOL
 
     def nil_expr(self, node: ast.AstNilExpr) -> None:
-        super().nil_expr(node)
         node.type_annot = ts.NIL
 
     def case_expr(self, node: ast.AstCaseExpr) -> None:
         node.target.accept(self)
-        covered: Dict[ts.Type, ast.AstType] = {}
-        result: ts.Type = ts.Type(set())
+        cases: Dict[ts.Type, ast.AstType] = {}
+        output_type = ts.Type(set())
         for case_type, case_value in node.cases:
+            # Check if the case type is valid
             case_type.accept(self)
             if not ts.contains(case_type.type_annot, node.target.type_annot):
                 self.errors.add(
                     message=f"invalid case {case_type.type_annot} for type {node.target.type_annot}",
                     regions=[case_type.region, node.target.region],
                 )
-            duplicates = [
-                covered_annot
-                for covered_annot in covered
-                if ts.contains(case_type.type_annot, covered_annot)
-            ]
-            if duplicates:
+            if case_type.type_annot in cases:
                 self.errors.add(
                     message=f"duplicate case {case_type.type_annot}",
-                    regions=[case_type.region]
-                    + [covered[covered_annot].region for covered_annot in duplicates],
+                    regions=[case_type.region, cases[case_type.type_annot].region],
                 )
-            covered[case_type.type_annot] = case_type
+            cases[case_type.type_annot] = case_type
+            # Get the case value type
             node.binding.type_annot = case_type.type_annot
             case_value.accept(self)
-            result = ts.union((result, case_value.type_annot))
-        covered_type = ts.union(covered.keys())
-        complete = ts.contains(node.target.type_annot, covered_type)
-        diff_type = ts.difference(node.target.type_annot, covered_type)
+            output_type = ts.union((output_type, case_value.type_annot))
+        matched_types = ts.union(cases.keys())
+        complete = ts.contains(node.target.type_annot, matched_types)
+        remaining = ts.difference(node.target.type_annot, matched_types)
         if node.fallback:
             if complete:
                 self.errors.add(
@@ -270,15 +242,15 @@ class TypeChecker(ast.DeepVisitor):
                     regions=[node.fallback.region],
                     severity=er.Severity.WARNING,
                 )
-            node.binding.type_annot = diff_type
+            node.binding.type_annot = remaining
             node.fallback.accept(self)
-            result = ts.union((result, node.fallback.type_annot))
+            output_type = ts.union((output_type, node.fallback.type_annot))
         elif not complete:
             self.errors.add(
-                message=f"incomplete case expression, missing case(s) for {diff_type}",
+                message=f"incomplete case expression, missing case(s) for {remaining}",
                 regions=[node.region],
             )
-        node.type_annot = result
+        node.type_annot = output_type
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
         super().call_expr(node)
@@ -300,30 +272,32 @@ class TypeChecker(ast.DeepVisitor):
                     er.SourceView.range(node.args[0].region, node.args[-1].region)
                 ],
             )
-        else:
-            for arg, param in zip(node.args, as_func.parameters):
-                if not ts.contains(arg.type_annot, param):
-                    self.errors.add(
-                        message=f"mismatched type for argument: "
-                        f"expected {param} but got {arg.type_annot}",
-                        regions=[arg.region],
-                    )
+        for arg, param in zip(node.args, as_func.parameters):
+            if not ts.contains(arg.type_annot, param):
+                self.errors.add(
+                    message=f"mismatched type for argument: "
+                    f"expected {param} but got {arg.type_annot}",
+                    regions=[arg.region],
+                )
         node.type_annot = as_func.return_type
 
     def tuple_expr(self, node: ast.AstTupleExpr) -> None:
         super().tuple_expr(node)
         node.type_annot = ts.TupleType.make([elem.type_annot for elem in node.exprs])
 
+    def lambda_expr(self, node: ast.AstLambdaExpr) -> None:
+        super().lambda_expr(node)
+        node.type_annot = ts.FunctionType.make(
+            [param.type_annot for param in node.params], node.value.type_annot
+        )
+
     def ident_type(self, node: ast.AstIdentType) -> None:
-        super().ident_type(node)
         if node.ref:
-            # TODO: User types
             self.errors.add(message=f"invalid type {node.name}", regions=[node.region])
         else:
             node.type_annot = ts.BuiltinType.get(node.name)
 
     def void_type(self, node: ast.AstVoidType) -> None:
-        super().void_type(node)
         node.type_annot = ts.VOID
 
     def func_type(self, node: ast.AstFuncType) -> None:

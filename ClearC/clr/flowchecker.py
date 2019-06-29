@@ -47,12 +47,10 @@ class FlowChecker(ast.DeepVisitor):
             + ([node.else_part] if node.else_part else [])
         )
         if node.else_part is not None and all(
-            map(lambda block: block.return_annot == an.ReturnAnnot.ALWAYS, blocks)
+            block.return_annot == an.ReturnAnnot.ALWAYS for block in blocks
         ):
             node.return_annot = an.ReturnAnnot.ALWAYS
-        elif any(
-            map(lambda block: block.return_annot == an.ReturnAnnot.SOMETIMES, blocks)
-        ):
+        elif any(block.return_annot == an.ReturnAnnot.SOMETIMES for block in blocks):
             node.return_annot = an.ReturnAnnot.SOMETIMES
 
     def while_stmt(self, node: ast.AstWhileStmt) -> None:
