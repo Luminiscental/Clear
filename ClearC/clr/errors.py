@@ -42,12 +42,13 @@ class CompileError(NamedTuple):
     severity: Severity = Severity.ERROR
 
     def __str__(self) -> str:
+        line_number_width = len(str(max(region.endline() for region in self.regions)))
         # Separate regions with an ellipsis, in order of how early they start
         regions = "\n...\n".join(
-            region.display()
+            region.display(line_number_width)
             for region in sorted(self.regions, key=lambda region: region.start)
         )
-        return f"[{self.severity}] {self.message}:\n{regions}"
+        return f"[{self.severity}] {self.message}:\n\n{regions}"
 
 
 class ErrorTracker:
@@ -98,7 +99,13 @@ class SourceView:
     def __str__(self) -> str:
         return self.source[self.start : self.end]
 
-    def display(self) -> str:
+    def endline(self) -> int:
+        """
+        Returns the line number of the last line spanned by this region.
+        """
+        return 1 + self.source[: self.end].count("\n")
+
+    def display(self, line_number_width: int) -> str:
         """
         Display the region as a string with line numbers and underlines.
         """
@@ -121,8 +128,6 @@ class SourceView:
                 if ends:
                     break
             index += len(line)
-        # Find the size of the biggest line number to pad to
-        line_number_width = len(str(max(item[0] for item in lines)))
         # Padding for underlines which don't get numbers
         line_number_padding = " " * line_number_width
         return "\n".join(

@@ -1,8 +1,14 @@
 
 {
+    func b((int, str) input) void {
+        val number, message := input;
+        print message + ":" + str(number);
+    }
+
     func a() void {
         print "a()";
     }
+
     {
         func x() int {
             val b := 3i;
@@ -12,6 +18,7 @@
             }
             return 3i;
         }
+
         print x();
         a();
     }
