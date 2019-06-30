@@ -31,7 +31,7 @@ class TypeChecker(ast.DeepVisitor):
                 )
         else:
             node.type_annot = node.val_init.type_annot
-            if not ts.valid(node.type_annot):
+            if node.type_annot == ts.VOID:
                 self.errors.add(
                     message="cannot declare value as void",
                     regions=[node.val_init.region],
@@ -162,9 +162,10 @@ class TypeChecker(ast.DeepVisitor):
     ) -> None:
         if operator in ts.TYPED_OPERATORS:
             for overload, opcodes in ts.TYPED_OPERATORS[operator].overloads.items():
-                node.type_annot = overload.return_type
-                node.opcodes = opcodes
-                break
+                if overload.parameters == args:
+                    node.type_annot = overload.return_type
+                    node.opcodes = opcodes
+                    break
             else:
                 types = ", ".join(str(arg) for arg in args)
                 self.errors.add(
