@@ -2,7 +2,7 @@
 Definitions for compile errors and tracking/displaying them.
 """
 
-from typing import List, NamedTuple
+from typing import List, NamedTuple, Tuple
 
 import enum
 
@@ -41,12 +41,13 @@ class CompileError(NamedTuple):
     regions: List["SourceView"]
     severity: Severity = Severity.ERROR
 
-    def display(self) -> str:
-        """
-        Returns a string representation of the error.
-        """
-        # TODO: Line number, context, e.t.c.
-        return f"[{self.severity}] {self.message}: {self.regions}"
+    def __str__(self) -> str:
+        # Separate regions with an ellipsis, in order of how early they start
+        regions = "\n...\n".join(
+            region.display()
+            for region in sorted(self.regions, key=lambda region: region.start)
+        )
+        return f"[{self.severity}] {self.message}:\n{regions}"
 
 
 class ErrorTracker:
@@ -95,14 +96,47 @@ class SourceView:
         return f"SourceView[{str(self)}]"
 
     def __str__(self) -> str:
-        return self.source[self.start : self.end + 1]
+        return self.source[self.start : self.end]
+
+    def display(self) -> str:
+        """
+        Display the region as a string with line numbers and underlines.
+        """
+        # List of (line number, line content, underline)
+        lines: List[Tuple[int, str, str]] = []
+        # Index into the source of the start of the current line
+        index = 0
+        for i, line in enumerate(self.source.splitlines(keepends=True)):
+            if self.start < index + len(line):
+                line_number = i + 1
+                # Check if the self starts or ends on this line
+                starts = self.start > index
+                ends = self.end < index + len(line)
+                # Find where in this line the self starts and ends
+                start = self.start - index if starts else 0
+                end = self.end - index if ends else len(line)
+                # Add the information to the list
+                lines.append((line_number, line, " " * start + "~" * (end - start)))
+                # Stop iterating if the error self ended
+                if ends:
+                    break
+            index += len(line)
+        # Find the size of the biggest line number to pad to
+        line_number_width = len(str(max(item[0] for item in lines)))
+        # Padding for underlines which don't get numbers
+        line_number_padding = " " * line_number_width
+        return "\n".join(
+            f"{line_number:{line_number_width}} | {line}"
+            f"{line_number_padding} | {underline}"
+            for line_number, line, underline in lines
+        )
 
     @staticmethod
     def all(source: str) -> "SourceView":
         """
         Given a source string returns a view of the entire string.
         """
-        return SourceView(source=source, start=0, end=len(source) - 1)
+        return SourceView(source=source, start=0, end=len(source))
 
     @staticmethod
     def range(start: "SourceView", end: "SourceView") -> "SourceView":

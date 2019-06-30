@@ -181,9 +181,7 @@ class Lexer:
         if match:
             literal = match.group(0)
             lexeme = er.SourceView(
-                source=self.source,
-                start=self.cursor,
-                end=self.cursor + len(literal) - 1,
+                source=self.source, start=self.cursor, end=self.cursor + len(literal)
             )
             self.tokens.append(Token(kind=kind, lexeme=lexeme))
             self.cursor += len(literal)

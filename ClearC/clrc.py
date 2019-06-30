@@ -54,7 +54,7 @@ def _check_errors(error_name: str, errors: Iterable[er.CompileError]) -> None:
         print(f"{error_name} {kind}:")
         print("--------")
         for error in errors:
-            print(error.display())
+            print(error)
         print("--------")
 
     if any(error.severity == er.Severity.ERROR for error in errors):
