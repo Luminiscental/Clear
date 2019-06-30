@@ -279,9 +279,6 @@ class DeepVisitor(AstVisitor):
             subtype.accept(self)
 
 
-AstScope = Union["AstBlockStmt", "Ast", "AstCaseExpr", "AstLambdaExpr"]
-
-
 class ScopeVisitor(DeepVisitor):
     """
     Ast visitor base class to keep track of the current scope.
@@ -289,12 +286,12 @@ class ScopeVisitor(DeepVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self._scopes: List[AstScope] = []
+        self._scopes: List["AstScope"] = []
 
-    def _get_scope(self) -> AstScope:
+    def _get_scope(self) -> "AstScope":
         return self._scopes[-1]
 
-    def _push_scope(self, node: AstScope) -> None:
+    def _push_scope(self, node: "AstScope") -> None:
         self._scopes.append(node)
 
     def _pop_scope(self) -> None:
@@ -387,21 +384,8 @@ class AstNode:
     Base class for an ast node. All nodes must be able to accept an ast visitor.
     """
 
-    def __init__(self) -> None:
-        # TODO: Move these to only be on nodes that need them
-        # Annotation Defaults:
-        self.type_annot: ts.Type = ts.UNRESOLVED
-        self.return_annot: an.ReturnAnnot = an.ReturnAnnot.NEVER
-        self.index_annot: an.IndexAnnot = an.IndexAnnot(
-            value=-1, kind=an.IndexAnnotType.UNRESOLVED
-        )
-
-        self.names: Dict[str, Union[AstIdentRef]] = {}
-        self.sequence: List[AstDecl] = []
-        self.scope: Optional[AstScope] = None
-        self.upvalues: List[AstIdentRef] = []
-        self.upvalue_indices: List[an.IndexAnnot] = []
-        self.ref: Optional[AstIdentRef] = None
+    def __init__(self, region: er.SourceView) -> None:
+        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         """
@@ -410,27 +394,72 @@ class AstNode:
         raise NotImplementedError
 
 
-class AstType(AstNode):
+class AstTyped(AstNode):
     """
-    Base class for type nodes to help mypy.
+    Base class for nodes with type annotations.
     """
 
     def __init__(self, region: er.SourceView) -> None:
-        super().__init__()
-        self.region = region
+        super().__init__(region)
+        self.type_annot = ts.UNRESOLVED
 
     def accept(self, visitor: AstVisitor) -> None:
         raise NotImplementedError
 
 
-class AstExpr(AstNode):
+class AstIndexed(AstNode):
     """
-    Base class for expression nodes to help mypy.
+    Base class for nodes with index annotations.
     """
 
     def __init__(self, region: er.SourceView) -> None:
-        super().__init__()
-        self.region = region
+        super().__init__(region)
+        self.index_annot = an.IndexAnnot(value=-1, kind=an.IndexAnnotType.UNRESOLVED)
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError
+
+
+class AstType(AstTyped):
+    """
+    Base class for types to help mypy.
+    """
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError
+
+
+class AstExpr(AstTyped):
+    """
+    Base class for expressions to help mypy.
+    """
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError
+
+
+class AstScope(AstNode):
+    """
+    Base class for a node with scope.
+    """
+
+    def __init__(self, region: er.SourceView) -> None:
+        super().__init__(region)
+        self.names: Dict[str, AstIdentRef] = {}
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError
+
+
+class AstDecl(AstNode):
+    """
+    Base class for declarations, annotated with return possibilities and scope.
+    """
+
+    def __init__(self, region: er.SourceView) -> None:
+        super().__init__(region)
+        self.return_annot = an.ReturnAnnot.NEVER
+        self.scope: Optional[AstScope] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         raise NotImplementedError
@@ -444,39 +473,39 @@ AstStmt = Union[
     "AstReturnStmt",
     "AstExprStmt",
 ]
-AstDecl = Union["AstValueDecl", "AstFuncDecl", AstStmt]
 
 # Specific nodes:
 
 
-class Ast(AstNode):
+class Ast(AstScope):
     """
     The root ast node.
     """
 
-    def __init__(self, decls: List[AstDecl]) -> None:
-        super().__init__()
+    def __init__(self, decls: List[AstDecl], region: er.SourceView) -> None:
+        super().__init__(region)
         self.decls = decls
+        # Annotations
+        self.sequence: List[AstDecl] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.start(self)
 
 
-class AstBinding(AstNode):
+class AstBinding(AstTyped, AstIndexed):
     """
     Ast node for a value binding.
     """
 
     def __init__(self, name: str, region: er.SourceView) -> None:
-        super().__init__()
+        super().__init__(region)
         self.name = name
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binding(self)
 
 
-class AstValueDecl(AstNode):
+class AstValueDecl(AstDecl, AstTyped):
     """
     Ast node for a value declaration.
     """
@@ -488,32 +517,30 @@ class AstValueDecl(AstNode):
         val_init: AstExpr,
         region: er.SourceView,
     ):
-        super().__init__()
+        super().__init__(region)
         self.bindings = bindings
         self.val_type = val_type
         self.val_init = val_init
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.value_decl(self)
 
 
-class AstParam(AstNode):
+class AstParam(AstTyped, AstIndexed):
     """
     Ast node for a parameter declaration.
     """
 
     def __init__(self, param_type: AstType, param_name: lx.Token) -> None:
-        super().__init__()
+        super().__init__(er.SourceView.range(param_type.region, param_name.lexeme))
         self.param_type = param_type
         self.param_name = str(param_name)
-        self.region = er.SourceView.range(param_type.region, param_name.lexeme)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.param(self)
 
 
-class AstFuncDecl(AstNode):
+class AstFuncDecl(AstDecl, AstTyped, AstIndexed):
     """
     Ast node for a function declaration.
     """
@@ -526,46 +553,48 @@ class AstFuncDecl(AstNode):
         block: "AstBlockStmt",
         region: er.SourceView,
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.ident = ident
         self.params = params
         self.return_type = return_type
         self.block = block
-        self.region = region
+        # Annotations
+        self.upvalues: List[AstIdentRef] = []
+        self.upvalue_indices: List[an.IndexAnnot] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_decl(self)
 
 
-class AstPrintStmt(AstNode):
+class AstPrintStmt(AstDecl):
     """
     Ast node for a print statement.
     """
 
     def __init__(self, expr: Optional[AstExpr], region: er.SourceView) -> None:
-        super().__init__()
+        super().__init__(region)
         self.expr = expr
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.print_stmt(self)
 
 
-class AstBlockStmt(AstNode):
+class AstBlockStmt(AstDecl, AstScope):
     """
     Ast node for a block statement.
     """
 
     def __init__(self, decls: List[AstDecl], region: er.SourceView) -> None:
-        super().__init__()
+        super().__init__(region)
         self.decls = decls
-        self.region = region
+        # Annotations
+        self.sequence: List[AstDecl] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
 
 
-class AstIfStmt(AstNode):
+class AstIfStmt(AstDecl):
     """
     Ast node for an if statement.
     """
@@ -577,17 +606,16 @@ class AstIfStmt(AstNode):
         else_part: Optional[AstBlockStmt],
         region: er.SourceView,
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.if_part = if_part
         self.elif_parts = elif_parts
         self.else_part = else_part
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.if_stmt(self)
 
 
-class AstWhileStmt(AstNode):
+class AstWhileStmt(AstDecl):
     """
     Ast node for a while statement.
     """
@@ -595,38 +623,35 @@ class AstWhileStmt(AstNode):
     def __init__(
         self, cond: Optional[AstExpr], block: AstBlockStmt, region: er.SourceView
     ) -> None:
-        super().__init__()
+        super().__init__(region)
         self.cond = cond
         self.block = block
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.while_stmt(self)
 
 
-class AstReturnStmt(AstNode):
+class AstReturnStmt(AstDecl):
     """
     Ast node for a return statement.
     """
 
     def __init__(self, expr: Optional[AstExpr], region: er.SourceView) -> None:
-        super().__init__()
+        super().__init__(region)
         self.expr = expr
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.return_stmt(self)
 
 
-class AstExprStmt(AstNode):
+class AstExprStmt(AstDecl):
     """
     Ast node for an expression statement.
     """
 
     def __init__(self, expr: AstExpr, region: er.SourceView) -> None:
-        super().__init__()
+        super().__init__(region)
         self.expr = expr
-        self.region = region
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.expr_stmt(self)
@@ -713,7 +738,7 @@ class AstStrExpr(AstExpr):
 AstIdentRef = Union[AstFuncDecl, AstBinding, AstParam]
 
 
-class AstIdentExpr(AstExpr):
+class AstIdentExpr(AstExpr, AstIndexed):
     """
     Ast node for an identifier expression.
     """
@@ -721,6 +746,8 @@ class AstIdentExpr(AstExpr):
     def __init__(self, token: lx.Token) -> None:
         super().__init__(token.lexeme)
         self.name = str(token)
+        # Annotations
+        self.ref: Optional[AstIdentRef] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
@@ -751,7 +778,7 @@ class AstNilExpr(AstExpr):
         visitor.nil_expr(self)
 
 
-class AstCaseExpr(AstExpr):
+class AstCaseExpr(AstExpr, AstScope):
     """
     Ast node for a case expression.
     """
@@ -803,7 +830,7 @@ class AstTupleExpr(AstExpr):
         visitor.tuple_expr(self)
 
 
-class AstLambdaExpr(AstExpr):
+class AstLambdaExpr(AstExpr, AstScope):
     """
     Ast node for a lambda expression.
     """
@@ -815,6 +842,9 @@ class AstLambdaExpr(AstExpr):
         self.params = params
         self.value = value
         self.region = region
+        # Annotations
+        self.upvalues: List[AstIdentRef] = []
+        self.upvalue_indices: List[an.IndexAnnot] = []
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.lambda_expr(self)
@@ -828,6 +858,8 @@ class AstIdentType(AstType):
     def __init__(self, token: lx.Token) -> None:
         super().__init__(token.lexeme)
         self.name = str(token)
+        # Annotations
+        self.ref: Optional[AstIdentRef] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_type(self)

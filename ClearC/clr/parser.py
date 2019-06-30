@@ -118,7 +118,7 @@ def parse_ast(parser: Parser) -> Result[ast.Ast]:
         if isinstance(decl, er.CompileError):
             return decl
         decls.append(decl)
-    return ast.Ast(decls)
+    return ast.Ast(decls, er.SourceView.range(decls[0].region, decls[-1].region))
 
 
 def parse_token(parser: Parser, kinds: Iterable[lx.TokenType]) -> Optional[lx.Token]:
@@ -564,9 +564,8 @@ def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
             message="expected '(' to begin parameter types",
             regions=[parser.curr_region()],
         )
-    params = finish_tuple(
-        parser, lambda parser: parse_type(parser, Precedence.TUPLE.next())
-    )
+
+    params = finish_tuple(parser, lambda p: parse_type(p, Precedence.TUPLE.next()))
     if isinstance(params, er.CompileError):
         return params
     return_type = parse_type(parser)

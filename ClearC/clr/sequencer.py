@@ -23,7 +23,7 @@ class SequenceBuilder(ast.FunctionVisitor):
         self.completed: List[AstNameDecl] = []
 
     def _decl(self, node: ast.AstDecl) -> None:
-        if node.scope:
+        if node.scope and isinstance(node.scope, (ast.Ast, ast.AstBlockStmt)):
             node.scope.sequence.append(node)
 
     def _start(self, node: AstNameDecl) -> bool:
