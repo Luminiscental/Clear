@@ -188,6 +188,7 @@ class DeepVisitor(AstVisitor):
         self._decl(node)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
+        node.binding.accept(self)
         for param in node.params:
             param.accept(self)
         node.return_type.accept(self)
@@ -303,6 +304,7 @@ class ScopeVisitor(DeepVisitor):
         self._pop_scope()
 
     def func_decl(self, node: "AstFuncDecl") -> None:
+        node.binding.accept(self)
         self._push_scope(node.block)
         for param in node.params:
             param.accept(self)
@@ -359,6 +361,7 @@ class FunctionVisitor(ScopeVisitor):
         self._functions.pop()
 
     def func_decl(self, node: "AstFuncDecl") -> None:
+        node.binding.accept(self)
         self._push_function(node)
         # Don't delegate to super, we want _decl to be called in the right scope
         for param in node.params:
@@ -547,14 +550,14 @@ class AstFuncDecl(AstDecl, AstTyped, AstIndexed):
 
     def __init__(
         self,
-        ident: str,
+        binding: AstBinding,
         params: List[AstParam],
         return_type: AstType,
         block: "AstBlockStmt",
         region: er.SourceView,
     ) -> None:
         super().__init__(region)
-        self.ident = ident
+        self.binding = binding
         self.params = params
         self.return_type = return_type
         self.block = block
@@ -735,7 +738,7 @@ class AstStrExpr(AstExpr):
 
 
 # Type alias for identifier declarations
-AstIdentRef = Union[AstFuncDecl, AstBinding, AstParam]
+AstIdentRef = Union[AstBinding, AstParam]
 
 
 class AstIdentExpr(AstExpr, AstIndexed):

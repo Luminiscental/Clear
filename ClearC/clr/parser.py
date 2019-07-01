@@ -210,11 +210,9 @@ def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
     AstFuncDecl : "func" IDENTIFIER "(" ( AstParam ( "," AstParam )* )? ")" AstType AstBlockStmt ;
     """
     start = parser.prev().lexeme
-    ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
-    if ident is None:
-        return er.CompileError(
-            message="expected function name", regions=[parser.curr_region()]
-        )
+    binding = parse_binding(parser)
+    if isinstance(binding, er.CompileError):
+        return binding
 
     if not parser.match(lx.TokenType.LEFT_PAREN):
         return er.CompileError(
@@ -238,7 +236,7 @@ def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
         return block
 
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstFuncDecl(str(ident), params, return_type, block, region)
+    return ast.AstFuncDecl(binding, params, return_type, block, region)
 
 
 def parse_param(parser: Parser) -> Result[ast.AstParam]:

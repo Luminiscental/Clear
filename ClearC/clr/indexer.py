@@ -24,7 +24,7 @@ class UpvalueTracker(ast.FunctionVisitor):
                 for binding in decl.bindings:
                     self._global_refs.append(binding)
             elif isinstance(decl, ast.AstFuncDecl):
-                self._global_refs.append(decl)
+                self._global_refs.append(decl.binding)
             decl.accept(self)
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
@@ -106,10 +106,6 @@ class IndexBuilder(ast.FunctionVisitor):
     def param(self, node: ast.AstParam) -> None:
         node.index_annot = self._make_index()
         node.index_annot.kind = an.IndexAnnotType.PARAM
-
-    def func_decl(self, node: ast.AstFuncDecl) -> None:
-        super().func_decl(node)
-        node.index_annot = self._make_index()
 
 
 class IndexWriter(ast.FunctionVisitor):

@@ -1,8 +1,8 @@
 
 {
-    val converter := str;
-    val test := 2;
+    func b() void {
+        print "b()";
+    }
 
-    print str(test);
-    print converter(test);
+    val b := 2;
 }

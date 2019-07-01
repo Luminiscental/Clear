@@ -70,7 +70,7 @@ class TypeChecker(ast.DeepVisitor):
                 message=f"invalid return type {node.return_type.type_annot}",
                 regions=[node.return_type.region],
             )
-        node.type_annot = ts.FunctionType.make(
+        node.binding.type_annot = ts.FunctionType.make(
             [param.type_annot for param in node.params], node.return_type.type_annot
         )
         self.expected_returns.append(node.return_type.type_annot)

@@ -61,7 +61,7 @@ class AstPrinter(ast.AstVisitor):
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         self._startline()
-        self._append(f"func {node.ident}(")
+        self._append(f"func {node.binding.name}(")
         if node.params:
             node.params[0].accept(self)
             for param in node.params[1:]:

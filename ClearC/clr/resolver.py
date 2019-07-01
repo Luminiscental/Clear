@@ -28,10 +28,6 @@ class NameTracker(ast.ScopeVisitor):
     def param(self, node: ast.AstParam) -> None:
         self._set_name(node.param_name, node)
 
-    def func_decl(self, node: ast.AstFuncDecl) -> None:
-        self._set_name(node.ident, node)
-        super().func_decl(node)
-
 
 class ScopeTracker(ast.ScopeVisitor):
     """
