@@ -1,6 +1,8 @@
 
 {
-    val a := 0, 1;
+    val converter := str;
+    val test := 2;
 
-    val x, y := a;
+    print str(test);
+    print converter(test);
 }

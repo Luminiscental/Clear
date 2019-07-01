@@ -389,9 +389,7 @@ class CodeGenerator(ast.FunctionVisitor):
         self.program.constant(bc.ClrStr(node.value))
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        # TODO: Make print a builtin not a statement
         # TODO: Cache the function if it's used multiple times
-        # TODO: Elide the function if it gets called straight away
         if node.name in ts.BUILTINS:
             builtin = ts.BUILTINS[node.name]
             as_func = builtin.type_annot.get_function()
@@ -447,21 +445,31 @@ class CodeGenerator(ast.FunctionVisitor):
             self.program.end_jump(jump)
 
     def call_expr(self, node: ast.AstCallExpr) -> None:
-        # Load the function and arguments
-        super().call_expr(node)
-        # Extract the ip from the function beneath the arguments
-        self.program.append_op(bc.Opcode.EXTRACT_FIELD)
-        self.program.append_op(len(node.args))
-        # ip is the first element, but offset by the type tag
-        self.program.append_op(1 + 0)
-        # Call the function
-        self.program.append_op(bc.Opcode.CALL)
-        self.program.append_op(len(node.args) + 1)
-        # Fetch the return value if there is one
-        as_func = node.function.type_annot.get_function()
-        if as_func is not None:  # Should be true
-            if as_func.return_type != ts.VOID:
-                self.program.append_op(bc.Opcode.PUSH_RETURN)
+        if (
+            isinstance(node.function, ast.AstIdentExpr)
+            and node.function.name in ts.BUILTINS
+        ):
+            # If it's a direct built-in call don't bother loading the builtin as a function object
+            builtin = ts.BUILTINS[node.function.name]
+            for arg in node.args:
+                arg.accept(self)
+            self.program.append_op(builtin.opcode)
+        else:
+            # Load the function and arguments
+            super().call_expr(node)
+            # Extract the ip from the function beneath the arguments
+            self.program.append_op(bc.Opcode.EXTRACT_FIELD)
+            self.program.append_op(len(node.args))
+            # ip is the first element, but offset by the type tag
+            self.program.append_op(1 + 0)
+            # Call the function
+            self.program.append_op(bc.Opcode.CALL)
+            self.program.append_op(len(node.args) + 1)
+            # Fetch the return value if there is one
+            as_func = node.function.type_annot.get_function()
+            if as_func is not None:  # Should be true
+                if as_func.return_type != ts.VOID:
+                    self.program.append_op(bc.Opcode.PUSH_RETURN)
 
     def tuple_expr(self, node: ast.AstTupleExpr) -> None:
         # Make a struct from all the elements
