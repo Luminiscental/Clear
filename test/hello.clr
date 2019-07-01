@@ -1,26 +1,6 @@
 
 {
-    func b((int, str) input) void {
-        val number, message := input;
-        print message + ":" + str(number);
-    }
+    val a := 0, 1;
 
-    func a() void {
-        print "a()";
-    }
-
-    {
-        func x() int {
-            val b := 3i;
-            {
-                val a := 7i;
-                return b;
-            }
-            return 3i;
-        }
-
-        print x();
-        a();
-    }
-    val b := 3;
+    val x, y := a;
 }

@@ -207,14 +207,15 @@ class Opcode(enum.Enum):
     SET_RETURN = 40
     PUSH_RETURN = 41
     STRUCT = 42
-    GET_FIELD = 43
-    EXTRACT_FIELD = 44
-    SET_FIELD = 45
-    REF_LOCAL = 46
-    DEREF = 47
-    SET_REF = 48
-    IS_VAL_TYPE = 49
-    IS_OBJ_TYPE = 50
+    DESTRUCT = 43
+    GET_FIELD = 44
+    EXTRACT_FIELD = 45
+    SET_FIELD = 46
+    REF_LOCAL = 47
+    DEREF = 48
+    SET_REF = 49
+    IS_VAL_TYPE = 50
+    IS_OBJ_TYPE = 51
 
     def __str__(self) -> str:
         return "OP_" + self.name

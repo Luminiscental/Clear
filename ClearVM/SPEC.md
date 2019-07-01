@@ -550,15 +550,15 @@ __Opcodes__
 
 - 0x25 (`OP_CALL`)
 
-    _Parameters_: `args` (unsigned byte)
+    _Parameters_: `argCount` (unsigned byte)
 
-    _Initial Stack_: `..., arg0, arg1, ..., argn, ip`
+    _Initial Stack_: `..., arg(0), arg(1), ..., arg(argCount - 1), ip`
 
-    _Final Stack_: `..., ip, fp, arg0, arg1, ..., argn`
+    _Final Stack_: `..., ip, fp, arg(0), arg(1), ..., arg(argCount - 1)`
 
     Given a number of arguments, pops an IP followed by that many values off the stack, then pushes
-    the current IP and FP followed by the arguments and loads the popped IP. If the top value is
-    not an IP value this emits an error.
+    the current IP and FP followed by the arguments and loads the popped IP. The FP is then set to
+    point at the first argument. If the top value is not an IP value this emits an error.
 
 - 0x26 (`OP_LOAD_IP`)
 
@@ -604,37 +604,48 @@ __Opcodes__
 
 - 0x2a (`OP_STRUCT`)
 
-    _Parameters_: `fields` (unsigned byte)
+    _Parameters_: `fieldCount` (unsigned byte)
 
-    _Initial Stack_: `..., arg0, arg1, ..., argn`
+    _Initial Stack_: `..., arg(0), arg(1), ..., arg(fieldCount - 1)`
 
     _Final Stack_: `..., struct`
 
     Pops the given number of field values off the stack and pushes a struct of them.
 
-- 0x2b (`OP_GET_FIELD`)
+- 0x2b (`OP_DESTRUCT`)
+
+    _Parameters_: `dropCount` (unsigned byte)
+
+    _Initial Stack_: `..., struct`
+
+    _Final Stack_: `..., field(dropCount), field(dropCount + 1), ..., field(n)`
+
+    Pops a struct value off the stack and pushes its fields, skipping the first `dropCount` fields.
+    If the popped value isn't a struct this emits an error.
+
+- 0x2c (`OP_GET_FIELD`)
 
     _Parameters_: `index` (unsigned byte)
 
     _Initial Stack_: `..., struct`
 
-    _Final Stack_: `..., field`
+    _Final Stack_: `..., field(index)`
 
     Pops a struct value off the stack and pushes its field at the given index. If the popped value
     isn't a struct or the index is too large this emits an error.
 
-- 0x2c (`OP_EXTRACT_FIELD`)
+- 0x2d (`OP_EXTRACT_FIELD`)
 
     _Parameters_: `offset` (unsigned byte), `index` (unsigned byte)
 
     _Initial Stack_: `..., struct, ...`
 
-    _Final Stack_: `..., struct, ..., field`
+    _Final Stack_: `..., struct, ..., field(index)`
 
     Peeks down the stack by the given offset and pushes the field of the peeked struct value at the
     given index. If the peeked value is not a struct or the index is too large this emits an error.
 
-- 0x2d (`OP_SET_FIELD`)
+- 0x2e (`OP_SET_FIELD`)
 
     _Parameters_: `index` (unsigned byte)
 
@@ -645,7 +656,7 @@ __Opcodes__
     Pops a value off the stack and sets the field at the given index of the struct below to it. If
     the value below isn't a struct or the index is too large this emits an error.
 
-- 0x2e (`OP_REF_LOCAL`)
+- 0x2f (`OP_REF_LOCAL`)
 
     _Parameters_: `index` (unsigned byte)
 
@@ -656,7 +667,7 @@ __Opcodes__
     Pushes an upvalue referencing the local at the given index (i.e. the value on the stack offset
     from the FP by the index). If the index is above the top of the stack this emits an error.
 
-- 0x2f (`OP_DEREF`)
+- 0x30 (`OP_DEREF`)
 
     _Parameters_: none
 
@@ -666,7 +677,7 @@ __Opcodes__
 
     Pops an upvalue and pushes its referenced value.
 
-- 0x30 (`OP_SET_REF`)
+- 0x31 (`OP_SET_REF`)
 
     _Parameters_: none
 
@@ -676,7 +687,7 @@ __Opcodes__
 
     Pops a value then an upvalue and sets the upvalues reference to the popped value.
 
-- 0x31 (`OP_IS_VAL_TYPE`)
+- 0x32 (`OP_IS_VAL_TYPE`)
 
     _Parameters_: `type`
 
@@ -687,7 +698,7 @@ __Opcodes__
     Peeks at the top of the stack and pushes a boolean for whether its type is equal to the
     argument.
 
-- 0x32 (`OP_IS_OBJ_TYPE`)
+- 0x33 (`OP_IS_OBJ_TYPE`)
 
     _Parameters_: `type`
 

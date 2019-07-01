@@ -74,20 +74,21 @@ typedef enum {
 
     // Structs
     OP_STRUCT = 42,
-    OP_GET_FIELD = 43,
-    OP_EXTRACT_FIELD = 44,
-    OP_SET_FIELD = 45,
+    OP_DESTRUCT = 43,
+    OP_GET_FIELD = 44,
+    OP_EXTRACT_FIELD = 45,
+    OP_SET_FIELD = 46,
 
     // Upvalues
-    OP_REF_LOCAL = 46,
-    OP_DEREF = 47,
-    OP_SET_REF = 48,
+    OP_REF_LOCAL = 47,
+    OP_DEREF = 48,
+    OP_SET_REF = 49,
 
     // Types
-    OP_IS_VAL_TYPE = 49,
-    OP_IS_OBJ_TYPE = 50,
+    OP_IS_VAL_TYPE = 50,
+    OP_IS_OBJ_TYPE = 51,
 
-    OP_COUNT = 51
+    OP_COUNT = 52
 
 } OpCode;
 

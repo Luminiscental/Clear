@@ -289,15 +289,11 @@ class CodeGenerator(ast.FunctionVisitor):
         if len(node.bindings) == 1:
             self.program.declare(node.bindings[0].index_annot)
         else:
-            # TODO: Add an opcode so we don't have to abuse the return store here
-            # Put the value in the return store
-            self.program.append_op(bc.Opcode.SET_RETURN)
-            for i, binding in enumerate(node.bindings):
-                # For each binding load the value and get the corresponding element out of it
-                self.program.append_op(bc.Opcode.PUSH_RETURN)
-                self.program.append_op(bc.Opcode.GET_FIELD)
-                # Index offset by the type tag
-                self.program.append_op(1 + i)
+            self.program.append_op(bc.Opcode.DESTRUCT)
+            # Skip the type tag
+            self.program.append_op(1)
+            # Declare all the bindings
+            for binding in reversed(node.bindings):
                 self.program.declare(binding.index_annot)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:

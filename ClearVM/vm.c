@@ -721,6 +721,30 @@ static Result op_struct(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_destruct(VM *vm) {
+
+    TRACE(printf("op_destruct\n");)
+
+    READ(dropCount)
+
+    POP(structValue)
+
+    if (structValue.type != VAL_OBJ || structValue.as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Popped value isn't a struct\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
+
+    for (size_t i = dropCount; i < structObj->fieldCount; i++) {
+
+        PUSH(structObj->fields[i])
+    }
+
+    return RESULT_OK;
+}
+
 static Result op_getField(VM *vm) {
 
     TRACE(printf("op_getField\n");)
@@ -975,6 +999,7 @@ Result initVM(VM *vm) {
     INSTR(OP_PUSH_RETURN, op_pushReturn);
 
     INSTR(OP_STRUCT, op_struct);
+    INSTR(OP_DESTRUCT, op_destruct);
     INSTR(OP_GET_FIELD, op_getField);
     INSTR(OP_EXTRACT_FIELD, op_extractField);
     INSTR(OP_SET_FIELD, op_setField);

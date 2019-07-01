@@ -125,6 +125,7 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         SIMPLE(OP_PUSH_RETURN)
 
         U8(OP_STRUCT)
+        U8(OP_DESTRUCT)
         U8(OP_GET_FIELD)
 
         case OP_EXTRACT_FIELD: {

@@ -50,7 +50,9 @@ class AstPrinter(ast.AstVisitor):
         if node.val_type:
             self._append(" : ")
             node.val_type.accept(self)
-        self._append(" = ")
+            self._append(" = ")
+        else:
+            self._append(" := ")
         node.val_init.accept(self)
         self._append(";")
 
