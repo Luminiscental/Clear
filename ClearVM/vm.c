@@ -125,16 +125,56 @@ static Result errorInstruction(VM *vm) {
     return RESULT_ERR;
 }
 
-// TODO: Make this consistent with disassembly
+static void traceOpcode(VM *vm, const char *name, bool endLine) {
+
 #ifdef DEBUG_TRACE
-#define TRACE(x) x
+
+    size_t offset = vm->ip - vm->start;
+    printf("%04zu %-18s", offset, name);
+
+    if (endLine) {
+
+        printf("\n");
+
+    } else {
+
+        printf(" ");
+    }
+
 #else
-#define TRACE(x)
+
+    UNUSED(vm);
+    UNUSED(name);
+    UNUSED(endLine);
+
 #endif
+}
+
+static void traceU8(uint8_t value, bool endLine) {
+
+#ifdef DEBUG_TRACE
+
+    printf("%d", value);
+
+    if (endLine) {
+
+        printf("\n");
+
+    } else {
+
+        printf(" ");
+    }
+
+#else
+
+    UNUSED(value);
+
+#endif
+}
 
 #define UNARY_OP(name, op)                                                     \
     static Result op_##name(VM *vm) {                                          \
-        TRACE(printf("op_" #name "\n");)                                       \
+        traceOpcode(vm, "OP_" #name, true);                                    \
         PEEK(value, 0)                                                         \
         Value a = *value;                                                      \
         *value = op;                                                           \
@@ -143,7 +183,7 @@ static Result errorInstruction(VM *vm) {
 
 #define BINARY_OP(name, op)                                                    \
     static Result op_##name(VM *vm) {                                          \
-        TRACE(printf("op_" #name "\n");)                                       \
+        traceOpcode(vm, "OP_" #name, true);                                    \
         POP(second)                                                            \
         PEEK(first, 0)                                                         \
         Value a = *first;                                                      \
@@ -154,9 +194,10 @@ static Result errorInstruction(VM *vm) {
 
 static Result op_pushConst(VM *vm) {
 
-    TRACE(printf("op_pushConst\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_PUSH_CONST", false);
+    traceU8(index, true);
 
     if (index >= vm->constantCount) {
 
@@ -171,7 +212,7 @@ static Result op_pushConst(VM *vm) {
 
 static Result op_pushTrue(VM *vm) {
 
-    TRACE(printf("op_pushTrue\n");)
+    traceOpcode(vm, "OP_PUSH_TRUE", true);
 
     PUSH(makeBool(true))
 
@@ -180,7 +221,7 @@ static Result op_pushTrue(VM *vm) {
 
 static Result op_pushFalse(VM *vm) {
 
-    TRACE(printf("op_pushFalse\n");)
+    traceOpcode(vm, "OP_PUSH_FALSE", true);
 
     PUSH(makeBool(false))
 
@@ -189,7 +230,7 @@ static Result op_pushFalse(VM *vm) {
 
 static Result op_pushNil(VM *vm) {
 
-    TRACE(printf("op_pushNil\n");)
+    traceOpcode(vm, "OP_PUSH_NIL", true);
 
     PUSH(makeNil());
 
@@ -198,9 +239,10 @@ static Result op_pushNil(VM *vm) {
 
 static Result op_setGlobal(VM *vm) {
 
-    TRACE(printf("op_setGlobal\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_SET_GLOBAL", false);
+    traceU8(index, true);
 
     POP(value)
 
@@ -215,9 +257,10 @@ static Result op_setGlobal(VM *vm) {
 
 static Result op_pushGlobal(VM *vm) {
 
-    TRACE(printf("op_pushGlobal\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_PUSH_GLOBAL", false);
+    traceU8(index, true);
 
     Value global;
     if (getGlobal(&vm->globals, index, &global) != RESULT_OK) {
@@ -233,9 +276,10 @@ static Result op_pushGlobal(VM *vm) {
 
 static Result op_setLocal(VM *vm) {
 
-    TRACE(printf("op_setLocal\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_SET_LOCAL", false);
+    traceU8(index, true);
 
     POP(value)
 
@@ -251,11 +295,12 @@ static Result op_setLocal(VM *vm) {
     return RESULT_OK;
 }
 
-static Result op_getLocal(VM *vm) {
-
-    TRACE(printf("op_getLocal\n");)
+static Result op_pushLocal(VM *vm) {
 
     READ(index)
+
+    traceOpcode(vm, "OP_PUSH_LOCAL", false);
+    traceU8(index, true);
 
     if (index >= vm->sp - vm->fp) {
 
@@ -270,7 +315,7 @@ static Result op_getLocal(VM *vm) {
 
 static Result op_int(VM *vm) {
 
-    TRACE(printf("op_int\n");)
+    traceOpcode(vm, "OP_INT", true);
 
     PEEK(value, 0)
 
@@ -319,7 +364,7 @@ static Result op_int(VM *vm) {
 
 static Result op_bool(VM *vm) {
 
-    TRACE(printf("op_bool\n");)
+    traceOpcode(vm, "OP_BOOL", true);
 
     PEEK(value, 0)
 
@@ -377,7 +422,7 @@ static Result op_bool(VM *vm) {
 
 static Result op_num(VM *vm) {
 
-    TRACE(printf("op_num\n");)
+    traceOpcode(vm, "OP_NUM", true);
 
     PEEK(value, 0)
 
@@ -426,7 +471,7 @@ static Result op_num(VM *vm) {
 
 static Result op_str(VM *vm) {
 
-    TRACE(printf("op_str\n");)
+    traceOpcode(vm, "OP_STR", true);
 
     PEEK(value, 0)
 
@@ -435,7 +480,7 @@ static Result op_str(VM *vm) {
 
 static Result op_clock(VM *vm) {
 
-    TRACE(printf("op_clock\n");)
+    traceOpcode(vm, "OP_CLOCK", true);
 
     PUSH(makeNum((double)clock() / CLOCKS_PER_SEC))
 
@@ -444,7 +489,7 @@ static Result op_clock(VM *vm) {
 
 static Result op_print(VM *vm) {
 
-    TRACE(printf("op_print\n");)
+    traceOpcode(vm, "OP_PRINT", true);
 
     POP(str)
 
@@ -462,7 +507,7 @@ static Result op_print(VM *vm) {
 
 static Result op_pop(VM *vm) {
 
-    TRACE(printf("op_pop\n");)
+    traceOpcode(vm, "OP_POP", true);
 
     POP(value)
 
@@ -477,7 +522,7 @@ static Result op_pop(VM *vm) {
 
 static Result op_squash(VM *vm) {
 
-    TRACE(printf("op_squash\n");)
+    traceOpcode(vm, "OP_SQUASH", true);
 
     POP(value)
 
@@ -505,7 +550,7 @@ BINARY_OP(numDiv, makeNum(a.as.f64 / b.as.f64))
 
 static Result op_strCat(VM *vm) {
 
-    TRACE(printf("op_strCat\n");)
+    traceOpcode(vm, "OP_STR_CAT", true);
 
     POP(b)
 
@@ -541,9 +586,10 @@ BINARY_OP(equal, makeBool(valuesEqual(a, b)))
 
 static Result op_jump(VM *vm) {
 
-    TRACE(printf("op_jump\n");)
-
     READ(offset)
+
+    traceOpcode(vm, "OP_JUMP", false);
+    traceU8(offset, true);
 
     vm->ip += offset;
     if (vm->ip > vm->end) {
@@ -557,9 +603,11 @@ static Result op_jump(VM *vm) {
 
 static Result op_jumpIfFalse(VM *vm) {
 
-    TRACE(printf("op_jumpIfFalse\n");)
-
     READ(offset)
+
+    traceOpcode(vm, "OP_JUMP_IF_FALSE", false);
+    traceU8(offset, true);
+
     POP(cond)
 
     if (!cond.as.b) {
@@ -577,9 +625,10 @@ static Result op_jumpIfFalse(VM *vm) {
 
 static Result op_loop(VM *vm) {
 
-    TRACE(printf("op_loop\n");)
-
     READ(offset)
+
+    traceOpcode(vm, "OP_LOOP", false);
+    traceU8(offset, true);
 
     vm->ip -= offset;
     if (vm->ip < vm->start) {
@@ -593,9 +642,10 @@ static Result op_loop(VM *vm) {
 
 static Result op_function(VM *vm) {
 
-    TRACE(printf("op_function\n");)
-
     READ(offset)
+
+    traceOpcode(vm, "OP_FUNCTION", false);
+    traceU8(offset, true);
 
     uint8_t *ip = vm->ip;
     PUSH(makeIP(ip))
@@ -606,9 +656,10 @@ static Result op_function(VM *vm) {
 
 static Result op_call(VM *vm) {
 
-    TRACE(printf("op_call\n");)
-
     READ(paramCount)
+
+    traceOpcode(vm, "OP_CALL", false);
+    traceU8(paramCount, true);
 
     POP(function)
 
@@ -673,7 +724,7 @@ static Result op_call(VM *vm) {
 
 static Result op_loadIp(VM *vm) {
 
-    TRACE(printf("op_load_ip\n");)
+    traceOpcode(vm, "OP_LOAD_IP", true);
 
     POP(ipValue)
 
@@ -690,7 +741,7 @@ static Result op_loadIp(VM *vm) {
 
 static Result op_loadFp(VM *vm) {
 
-    TRACE(printf("op_load_fp\n");)
+    traceOpcode(vm, "OP_LOAD_FP", true);
 
     POP(fpValue)
 
@@ -707,7 +758,7 @@ static Result op_loadFp(VM *vm) {
 
 static Result op_setReturn(VM *vm) {
 
-    TRACE(printf("op_setReturn\n");)
+    traceOpcode(vm, "OP_SET_RETURN", true);
 
     POP(returnValue)
     vm->returnStore = returnValue;
@@ -717,7 +768,7 @@ static Result op_setReturn(VM *vm) {
 
 static Result op_pushReturn(VM *vm) {
 
-    TRACE(printf("op_pushReturn\n");)
+    traceOpcode(vm, "OP_PUSH_RETURN", true);
 
     PUSH(vm->returnStore)
 
@@ -726,9 +777,10 @@ static Result op_pushReturn(VM *vm) {
 
 static Result op_struct(VM *vm) {
 
-    TRACE(printf("op_struct\n");)
-
     READ(fieldCount)
+
+    traceOpcode(vm, "OP_STRUCT", false);
+    traceU8(fieldCount, true);
 
     Value result = makeStruct(vm, fieldCount);
     StructObject *structObj = (StructObject *)result.as.obj->ptr;
@@ -742,9 +794,10 @@ static Result op_struct(VM *vm) {
 
 static Result op_destruct(VM *vm) {
 
-    TRACE(printf("op_destruct\n");)
-
     READ(dropCount)
+
+    traceOpcode(vm, "OP_DESTRUCT", false);
+    traceU8(dropCount, true);
 
     POP(structValue)
 
@@ -763,9 +816,10 @@ static Result op_destruct(VM *vm) {
 
 static Result op_getField(VM *vm) {
 
-    TRACE(printf("op_getField\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_GET_FIELD", false);
+    traceU8(index, true);
 
     POP(structValue)
 
@@ -790,10 +844,12 @@ static Result op_getField(VM *vm) {
 
 static Result op_extractField(VM *vm) {
 
-    TRACE(printf("op_extractField\n");)
-
     READ(offset)
     READ(index)
+
+    traceOpcode(vm, "OP_EXTRACT_FIELD", false);
+    traceU8(offset, false);
+    traceU8(index, true);
 
     PEEK(structValue, offset)
 
@@ -819,9 +875,10 @@ static Result op_extractField(VM *vm) {
 
 static Result op_setField(VM *vm) {
 
-    TRACE(printf("op_setField\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_SET_FIELD", false);
+    traceU8(index, true);
 
     POP(field)
 
@@ -849,9 +906,10 @@ static Result op_setField(VM *vm) {
 
 static Result op_refLocal(VM *vm) {
 
-    TRACE(printf("op_refLocal\n");)
-
     READ(index)
+
+    traceOpcode(vm, "OP_REF_LOCAL", false);
+    traceU8(index, true);
 
     if (index >= vm->sp - vm->fp) {
 
@@ -868,7 +926,7 @@ static Result op_refLocal(VM *vm) {
 
 static Result op_deref(VM *vm) {
 
-    TRACE(printf("op_deref\n");)
+    traceOpcode(vm, "OP_DEREF", true);
 
     PEEK(upvalue, 0)
 
@@ -886,7 +944,7 @@ static Result op_deref(VM *vm) {
 
 static Result op_setRef(VM *vm) {
 
-    TRACE(printf("op_setRef\n");)
+    traceOpcode(vm, "OP_SET_REF", true);
 
     POP(value)
     POP(upvalue)
@@ -905,9 +963,10 @@ static Result op_setRef(VM *vm) {
 
 static Result op_isValType(VM *vm) {
 
-    TRACE(printf("op_isValType\n");)
-
     READ(val_type)
+
+    traceOpcode(vm, "OP_IS_VAL_TYPE", false);
+    traceU8(val_type, true);
 
     PEEK(value, 0)
 
@@ -918,9 +977,10 @@ static Result op_isValType(VM *vm) {
 
 static Result op_isObjType(VM *vm) {
 
-    TRACE(printf("op_isObjType\n");)
-
     READ(obj_type)
+
+    traceOpcode(vm, "OP_IS_OBJ_TYPE", false);
+    traceU8(obj_type, true);
 
     PEEK(value, 0)
 
@@ -974,7 +1034,7 @@ Result initVM(VM *vm) {
     INSTR(OP_SET_GLOBAL, op_setGlobal);
     INSTR(OP_PUSH_GLOBAL, op_pushGlobal);
     INSTR(OP_SET_LOCAL, op_setLocal);
-    INSTR(OP_PUSH_LOCAL, op_getLocal);
+    INSTR(OP_PUSH_LOCAL, op_pushLocal);
 
     INSTR(OP_INT, op_int);
     INSTR(OP_BOOL, op_bool);
@@ -1147,7 +1207,7 @@ static Result runVM(VM *vm) {
 
 #ifdef DEBUG_STACK
 
-        printf("\t\t\t");
+        printf("\n    ");
         for (Value *value = vm->stack; value < vm->sp; value++) {
 
             if (value == vm->fp) {
@@ -1159,7 +1219,7 @@ static Result runVM(VM *vm) {
             printValue(*value);
             printf("] ");
         }
-        printf("\n");
+        printf("\n\n");
 
 #endif
     }
