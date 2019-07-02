@@ -1,8 +1,7 @@
 
 {
-    func b() void {
-        print "b()";
-    }
+    val a := 1, func(num x) x * x;
+    val _, square := a;
 
-    val b := 2;
+    print square(16);
 }

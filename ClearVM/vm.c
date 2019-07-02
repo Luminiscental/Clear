@@ -73,14 +73,34 @@ static Result readU8(VM *vm, uint8_t *out) {
     }                                                                          \
     Value name = *--vm->sp;
 
+#define POPN(arr, n)                                                           \
+    if (vm->sp - vm->stack <= (n)-1) {                                         \
+                                                                               \
+        printf("|| Stack underflow\n");                                        \
+        return RESULT_ERR;                                                     \
+    }                                                                          \
+    vm->sp -= (n);                                                             \
+    if (arr) {                                                                 \
+                                                                               \
+        memcpy((arr), vm->sp, (n) * sizeof(Value));                            \
+    }
+
 #define PUSH(name)                                                             \
     if (vm->sp - vm->stack == STACK_MAX) {                                     \
                                                                                \
         printf("|| Stack overflow\n");                                         \
         return RESULT_ERR;                                                     \
-    } else {                                                                   \
-        *vm->sp++ = name;                                                      \
-    }
+    }                                                                          \
+    *vm->sp++ = name;
+
+#define PUSHN(arr, n)                                                          \
+    if (vm->sp - vm->stack >= (long)(STACK_MAX + (n)-1)) {                     \
+                                                                               \
+        printf("|| Stack overflow\n");                                         \
+        return RESULT_ERR;                                                     \
+    }                                                                          \
+    memcpy(vm->sp, (arr), (n) * sizeof(Value));                                \
+    vm->sp += n;
 
 #define PEEK(name, offset)                                                     \
     if (vm->sp - vm->stack <= offset) {                                        \
@@ -600,14 +620,18 @@ static Result op_call(VM *vm) {
 
     Value *params = ALLOCATE_ARRAY(Value, paramCount);
 
-#define POP_(name)                                                             \
-    if (vm->sp - vm->stack == 0) {                                             \
+#define POPN_(arr, n)                                                          \
+    if (vm->sp - vm->stack <= (n)-1) {                                         \
                                                                                \
         printf("|| Stack underflow\n");                                        \
         FREE_ARRAY(Value, params, paramCount);                                 \
         return RESULT_ERR;                                                     \
     }                                                                          \
-    Value name = *--vm->sp;
+    vm->sp -= (n);                                                             \
+    if (arr) {                                                                 \
+                                                                               \
+        memcpy((arr), vm->sp, (n) * sizeof(Value));                            \
+    }
 
 #define PUSH_(name)                                                            \
     if (vm->sp - vm->stack == STACK_MAX) {                                     \
@@ -615,18 +639,20 @@ static Result op_call(VM *vm) {
         printf("|| Stack overflow\n");                                         \
         FREE_ARRAY(Value, params, paramCount);                                 \
         return RESULT_ERR;                                                     \
-    } else {                                                                   \
-        *vm->sp++ = name;                                                      \
-    }
+    }                                                                          \
+    *vm->sp++ = name;
 
-    // TODO: POPN and PUSHN
+#define PUSHN_(arr, n)                                                         \
+    if (vm->sp - vm->stack >= (long)(STACK_MAX + (n)-1)) {                     \
+                                                                               \
+        printf("|| Stack overflow\n");                                         \
+        FREE_ARRAY(Value, params, paramCount);                                 \
+        return RESULT_ERR;                                                     \
+    }                                                                          \
+    memcpy(vm->sp, (arr), (n) * sizeof(Value));                                \
+    vm->sp += n;
 
-    for (int i = paramCount - 1; i >= 0; i--) {
-
-        POP_(param)
-
-        params[i] = param;
-    }
+    POPN_(params, paramCount)
 
     PUSH_(makeIP(vm->ip))
     PUSH_(makeFP(vm->fp))
@@ -634,13 +660,11 @@ static Result op_call(VM *vm) {
     vm->fp = vm->sp;
     vm->ip = function.as.ptr;
 
-    for (size_t i = 0; i < paramCount; i++) {
+    PUSHN_(params, paramCount)
 
-        PUSH_(params[i])
-    }
-
+#undef PUSHN_
 #undef PUSH_
-#undef POP_
+#undef POPN_
 
     FREE_ARRAY(Value, params, paramCount);
 
@@ -709,12 +733,7 @@ static Result op_struct(VM *vm) {
     Value result = makeStruct(vm, fieldCount);
     StructObject *structObj = (StructObject *)result.as.obj->ptr;
 
-    for (int i = fieldCount - 1; i >= 0; i--) {
-
-        POP(field)
-
-        structObj->fields[i] = field;
-    }
+    POPN(structObj->fields, fieldCount)
 
     PUSH(result)
 
@@ -737,10 +756,7 @@ static Result op_destruct(VM *vm) {
 
     StructObject *structObj = (StructObject *)structValue.as.obj->ptr;
 
-    for (size_t i = dropCount; i < structObj->fieldCount; i++) {
-
-        PUSH(structObj->fields[i])
-    }
+    PUSHN(structObj->fields + dropCount, structObj->fieldCount - dropCount)
 
     return RESULT_OK;
 }
@@ -917,7 +933,9 @@ static Result op_isObjType(VM *vm) {
 #undef UNARY_OP
 #undef READ
 #undef PEEK
+#undef PUSHN
 #undef PUSH
+#undef POPN
 #undef POP
 
 Result initVM(VM *vm) {
