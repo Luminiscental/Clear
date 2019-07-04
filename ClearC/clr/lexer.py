@@ -6,6 +6,7 @@ from typing import List, Iterable, Optional, Tuple
 
 import enum
 import re
+import dataclasses as dc
 
 import clr.errors as er
 
@@ -40,6 +41,7 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
         (r"-", TokenType.MINUS),
         (r"\*", TokenType.STAR),
         (r"/", TokenType.SLASH),
+        (r"\.", TokenType.DOT),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 
@@ -63,6 +65,7 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
             TokenType.FALSE,
             TokenType.AS,
             TokenType.CASE,
+            TokenType.STRUCT,
         }
 
         keywords = {keyword.value: keyword for keyword in keyword_set}
@@ -110,6 +113,7 @@ class TokenType(enum.Enum):
     NIL = "nil"
     AS = "as"
     CASE = "case"
+    STRUCT = "struct"
     # Symbols
     EQUALS = "="
     DOUBLE_EQUALS = "=="
@@ -131,6 +135,7 @@ class TokenType(enum.Enum):
     MINUS = "-"
     STAR = "*"
     SLASH = "/"
+    DOT = "."
     # Special
     ERROR = "<ERROR>"
 
@@ -138,33 +143,28 @@ class TokenType(enum.Enum):
         return str(self.value)
 
 
+@dc.dataclass
 class Token:
     """
     Represents a single token within a string of Clear source code.
     """
 
-    def __init__(self, kind: TokenType, lexeme: er.SourceView) -> None:
-        self.kind = kind
-        self.lexeme = lexeme
-
-    def __repr__(self) -> str:
-        return f"Token(kind={self.kind}, lexeme={self.lexeme})"
+    kind: TokenType
+    lexeme: er.SourceView
 
     def __str__(self) -> str:
         return str(self.lexeme)
 
 
+@dc.dataclass
 class Lexer:
     """
     Class for walking over a source string and emitting tokens or skipping based on regex patterns.
     """
 
-    tokens: List[Token]
-
-    def __init__(self, source: str) -> None:
-        self.source = source
-        self.cursor = 0
-        self.tokens = []
+    source: str
+    cursor: int = 0
+    tokens: List[Token] = dc.field(default_factory=list)
 
     def done(self) -> bool:
         """

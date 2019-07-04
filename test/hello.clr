@@ -1,7 +1,12 @@
 
-{
-    val a := 1, func(num x) x * x;
-    val _, square := a;
+struct Point {
+    num x;
+    num y;
 
-    print square(16);
+    val class_name := "Point";
 }
+
+val p := Point { x=1, y=3 };
+
+print p.class_name;
+print str(p.x) + ", " + str(p.y);

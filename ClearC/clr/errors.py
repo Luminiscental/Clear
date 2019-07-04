@@ -2,9 +2,10 @@
 Definitions for compile errors and tracking/displaying them.
 """
 
-from typing import List, NamedTuple, Tuple
+from typing import List, Tuple
 
 import enum
+import dataclasses as dc
 
 
 class Severity(enum.Enum):
@@ -32,7 +33,8 @@ class Severity(enum.Enum):
         return self.name
 
 
-class CompileError(NamedTuple):
+@dc.dataclass
+class CompileError:
     """
     Class representing a compile error, has a message and a region of code.
     """
@@ -51,13 +53,13 @@ class CompileError(NamedTuple):
         return f"[{self.severity}] {self.message}:\n\n{regions}"
 
 
+@dc.dataclass
 class ErrorTracker:
     """
     Wrapper class for keeping track of a list of errors.
     """
 
-    def __init__(self) -> None:
-        self._errors: List[CompileError] = []
+    _errors: List[CompileError] = dc.field(default_factory=list)
 
     def add(
         self,
@@ -83,18 +85,15 @@ class IncompatibleSourceError(Exception):
     """
 
 
+@dc.dataclass
 class SourceView:
     """
     Represents a region within a Clear source string.
     """
 
-    def __init__(self, source: str, start: int, end: int) -> None:
-        self.start = start
-        self.end = end
-        self.source = source
-
-    def __repr__(self) -> str:
-        return f"SourceView[{str(self)}]"
+    source: str
+    start: int
+    end: int
 
     def __str__(self) -> str:
         return self.source[self.start : self.end]

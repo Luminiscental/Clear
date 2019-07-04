@@ -2,7 +2,7 @@
 Module containing miscellaneous utility functions.
 """
 
-from typing import TypeVar, Callable, Iterable, Dict, Set, Tuple, List, Any
+from typing import TypeVar, Callable, Iterable, Dict, Set, Tuple, Any
 
 T = TypeVar("T")  # pylint: disable=invalid-name
 K = TypeVar("K")  # pylint: disable=invalid-name
@@ -36,25 +36,11 @@ def split_instances(clazz: type, values: Iterable[T]) -> Tuple[Set[Any], Set[T]]
     return instances, rest
 
 
-def split_by(pred: Callable[[T], bool], values: Iterable[T]) -> Tuple[List[T], List[T]]:
-    """
-    Split an iterable into the values that do and don't satisfy a given predicate.
-    """
-    filt = []
-    comp = []
-    for value in values:
-        if pred(value):
-            filt.append(value)
-        else:
-            comp.append(value)
-    return filt, comp
-
-
-def break_after(value: T, iterable: Iterable[T]) -> Iterable[T]:
+def break_before(value: T, iterable: Iterable[T]) -> Iterable[T]:
     """
     Break after reaching the given value in an iterable.
     """
     for element in iterable:
-        yield element
         if element == value:
             break
+        yield element

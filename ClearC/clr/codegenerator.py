@@ -241,6 +241,21 @@ class Program:
             self.append_op(bc.Opcode.PUSH_LOCAL)
             self.append_op(index_annot.value)
 
+    def call(self, args: int, non_void: bool) -> None:
+        """
+        Call a function with the given number of args.
+        """
+        # Extract the ip from the function beneath the arguments
+        self.append_op(bc.Opcode.EXTRACT_FIELD)
+        self.append_op(args)
+        # ip is the first element, but offset by the type tag
+        self.append_op(1 + 0)
+        # Call the function
+        self.append_op(bc.Opcode.CALL)
+        self.append_op(args + 1)
+        if non_void:
+            self.append_op(bc.Opcode.PUSH_RETURN)
+
     def upvalue(self, index_annot: an.IndexAnnot) -> None:
         """
         Make an upvalue to an index.
@@ -265,7 +280,7 @@ class Program:
         self.append_op(index)
 
 
-class CodeGenerator(ast.FunctionVisitor):
+class CodeGenerator(ast.ContextVisitor):
     """
     Ast visitor to build up a program from the annotated ast.
     """
@@ -275,14 +290,21 @@ class CodeGenerator(ast.FunctionVisitor):
         self.program = Program()
 
     def _return(self, node: ast.AstFuncDecl) -> None:
-        # If the function block is in scope pop all the names in it
-        if node.block in self._scopes:
-            function_scopes = util.break_after(node.block, reversed(self._scopes))
-            for scope in function_scopes:
-                for _ in scope.names:
-                    self.program.append_op(bc.Opcode.POP)
+        # Pop all the names in the function scope
+        if node in self._contexts:
+            for context in util.break_before(node, reversed(self._contexts)):
+                if isinstance(context, ast.AstScope) and not isinstance(
+                    context, ast.AstStructDecl
+                ):
+                    for _ in context.names:
+                        self.program.append_op(bc.Opcode.POP)
+        for _ in node.block.names:
+            self.program.append_op(bc.Opcode.POP)
         # Emit the return
         self.program.emit_return()
+
+    def struct_decl(self, node: ast.AstStructDecl) -> None:
+        raise NotImplementedError
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.val_init.accept(self)
@@ -297,11 +319,11 @@ class CodeGenerator(ast.FunctionVisitor):
                 self.program.declare(binding.index_annot)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        with self.program.function(node.type_annot, node.upvalue_indices):
+        with self.program.function(node.binding.type_annot, node.upvalue_indices):
             super().func_decl(node)
             if node.return_type.type_annot == ts.VOID:
                 self._return(node)
-        self.program.declare(node.index_annot)
+        self.program.declare(node.binding.index_annot)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         if node.expr:
@@ -359,10 +381,10 @@ class CodeGenerator(ast.FunctionVisitor):
         if node.expr:
             node.expr.accept(self)
             self.program.append_op(bc.Opcode.SET_RETURN)
-        # Shouldn't be in a lambda since it's a statement
-        function = self._get_function()
-        if isinstance(function, ast.AstFuncDecl):
-            self._return(function)
+        for context in reversed(self._contexts):
+            if isinstance(context, ast.AstFuncDecl):
+                self._return(context)
+                break
 
     def expr_stmt(self, node: ast.AstExprStmt) -> None:
         node.expr.accept(self)
@@ -457,19 +479,9 @@ class CodeGenerator(ast.FunctionVisitor):
         else:
             # Load the function and arguments
             super().call_expr(node)
-            # Extract the ip from the function beneath the arguments
-            self.program.append_op(bc.Opcode.EXTRACT_FIELD)
-            self.program.append_op(len(node.args))
-            # ip is the first element, but offset by the type tag
-            self.program.append_op(1 + 0)
-            # Call the function
-            self.program.append_op(bc.Opcode.CALL)
-            self.program.append_op(len(node.args) + 1)
-            # Fetch the return value if there is one
             as_func = node.function.type_annot.get_function()
-            if as_func is not None:  # Should be true
-                if as_func.return_type != ts.VOID:
-                    self.program.append_op(bc.Opcode.PUSH_RETURN)
+            if as_func is not None:  # Should always be true
+                self.program.call(len(node.args), as_func.return_type != ts.VOID)
 
     def tuple_expr(self, node: ast.AstTupleExpr) -> None:
         # Make a struct from all the elements
@@ -487,3 +499,36 @@ class CodeGenerator(ast.FunctionVisitor):
             for _ in node.params:
                 self.program.append_op(bc.Opcode.POP)
             self.program.emit_return()
+
+    def construct_expr(self, node: ast.AstConstructExpr) -> None:
+        if not isinstance(node.ref, ast.AstStructDecl):
+            return
+        struct = node.ref
+        with self.program.struct(struct.type_annot, field_count=len(struct.fields)):
+            for binding, is_param in struct.iter_bindings():
+                if is_param:
+                    node.inits[binding.name].accept(self)
+                else:
+                    self.program.load(binding.index_annot)
+        for i, (_, is_param) in enumerate(struct.iter_bindings()):
+            if is_param:
+                continue
+            # Get the field generator
+            self.program.append_op(bc.Opcode.GET_FIELD)
+            self.program.append_op(1 + i)
+            # Get the constructed object
+            self.program.load(node.index_annot)
+            # Call the field generator with it
+            self.program.call(args=1, non_void=True)
+            # Set the field
+            self.program.append_op(bc.Opcode.SET_FIELD)
+            self.program.append_op(1 + i)
+
+    def access_expr(self, node: ast.AstAccessExpr) -> None:
+        if not node.ref:
+            return
+        self.program.append_op(bc.Opcode.GET_FIELD)
+        struct = node.ref
+        for i, (binding, _) in enumerate(struct.iter_bindings()):
+            if binding.name == node.name:
+                self.program.append_op(1 + i)

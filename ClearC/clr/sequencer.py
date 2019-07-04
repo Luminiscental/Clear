@@ -9,10 +9,10 @@ import contextlib
 import clr.ast as ast
 
 
-AstNameDecl = Union[ast.AstValueDecl, ast.AstFuncDecl]
+AstNameDecl = Union[ast.AstValueDecl, ast.AstFuncDecl, ast.AstStructDecl]
 
 
-class SequenceBuilder(ast.FunctionVisitor):
+class SequenceBuilder(ast.ContextVisitor):
     """
     Ast visitor to annotate the execution order of declarations.
     """
@@ -42,6 +42,11 @@ class SequenceBuilder(ast.FunctionVisitor):
         yield
         self.completed.append(node)
 
+    def struct_decl(self, node: ast.AstStructDecl) -> None:
+        if self._start(node):
+            with self._name_decl(node):
+                raise NotImplementedError
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
         if self._start(node):
             with self._name_decl(node):
@@ -54,11 +59,17 @@ class SequenceBuilder(ast.FunctionVisitor):
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         if node.ref:
-            # Special case for recursive function calls
-            if self._functions and node.ref == self._functions[-1]:
-                pass
-            else:
-                node.ref.accept(self)
+            for context in reversed(self._contexts):
+                if isinstance(context, ast.AstFuncDecl):
+                    if node.ref == context:
+                        # If it's the recursion upvalue don't lookup
+                        return
+                    break
+            node.ref.accept(self)
+
+    def construct_expr(self, node: ast.AstConstructExpr) -> None:
+        if node.ref:
+            node.ref.accept(self)
 
 
 class SequenceWriter(ast.DeepVisitor):

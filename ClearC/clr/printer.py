@@ -40,9 +40,27 @@ class AstPrinter(ast.AstVisitor):
             decl.accept(self)
         self._flush()
 
+    def struct_decl(self, node: ast.AstStructDecl) -> None:
+        self._startline()
+        self._append(f"struct {node.name} ")
+        self._append("{")
+        self._indent += 1
+
+        for field in node.fields:
+            if isinstance(field, ast.AstParam):
+                self._startline()
+                field.accept(self)
+                self._append(";")
+            else:
+                field.accept(self)
+
+        self._indent -= 1
+        self._startline()
+        self._append("}")
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
         self._startline()
-        self._append(f"val ")
+        self._append("val ")
         node.bindings[0].accept(self)
         for binding in node.bindings[1:]:
             self._append(", ")
@@ -75,7 +93,8 @@ class AstPrinter(ast.AstVisitor):
 
     def param(self, node: ast.AstParam) -> None:
         node.param_type.accept(self)
-        self._append(f" {node.param_name}")
+        self._append(" ")
+        node.binding.accept(self)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         self._startline()
@@ -170,9 +189,9 @@ class AstPrinter(ast.AstVisitor):
         self._append("nil")
 
     def case_expr(self, node: ast.AstCaseExpr) -> None:
-        self._append("case ")
+        self._append("case(")
         node.target.accept(self)
-        self._append(" as ")
+        self._append(") as ")
         node.binding.accept(self)
 
         self._append(" {")
@@ -229,6 +248,28 @@ class AstPrinter(ast.AstVisitor):
         self._append(") (")
         node.value.accept(self)
         self._append(")")
+
+    def construct_expr(self, node: ast.AstConstructExpr) -> None:
+        self._append(node.name)
+        self._append(" {")
+        inits = list(node.inits.items())
+        if inits:
+            self._append(" ")
+
+            def print_init(name: str, value: ast.AstExpr) -> None:
+                self._append(f"{name}=")
+                value.accept(self)
+
+            print_init(*inits[0])
+            for name, value in inits[1:]:
+                self._append(", ")
+                print_init(name, value)
+            self._append(" ")
+        self._append("}")
+
+    def access_expr(self, node: ast.AstAccessExpr) -> None:
+        node.target.accept(self)
+        self._append(f".{node.name}")
 
     def ident_type(self, node: ast.AstIdentType) -> None:
         self._append(node.name)

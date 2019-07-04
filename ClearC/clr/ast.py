@@ -2,7 +2,9 @@
 Module containing definitions for a Clear ast and a base class for ast visitors.
 """
 
-from typing import Union, List, Optional, Tuple, Dict
+from typing import Union, List, Optional, Tuple, Dict, Iterable
+
+import dataclasses as dc
 
 import clr.errors as er
 import clr.lexer as lx
@@ -26,24 +28,29 @@ class AstVisitor:
         Start visiting a tree.
         """
 
-    def value_decl(self, node: "AstValueDecl") -> None:
-        """
-        Visit a value declaration node.
-        """
-
     def binding(self, node: "AstBinding") -> None:
         """
         Visit a value binding node.
         """
 
-    def func_decl(self, node: "AstFuncDecl") -> None:
-        """
-        Visit a function declaration node.
-        """
-
     def param(self, node: "AstParam") -> None:
         """
         Visit a parameter declaration node.
+        """
+
+    def struct_decl(self, node: "AstStructDecl") -> None:
+        """
+        Visit a struct declaration node.
+        """
+
+    def value_decl(self, node: "AstValueDecl") -> None:
+        """
+        Visit a value declaration node.
+        """
+
+    def func_decl(self, node: "AstFuncDecl") -> None:
+        """
+        Visit a function declaration node.
         """
 
     def print_stmt(self, node: "AstPrintStmt") -> None:
@@ -136,6 +143,16 @@ class AstVisitor:
         Visit a lambda expression.
         """
 
+    def construct_expr(self, node: "AstConstructExpr") -> None:
+        """
+        Visit a construct expression.
+        """
+
+    def access_expr(self, node: "AstAccessExpr") -> None:
+        """
+        Visit an access expression.
+        """
+
     def ident_type(self, node: "AstIdentType") -> None:
         """
         Visit an identifier type node.
@@ -179,6 +196,15 @@ class DeepVisitor(AstVisitor):
         for decl in node.decls:
             decl.accept(self)
 
+    def param(self, node: "AstParam") -> None:
+        node.param_type.accept(self)
+        node.binding.accept(self)
+
+    def struct_decl(self, node: "AstStructDecl") -> None:
+        for field in node.fields:
+            field.accept(self)
+        self._decl(node)
+
     def value_decl(self, node: "AstValueDecl") -> None:
         for binding in node.bindings:
             binding.accept(self)
@@ -194,9 +220,6 @@ class DeepVisitor(AstVisitor):
         node.return_type.accept(self)
         node.block.accept(self)
         self._decl(node)
-
-    def param(self, node: "AstParam") -> None:
-        node.param_type.accept(self)
 
     def print_stmt(self, node: "AstPrintStmt") -> None:
         if node.expr:
@@ -263,6 +286,13 @@ class DeepVisitor(AstVisitor):
             param.accept(self)
         node.value.accept(self)
 
+    def construct_expr(self, node: "AstConstructExpr") -> None:
+        for _, value in node.inits.items():
+            value.accept(self)
+
+    def access_expr(self, node: "AstAccessExpr") -> None:
+        node.target.accept(self)
+
     def func_type(self, node: "AstFuncType") -> None:
         for param in node.params:
             param.accept(self)
@@ -280,101 +310,71 @@ class DeepVisitor(AstVisitor):
             subtype.accept(self)
 
 
-class ScopeVisitor(DeepVisitor):
+AstContext = Union["AstScope", "AstFuncDecl"]
+
+
+class ContextVisitor(DeepVisitor):
     """
-    Ast visitor base class to keep track of the current scope.
+    Ast visitor base class to keep track of the current scope, function and struct.
     """
 
     def __init__(self) -> None:
         super().__init__()
-        self._scopes: List["AstScope"] = []
+        self._contexts: List[AstContext] = []
 
-    def _get_scope(self) -> "AstScope":
-        return self._scopes[-1]
+    def _push_context(self, context: AstContext) -> None:
+        self._contexts.append(context)
 
-    def _push_scope(self, node: "AstScope") -> None:
-        self._scopes.append(node)
+    def _get_context(self) -> AstContext:
+        return self._contexts[-1]
 
-    def _pop_scope(self) -> None:
-        self._scopes.pop()
+    def _pop_context(self) -> AstContext:
+        return self._contexts.pop()
 
     def start(self, node: "Ast") -> None:
-        self._push_scope(node)
+        self._push_context(node)
         super().start(node)
-        self._pop_scope()
+        self._pop_context()
+
+    def struct_decl(self, node: "AstStructDecl") -> None:
+        self._push_context(node)
+        for field in node.fields:
+            field.accept(self)
+        self._pop_context()
+        self._decl(node)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
         node.binding.accept(self)
-        self._push_scope(node.block)
+        self._push_context(node)
         for param in node.params:
             param.accept(self)
-        # Visit the block manually so it doesn't get an extra scope
         for decl in node.block.decls:
             decl.accept(self)
-        self._pop_scope()
+        self._pop_context()
         self._decl(node)
 
     def block_stmt(self, node: "AstBlockStmt") -> None:
-        self._push_scope(node)
-        # Don't delegate to super, we want _decl to be called in the right scope
+        self._push_context(node)
         for decl in node.decls:
             decl.accept(self)
-        self._pop_scope()
+        self._pop_context()
         self._decl(node)
 
     def case_expr(self, node: "AstCaseExpr") -> None:
         node.target.accept(self)
-        self._push_scope(node)
+        self._push_context(node)
         node.binding.accept(self)
         for case_type, case_value in node.cases:
             case_type.accept(self)
             case_value.accept(self)
         if node.fallback:
             node.fallback.accept(self)
-        self._pop_scope()
+        self._pop_context()
 
     def lambda_expr(self, node: "AstLambdaExpr") -> None:
-        self._push_scope(node)
+        self._push_context(node)
         super().lambda_expr(node)
-        self._pop_scope()
-
-
-AstFunction = Union["AstFuncDecl", "AstLambdaExpr"]
-
-
-class FunctionVisitor(ScopeVisitor):
-    """
-    Ast visitor base class to keep track of the current function and scope.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._functions: List[AstFunction] = []
-
-    def _get_function(self) -> AstFunction:
-        return self._functions[-1]
-
-    def _push_function(self, function: AstFunction) -> None:
-        self._functions.append(function)
-
-    def _pop_function(self) -> None:
-        self._functions.pop()
-
-    def func_decl(self, node: "AstFuncDecl") -> None:
-        node.binding.accept(self)
-        self._push_function(node)
-        # Don't delegate to super, we want _decl to be called in the right scope
-        for param in node.params:
-            param.accept(self)
-        node.return_type.accept(self)
-        node.block.accept(self)
-        self._pop_function()
-        self._decl(node)
-
-    def lambda_expr(self, node: "AstLambdaExpr") -> None:
-        self._push_function(node)
-        super().lambda_expr(node)
-        self._pop_function()
+        self._pop_context()
 
 
 # Node definitions:
@@ -382,13 +382,13 @@ class FunctionVisitor(ScopeVisitor):
 # Base node types:
 
 
+@dc.dataclass
 class AstNode:
     """
     Base class for an ast node. All nodes must be able to accept an ast visitor.
     """
 
-    def __init__(self, region: er.SourceView) -> None:
-        self.region = region
+    region: er.SourceView = er.SourceView.all("")
 
     def accept(self, visitor: AstVisitor) -> None:
         """
@@ -397,27 +397,25 @@ class AstNode:
         raise NotImplementedError
 
 
+@dc.dataclass
 class AstTyped(AstNode):
     """
     Base class for nodes with type annotations.
     """
 
-    def __init__(self, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.type_annot = ts.UNRESOLVED
+    type_annot = ts.UNRESOLVED
 
     def accept(self, visitor: AstVisitor) -> None:
         raise NotImplementedError
 
 
+@dc.dataclass
 class AstIndexed(AstNode):
     """
     Base class for nodes with index annotations.
     """
 
-    def __init__(self, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.index_annot = an.IndexAnnot(value=-1, kind=an.IndexAnnotType.UNRESOLVED)
+    index_annot = an.IndexAnnot(value=-1, kind=an.IndexAnnotType.UNRESOLVED)
 
     def accept(self, visitor: AstVisitor) -> None:
         raise NotImplementedError
@@ -441,28 +439,43 @@ class AstExpr(AstTyped):
         raise NotImplementedError
 
 
+AstName = Union["AstBinding", "AstStructDecl"]
+
+
+@dc.dataclass
 class AstScope(AstNode):
     """
     Base class for a node with scope.
     """
 
-    def __init__(self, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.names: Dict[str, AstIdentRef] = {}
+    names: Dict[str, AstName] = dc.field(default_factory=dict)
 
     def accept(self, visitor: AstVisitor) -> None:
         raise NotImplementedError
 
 
+@dc.dataclass
+class AstFunction(AstNode):
+    """
+    Base class for a function node.
+    """
+
+    params: List["AstParam"] = dc.field(default_factory=list)
+    upvalues: List["AstBinding"] = dc.field(default_factory=list)
+    upvalue_indices: List[an.IndexAnnot] = dc.field(default_factory=list)
+
+    def accept(self, visitor: AstVisitor) -> None:
+        raise NotImplementedError
+
+
+@dc.dataclass
 class AstDecl(AstNode):
     """
     Base class for declarations, annotated with return possibilities and scope.
     """
 
-    def __init__(self, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.return_annot = an.ReturnAnnot.NEVER
-        self.scope: Optional[AstScope] = None
+    return_annot = an.ReturnAnnot.NEVER
+    scope: Optional[AstScope] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         raise NotImplementedError
@@ -480,216 +493,214 @@ AstStmt = Union[
 # Specific nodes:
 
 
+@dc.dataclass
 class Ast(AstScope):
     """
     The root ast node.
     """
 
-    def __init__(self, decls: List[AstDecl], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.decls = decls
-        # Annotations
-        self.sequence: List[AstDecl] = []
+    decls: List[AstDecl] = dc.field(default_factory=list)
+    # Annotations:
+    sequence: List[AstDecl] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.start(self)
 
 
+@dc.dataclass
 class AstBinding(AstTyped, AstIndexed):
     """
     Ast node for a value binding.
     """
 
-    def __init__(self, name: str, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.name = name
+    name: str = ""
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binding(self)
 
 
-class AstValueDecl(AstDecl, AstTyped):
-    """
-    Ast node for a value declaration.
-    """
-
-    def __init__(
-        self,
-        bindings: List[AstBinding],
-        val_type: Optional[AstType],
-        val_init: AstExpr,
-        region: er.SourceView,
-    ):
-        super().__init__(region)
-        self.bindings = bindings
-        self.val_type = val_type
-        self.val_init = val_init
-
-    def accept(self, visitor: AstVisitor) -> None:
-        visitor.value_decl(self)
-
-
-class AstParam(AstTyped, AstIndexed):
+class AstParam(AstNode):
     """
     Ast node for a parameter declaration.
     """
 
-    def __init__(self, param_type: AstType, param_name: lx.Token) -> None:
-        super().__init__(er.SourceView.range(param_type.region, param_name.lexeme))
+    def __init__(self, param_type: AstType, binding: AstBinding) -> None:
+        super().__init__(region=er.SourceView.range(param_type.region, binding.region))
         self.param_type = param_type
-        self.param_name = str(param_name)
+        self.binding = binding
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.param(self)
 
 
-class AstFuncDecl(AstDecl, AstTyped, AstIndexed):
-    """
-    Ast node for a function declaration.
-    """
-
-    def __init__(
-        self,
-        binding: AstBinding,
-        params: List[AstParam],
-        return_type: AstType,
-        block: "AstBlockStmt",
-        region: er.SourceView,
-    ) -> None:
-        super().__init__(region)
-        self.binding = binding
-        self.params = params
-        self.return_type = return_type
-        self.block = block
-        # Annotations
-        self.upvalues: List[AstIdentRef] = []
-        self.upvalue_indices: List[an.IndexAnnot] = []
-
-    def accept(self, visitor: AstVisitor) -> None:
-        visitor.func_decl(self)
-
-
-class AstPrintStmt(AstDecl):
-    """
-    Ast node for a print statement.
-    """
-
-    def __init__(self, expr: Optional[AstExpr], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.expr = expr
-
-    def accept(self, visitor: AstVisitor) -> None:
-        visitor.print_stmt(self)
-
-
+@dc.dataclass
 class AstBlockStmt(AstDecl, AstScope):
     """
     Ast node for a block statement.
     """
 
-    def __init__(self, decls: List[AstDecl], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.decls = decls
-        # Annotations
-        self.sequence: List[AstDecl] = []
+    decls: List[AstDecl] = dc.field(default_factory=list)
+    # Annotations:
+    sequence: List[AstDecl] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
 
 
+@dc.dataclass
+class AstStructDecl(AstDecl, AstScope, AstTyped):
+    """
+    Ast node for a struct declaration.
+    """
+
+    name: str = ""
+    fields: List[Union[AstParam, "AstValueDecl", "AstFuncDecl"]] = dc.field(
+        default_factory=list
+    )
+
+    def iter_params(self) -> Iterable[AstParam]:
+        """
+        Iterate over the parameter fields of the struct.
+        """
+        for field in self.fields:
+            if isinstance(field, AstParam):
+                yield field
+
+    def iter_bindings(self) -> Iterable[Tuple[AstBinding, bool]]:
+        """
+        Iterate over the field bindings of the struct. Yields the binding along with a bool for whether it's a parameter field.
+        """
+        for field in self.fields:
+            if isinstance(field, AstParam):
+                yield field.binding, True
+            elif isinstance(field, AstValueDecl):
+                for subfield in field.bindings:
+                    yield subfield, False
+            else:
+                yield field.binding, False
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.struct_decl(self)
+
+
+@dc.dataclass
+class AstValueDecl(AstDecl, AstTyped):
+    """
+    Ast node for a value declaration.
+    """
+
+    bindings: List[AstBinding] = dc.field(default_factory=list)
+    val_type: Optional[AstType] = None
+    val_init: AstExpr = AstExpr()
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.value_decl(self)
+
+
+@dc.dataclass
+class AstFuncDecl(AstDecl, AstFunction):
+    """
+    Ast node for a function declaration.
+    """
+
+    binding: AstBinding = AstBinding()
+    params: List[AstParam] = dc.field(default_factory=list)
+    return_type: AstType = AstType()
+    block: "AstBlockStmt" = AstBlockStmt()
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.func_decl(self)
+
+
+@dc.dataclass
+class AstPrintStmt(AstDecl):
+    """
+    Ast node for a print statement.
+    """
+
+    expr: Optional[AstExpr] = None
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.print_stmt(self)
+
+
+@dc.dataclass
 class AstIfStmt(AstDecl):
     """
     Ast node for an if statement.
     """
 
-    def __init__(
-        self,
-        if_part: Tuple[AstExpr, AstBlockStmt],
-        elif_parts: List[Tuple[AstExpr, AstBlockStmt]],
-        else_part: Optional[AstBlockStmt],
-        region: er.SourceView,
-    ) -> None:
-        super().__init__(region)
-        self.if_part = if_part
-        self.elif_parts = elif_parts
-        self.else_part = else_part
+    if_part: Tuple[AstExpr, AstBlockStmt] = (AstExpr(), AstBlockStmt())
+    elif_parts: List[Tuple[AstExpr, AstBlockStmt]] = dc.field(default_factory=list)
+    else_part: Optional[AstBlockStmt] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.if_stmt(self)
 
 
+@dc.dataclass
 class AstWhileStmt(AstDecl):
     """
     Ast node for a while statement.
     """
 
-    def __init__(
-        self, cond: Optional[AstExpr], block: AstBlockStmt, region: er.SourceView
-    ) -> None:
-        super().__init__(region)
-        self.cond = cond
-        self.block = block
+    cond: Optional[AstExpr] = None
+    block: AstBlockStmt = AstBlockStmt()
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.while_stmt(self)
 
 
+@dc.dataclass
 class AstReturnStmt(AstDecl):
     """
     Ast node for a return statement.
     """
 
-    def __init__(self, expr: Optional[AstExpr], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.expr = expr
+    expr: Optional[AstExpr] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.return_stmt(self)
 
 
+@dc.dataclass
 class AstExprStmt(AstDecl):
     """
     Ast node for an expression statement.
     """
 
-    def __init__(self, expr: AstExpr, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.expr = expr
+    expr: AstExpr = AstExpr()
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.expr_stmt(self)
 
 
+@dc.dataclass
 class AstUnaryExpr(AstExpr):
     """
     Ast node for a unary expression.
     """
 
-    def __init__(
-        self, operator: lx.Token, target: AstExpr, region: er.SourceView
-    ) -> None:
-        super().__init__(region)
-        self.operator = operator
-        self.target = target
-        self.opcodes: List[bc.Instruction] = []
+    operator: lx.Token = lx.Token(kind=lx.TokenType.ERROR, lexeme=er.SourceView.all(""))
+    target: AstExpr = AstExpr()
+    # Annotations:
+    opcodes: List[bc.Instruction] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.unary_expr(self)
 
 
+@dc.dataclass
 class AstBinaryExpr(AstExpr):
     """
     Ast node for a binary expression.
     """
 
-    def __init__(
-        self, operator: lx.Token, left: AstExpr, right: AstExpr, region: er.SourceView
-    ) -> None:
-        super().__init__(region)
-        self.operator = operator
-        self.left = left
-        self.right = right
-        self.opcodes: List[bc.Instruction] = []
+    operator: lx.Token = lx.Token(kind=lx.TokenType.ERROR, lexeme=er.SourceView.all(""))
+    left: AstExpr = AstExpr()
+    right: AstExpr = AstExpr()
+    # Annotations:
+    opcodes: List[bc.Instruction] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binary_expr(self)
@@ -701,7 +712,7 @@ class AstIntExpr(AstExpr):
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__(literal.lexeme)
+        super().__init__(region=literal.lexeme)
         self.literal = str(literal)
         self.value = int(self.literal[:-1])
 
@@ -715,7 +726,7 @@ class AstNumExpr(AstExpr):
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__(literal.lexeme)
+        super().__init__(region=literal.lexeme)
         self.literal = str(literal)
         self.value = float(self.literal)
 
@@ -729,16 +740,12 @@ class AstStrExpr(AstExpr):
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__(literal.lexeme)
+        super().__init__(region=literal.lexeme)
         self.literal = str(literal)
         self.value = self.literal[1:-1]
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.str_expr(self)
-
-
-# Type alias for identifier declarations
-AstIdentRef = Union[AstBinding, AstParam]
 
 
 class AstIdentExpr(AstExpr, AstIndexed):
@@ -747,10 +754,10 @@ class AstIdentExpr(AstExpr, AstIndexed):
     """
 
     def __init__(self, token: lx.Token) -> None:
-        super().__init__(token.lexeme)
+        super().__init__(region=token.lexeme)
         self.name = str(token)
-        # Annotations
-        self.ref: Optional[AstIdentRef] = None
+        # Annotations:
+        self.ref: Optional[AstBinding] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
@@ -762,7 +769,7 @@ class AstBoolExpr(AstExpr):
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__(literal.lexeme)
+        super().__init__(region=literal.lexeme)
         self.value = str(literal) == "true"
 
     def accept(self, visitor: AstVisitor) -> None:
@@ -775,82 +782,93 @@ class AstNilExpr(AstExpr):
     """
 
     def __init__(self, literal: lx.Token) -> None:
-        super().__init__(literal.lexeme)
+        super().__init__(region=literal.lexeme)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.nil_expr(self)
 
 
+@dc.dataclass
 class AstCaseExpr(AstExpr, AstScope):
     """
     Ast node for a case expression.
     """
 
-    def __init__(
-        self,
-        target: AstExpr,
-        binding: AstBinding,
-        cases: List[Tuple[AstType, AstExpr]],
-        fallback: Optional[AstExpr],
-        region: er.SourceView,
-    ) -> None:
-        super().__init__(region)
-        self.target = target
-        self.binding = binding
-        self.cases = cases
-        self.fallback = fallback
+    target: AstExpr = AstExpr()
+    binding: AstBinding = AstBinding()
+    cases: List[Tuple[AstType, AstExpr]] = dc.field(default_factory=list)
+    fallback: Optional[AstExpr] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.case_expr(self)
 
 
+@dc.dataclass
 class AstCallExpr(AstExpr):
     """
     Ast node for a function call expression.
     """
 
-    def __init__(
-        self, function: AstExpr, args: List[AstExpr], region: er.SourceView
-    ) -> None:
-        super().__init__(region)
-        self.function = function
-        self.args = args
+    function: AstExpr = AstExpr()
+    args: List[AstExpr] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.call_expr(self)
 
 
+@dc.dataclass
 class AstTupleExpr(AstExpr):
     """
     Ast node for a tuple expression.
     """
 
-    def __init__(self, exprs: Tuple[AstExpr, ...], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.exprs = exprs
+    exprs: List[AstExpr] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.tuple_expr(self)
 
 
-class AstLambdaExpr(AstExpr, AstScope):
+@dc.dataclass
+class AstLambdaExpr(AstExpr, AstScope, AstFunction):
     """
     Ast node for a lambda expression.
     """
 
-    def __init__(
-        self, params: List[AstParam], value: AstExpr, region: er.SourceView
-    ) -> None:
-        super().__init__(region)
-        self.params = params
-        self.value = value
-        self.region = region
-        # Annotations
-        self.upvalues: List[AstIdentRef] = []
-        self.upvalue_indices: List[an.IndexAnnot] = []
+    params: List[AstParam] = dc.field(default_factory=list)
+    value: AstExpr = AstExpr()
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.lambda_expr(self)
+
+
+@dc.dataclass
+class AstConstructExpr(AstExpr, AstIndexed):
+    """
+    Ast node for a construct expression.
+    """
+
+    name: str = ""
+    inits: Dict[str, AstExpr] = dc.field(default_factory=dict)
+    # Annotations:
+    ref: Optional[AstStructDecl] = None
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.construct_expr(self)
+
+
+@dc.dataclass
+class AstAccessExpr(AstExpr):
+    """
+    Ast node for an access expression.
+    """
+
+    target: AstExpr = AstExpr()
+    name: str = ""
+    # Annotations:
+    ref: Optional[AstStructDecl] = None
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.access_expr(self)
 
 
 class AstIdentType(AstType):
@@ -859,10 +877,10 @@ class AstIdentType(AstType):
     """
 
     def __init__(self, token: lx.Token) -> None:
-        super().__init__(token.lexeme)
+        super().__init__(region=token.lexeme)
         self.name = str(token)
         # Annotations
-        self.ref: Optional[AstIdentRef] = None
+        self.ref: Optional[AstBinding] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_type(self)
@@ -874,62 +892,56 @@ class AstVoidType(AstType):
     """
 
     def __init__(self, token: lx.Token) -> None:
-        super().__init__(token.lexeme)
+        super().__init__(region=token.lexeme)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.void_type(self)
 
 
+@dc.dataclass
 class AstFuncType(AstType):
     """
     Ast node for a function type.
     """
 
-    def __init__(
-        self, params: List[AstType], return_type: AstType, region: er.SourceView
-    ) -> None:
-        super().__init__(region)
-        self.params = params
-        self.return_type = return_type
+    params: List[AstType] = dc.field(default_factory=list)
+    return_type: AstType = AstType()
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.func_type(self)
 
 
+@dc.dataclass
 class AstOptionalType(AstType):
     """
     Ast node for an optional type.
     """
 
-    def __init__(self, target: AstType, region: er.SourceView) -> None:
-        super().__init__(region)
-        self.target = target
+    target: AstType = AstType()
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.optional_type(self)
 
 
+@dc.dataclass
 class AstUnionType(AstType):
     """
     Ast node for a union type.
     """
 
-    def __init__(self, types: List[AstType], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.types = types
+    types: List[AstType] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.union_type(self)
 
 
+@dc.dataclass
 class AstTupleType(AstType):
     """
     Ast node for a tuple type.
     """
 
-    def __init__(self, types: Tuple[AstType, ...], region: er.SourceView) -> None:
-        super().__init__(region)
-        self.types = types
+    types: List[AstType] = dc.field(default_factory=list)
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.tuple_type(self)

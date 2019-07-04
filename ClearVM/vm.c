@@ -168,6 +168,7 @@ static void traceU8(uint8_t value, bool endLine) {
 #else
 
     UNUSED(value);
+    UNUSED(endLine);
 
 #endif
 }
@@ -1208,12 +1209,7 @@ static Result runVM(VM *vm) {
 #ifdef DEBUG_STACK
 
         printf("\n    ");
-        for (Value *value = vm->stack; value < vm->sp; value++) {
-
-            if (value == vm->fp) {
-
-                printf(" | ");
-            }
+        for (Value *value = vm->fp; value < vm->sp; value++) {
 
             printf("[");
             printValue(*value);

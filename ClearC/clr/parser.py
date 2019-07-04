@@ -4,6 +4,7 @@ Contains functions and definitions for parsing a list of tokens into a parse tre
 
 from typing import (
     List,
+    Dict,
     Sequence,
     Iterable,
     Optional,
@@ -118,7 +119,9 @@ def parse_ast(parser: Parser) -> Result[ast.Ast]:
         if isinstance(decl, er.CompileError):
             return decl
         decls.append(decl)
-    return ast.Ast(decls, er.SourceView.range(decls[0].region, decls[-1].region))
+    return ast.Ast(
+        decls=decls, region=er.SourceView.range(decls[0].region, decls[-1].region)
+    )
 
 
 def parse_token(parser: Parser, kinds: Iterable[lx.TokenType]) -> Optional[lx.Token]:
@@ -136,11 +139,13 @@ def parse_decl(parser: Parser) -> Result[ast.AstDecl]:
     """
     Parse a declaration from the parser or return an error.
 
-    AstDecl : AstValueDecl | AstFuncDecl | AstStmt ;
+    AstDecl : AstStructDecl | AstValueDecl | AstFuncDecl | AstStmt ;
     """
+    if parser.match(lx.TokenType.STRUCT):
+        return finish_struct_decl(parser)
     if parser.match(lx.TokenType.VAL):
         return finish_value_decl(parser)
-    if parser.match(lx.TokenType.FUNC):
+    if parser.match(lx.TokenType.FUNC) and not parser.check(lx.TokenType.LEFT_PAREN):
         return finish_func_decl(parser)
     return parse_stmt(parser)
 
@@ -156,7 +161,56 @@ def parse_binding(parser: Parser) -> Result[ast.AstBinding]:
         return er.CompileError(
             message="expected value name", regions=[parser.curr_region()]
         )
-    return ast.AstBinding(str(token), token.lexeme)
+    return ast.AstBinding(name=str(token), region=token.lexeme)
+
+
+def finish_struct_decl(parser: Parser) -> Result[ast.AstStructDecl]:
+    """
+    Parse a struct declaration from the parser or return an error. Assumes that the "struct" token
+    has already been consumed.
+
+    AstStructDecl : "struct" AstBinding "{" ( AstParam ";" | AstValueDecl | AstFuncDecl )* "}"
+    """
+    start = parser.prev().lexeme
+    ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
+    if ident is None:
+        return er.CompileError(
+            message="expected struct name", regions=[parser.curr_region()]
+        )
+    if not parser.match(lx.TokenType.LEFT_BRACE):
+        return er.CompileError(
+            message="expected '{' for struct body", regions=[parser.curr_region()]
+        )
+
+    def parse_field(
+        parser: Parser
+    ) -> Result[Union[ast.AstParam, ast.AstFuncDecl, ast.AstValueDecl]]:
+        if parser.match(lx.TokenType.VAL):
+            return finish_value_decl(parser)
+        if parser.match(lx.TokenType.FUNC) and not parser.check(
+            lx.TokenType.LEFT_PAREN
+        ):
+            return finish_func_decl(parser)
+        param = parse_param(parser)
+        if isinstance(param, er.CompileError):
+            return param
+        if not parser.match(lx.TokenType.SEMICOLON):
+            return er.CompileError(
+                message="expected ';' after field", regions=[parser.curr_region()]
+            )
+        return param
+
+    fields = []
+    while not parser.match(lx.TokenType.RIGHT_BRACE):
+        if parser.done():
+            return er.CompileError(message="unclosed '{'", regions=[start])
+        field = parse_field(parser)
+        if isinstance(field, er.CompileError):
+            return field
+        fields.append(field)
+
+    region = er.SourceView.range(start, parser.prev().lexeme)
+    return ast.AstStructDecl(name=str(ident), fields=fields, region=region)
 
 
 def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
@@ -193,13 +247,16 @@ def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
         return expr
 
     if not parser.match(lx.TokenType.SEMICOLON):
+        value_range = er.SourceView.range(start, parser.prev().lexeme)
         return er.CompileError(
             message="expected ';' to end value initializer",
-            regions=[parser.prev().lexeme, parser.curr_region()],
+            regions=[value_range, parser.curr_region()],
         )
 
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstValueDecl(bindings, val_type, expr, region)
+    return ast.AstValueDecl(
+        bindings=bindings, val_type=val_type, val_init=expr, region=region
+    )
 
 
 def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
@@ -236,7 +293,13 @@ def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
         return block
 
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstFuncDecl(binding, params, return_type, block, region)
+    return ast.AstFuncDecl(
+        binding=binding,
+        params=params,
+        return_type=return_type,
+        block=block,
+        region=region,
+    )
 
 
 def parse_param(parser: Parser) -> Result[ast.AstParam]:
@@ -248,12 +311,10 @@ def parse_param(parser: Parser) -> Result[ast.AstParam]:
     param_type = parse_type(parser, Precedence.TUPLE.next())  # Don't consume commas
     if isinstance(param_type, er.CompileError):
         return param_type
-    param_ident = parse_token(parser, [lx.TokenType.IDENTIFIER])
-    if param_ident is None:
-        return er.CompileError(
-            message="expected parameter name", regions=[parser.curr_region()]
-        )
-    return ast.AstParam(param_type, param_ident)
+    binding = parse_binding(parser)
+    if isinstance(binding, er.CompileError):
+        return binding
+    return ast.AstParam(param_type=param_type, binding=binding)
 
 
 def finish_tuple(
@@ -326,19 +387,24 @@ def finish_print_stmt(parser: Parser) -> Result[ast.AstPrintStmt]:
     start = parser.prev().lexeme
 
     if parser.match(lx.TokenType.SEMICOLON):
-        return ast.AstPrintStmt(None, er.SourceView.range(start, parser.prev().lexeme))
+        return ast.AstPrintStmt(
+            expr=None, region=er.SourceView.range(start, parser.prev().lexeme)
+        )
 
     expr = parse_expr(parser)
     if isinstance(expr, er.CompileError):
         return expr
 
     if not parser.match(lx.TokenType.SEMICOLON):
+        print_region = er.SourceView.range(start, parser.prev().lexeme)
         return er.CompileError(
             message="expected ';' to end print statement",
-            regions=[parser.prev().lexeme, parser.curr_region()],
+            regions=[print_region, parser.curr_region()],
         )
 
-    return ast.AstPrintStmt(expr, er.SourceView.range(start, parser.prev().lexeme))
+    return ast.AstPrintStmt(
+        expr=expr, region=er.SourceView.range(start, parser.prev().lexeme)
+    )
 
 
 def finish_block_stmt(parser: Parser) -> Result[ast.AstBlockStmt]:
@@ -362,7 +428,9 @@ def finish_block_stmt(parser: Parser) -> Result[ast.AstBlockStmt]:
         if isinstance(decl, er.CompileError):
             return decl
         decls.append(decl)
-    return ast.AstBlockStmt(decls, er.SourceView.range(start, parser.prev().lexeme))
+    return ast.AstBlockStmt(
+        decls=decls, region=er.SourceView.range(start, parser.prev().lexeme)
+    )
 
 
 def finish_if_stmt(parser: Parser) -> Result[ast.AstIfStmt]:
@@ -421,10 +489,10 @@ def finish_if_stmt(parser: Parser) -> Result[ast.AstIfStmt]:
             else_block = else_block_
             break
     return ast.AstIfStmt(
-        if_pair,
-        elif_pairs,
-        else_block,
-        er.SourceView.range(start, parser.prev().lexeme),
+        if_part=if_pair,
+        elif_parts=elif_pairs,
+        else_part=else_block,
+        region=er.SourceView.range(start, parser.prev().lexeme),
     )
 
 
@@ -453,7 +521,7 @@ def finish_while_stmt(parser: Parser) -> Result[ast.AstWhileStmt]:
     if isinstance(block, er.CompileError):
         return block
     return ast.AstWhileStmt(
-        cond, block, er.SourceView.range(start, parser.prev().lexeme)
+        cond=cond, block=block, region=er.SourceView.range(start, parser.prev().lexeme)
     )
 
 
@@ -477,7 +545,7 @@ def finish_return_stmt(parser: Parser) -> Result[ast.AstReturnStmt]:
                 regions=[parser.prev().lexeme, parser.curr_region()],
             )
     region = er.SourceView.range(return_token.lexeme, parser.prev().lexeme)
-    return ast.AstReturnStmt(expr, region)
+    return ast.AstReturnStmt(expr=expr, region=region)
 
 
 def parse_expr_stmt(parser: Parser) -> Result[ast.AstExprStmt]:
@@ -494,7 +562,9 @@ def parse_expr_stmt(parser: Parser) -> Result[ast.AstExprStmt]:
             message="expected ';' to end expression statement",
             regions=[parser.prev().lexeme, parser.curr_region()],
         )
-    return ast.AstExprStmt(expr, er.SourceView.range(expr.region, parser.prev().lexeme))
+    return ast.AstExprStmt(
+        expr=expr, region=er.SourceView.range(expr.region, parser.prev().lexeme)
+    )
 
 
 def finish_group_type(parser: Parser) -> Result[ast.AstType]:
@@ -521,7 +591,7 @@ def finish_optional_type(parser: Parser, target: ast.AstType) -> Result[ast.AstT
     already been consumed.
     """
     return ast.AstOptionalType(
-        target, er.SourceView.range(target.region, parser.prev().lexeme)
+        target=target, region=er.SourceView.range(target.region, parser.prev().lexeme)
     )
 
 
@@ -535,7 +605,7 @@ def finish_union_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
         return rhs
     types = [lhs] + rhs
     region = er.SourceView.range(types[0].region, types[-1].region)
-    return ast.AstUnionType(types, region)
+    return ast.AstUnionType(types=types, region=region)
 
 
 def finish_tuple_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
@@ -548,7 +618,7 @@ def finish_tuple_type(parser: Parser, lhs: ast.AstType) -> Result[ast.AstType]:
         return rhs
     types = [lhs] + rhs
     region = er.SourceView.range(types[0].region, types[-1].region)
-    return ast.AstTupleType(tuple(types), region)
+    return ast.AstTupleType(types=types, region=region)
 
 
 def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
@@ -570,7 +640,7 @@ def finish_func_type(parser: Parser) -> Result[ast.AstFuncType]:
     if isinstance(return_type, er.CompileError):
         return return_type
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstFuncType(params, return_type, region)
+    return ast.AstFuncType(params=params, return_type=return_type, region=region)
 
 
 def finish_ident_type(parser: Parser) -> Result[ast.AstIdentType]:
@@ -578,7 +648,7 @@ def finish_ident_type(parser: Parser) -> Result[ast.AstIdentType]:
     Parse an identifier type from the parser or return an error. Assumes that the identifier token
     has already been consumed.
     """
-    return ast.AstIdentType(parser.prev())
+    return ast.AstIdentType(token=parser.prev())
 
 
 def finish_void_type(parser: Parser) -> Result[ast.AstVoidType]:
@@ -586,7 +656,7 @@ def finish_void_type(parser: Parser) -> Result[ast.AstVoidType]:
     Parse a void type from the parser or return an error. Assumes that the "void" token has already
     been consumed.
     """
-    return ast.AstVoidType(parser.prev())
+    return ast.AstVoidType(token=parser.prev())
 
 
 def finish_group_expr(parser: Parser) -> Result[ast.AstExpr]:
@@ -617,7 +687,7 @@ def finish_unary_expr(parser: Parser) -> Result[ast.AstExpr]:
     if isinstance(target, er.CompileError):
         return target
     region = er.SourceView.range(operator.lexeme, target.region)
-    return ast.AstUnaryExpr(operator, target, region)
+    return ast.AstUnaryExpr(operator=operator, target=target, region=region)
 
 
 def finish_binary_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
@@ -632,16 +702,21 @@ def finish_binary_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     if isinstance(rhs, er.CompileError):
         return rhs
     region = er.SourceView.range(lhs.region, rhs.region)
-    return ast.AstBinaryExpr(operator, lhs, rhs, region)
+    return ast.AstBinaryExpr(operator=operator, left=lhs, right=rhs, region=region)
 
 
 def parse_alias(parser: Parser) -> Result[Tuple[ast.AstExpr, ast.AstBinding]]:
     """
     Parse an alias from the parser or return an error.
 
-    ALIAS : AstExpr "as" AstBinding | AstIdentExpr ;
+    ALIAS : "(" AstExpr ")" "as" AstBinding | AstIdentExpr ;
     """
-    target = parse_expr(parser)
+    if not parser.match(lx.TokenType.LEFT_PAREN):
+        return er.CompileError(
+            message="expected '(' to open target expression",
+            regions=[parser.curr_region()],
+        )
+    target = finish_group_expr(parser)
     if isinstance(target, er.CompileError):
         return target
     if parser.match(lx.TokenType.AS):
@@ -651,7 +726,7 @@ def parse_alias(parser: Parser) -> Result[Tuple[ast.AstExpr, ast.AstBinding]]:
     else:
         if isinstance(target, ast.AstIdentExpr):
             # "<ident>" is syntax sugar for "<ident> as <ident>"
-            binding = ast.AstBinding(target.name, target.region)
+            binding = ast.AstBinding(name=target.name, region=target.region)
         else:
             return er.CompileError(
                 message=f"missing binding for non-identifier target expression",
@@ -734,7 +809,9 @@ def finish_case_expr(parser: Parser) -> Result[ast.AstExpr]:
         return fallback
 
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstCaseExpr(*alias, cases, fallback, region)
+    return ast.AstCaseExpr(
+        target=alias[0], binding=alias[1], cases=cases, fallback=fallback, region=region
+    )
 
 
 def finish_call_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
@@ -748,7 +825,7 @@ def finish_call_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
     if isinstance(args, er.CompileError):
         return args
     region = er.SourceView.range(lhs.region, parser.prev().lexeme)
-    return ast.AstCallExpr(lhs, args, region)
+    return ast.AstCallExpr(function=lhs, args=args, region=region)
 
 
 def finish_tuple_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
@@ -763,7 +840,7 @@ def finish_tuple_expr(parser: Parser, lhs: ast.AstExpr) -> Result[ast.AstExpr]:
         return rhs
     exprs = [lhs] + rhs
     region = er.SourceView.range(exprs[0].region, exprs[-1].region)
-    return ast.AstTupleExpr(tuple(exprs), region)
+    return ast.AstTupleExpr(exprs=exprs, region=region)
 
 
 def finish_lambda_expr(parser: Parser) -> Result[ast.AstExpr]:
@@ -783,10 +860,28 @@ def finish_lambda_expr(parser: Parser) -> Result[ast.AstExpr]:
     if isinstance(value, er.CompileError):
         return value
     region = er.SourceView.range(start, parser.prev().lexeme)
-    return ast.AstLambdaExpr(params, value, region)
+    return ast.AstLambdaExpr(params=params, value=value, region=region)
 
 
-def finish_int_expr(parser: Parser) -> Result[ast.AstIntExpr]:
+def finish_access_expr(parser: Parser, target: ast.AstExpr) -> Result[ast.AstExpr]:
+    """
+    Parse an access expression from the parser or return an error. Assumes that the opening '{' has
+    already been consumed.
+    """
+    if not parser.match(lx.TokenType.IDENTIFIER):
+        return er.CompileError(
+            message=f"expected identifier for field access",
+            regions=[parser.curr_region()],
+        )
+    ident = parser.prev()
+    return ast.AstAccessExpr(
+        target=target,
+        name=str(ident),
+        region=er.SourceView.range(target.region, ident.lexeme),
+    )
+
+
+def finish_int_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse an int expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -797,10 +892,10 @@ def finish_int_expr(parser: Parser) -> Result[ast.AstIntExpr]:
         return er.CompileError(
             message="literal value is too large", regions=[token.lexeme]
         )
-    return ast.AstIntExpr(token)
+    return ast.AstIntExpr(literal=token)
 
 
-def finish_num_expr(parser: Parser) -> Result[ast.AstNumExpr]:
+def finish_num_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse a num expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -813,10 +908,10 @@ def finish_num_expr(parser: Parser) -> Result[ast.AstNumExpr]:
                 message="too many decimal palces, precision up to only 7 is supported",
                 regions=[token.lexeme],
             )
-    return ast.AstNumExpr(token)
+    return ast.AstNumExpr(literal=token)
 
 
-def finish_str_expr(parser: Parser) -> Result[ast.AstStrExpr]:
+def finish_str_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse a str expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
@@ -826,31 +921,74 @@ def finish_str_expr(parser: Parser) -> Result[ast.AstStrExpr]:
         return er.CompileError(
             message="string literal too long, max length is 512", regions=[token.lexeme]
         )
-    return ast.AstStrExpr(token)
+    return ast.AstStrExpr(literal=token)
 
 
-def finish_ident_expr(parser: Parser) -> Result[ast.AstIdentExpr]:
+def finish_ident_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse an identifier expression from the parser or return an error. Assumes that the identifier
     has already been consumed.
     """
-    return ast.AstIdentExpr(parser.prev())
+    ident = parser.prev()
+    # Check if it's a construct expression
+    if parser.match(lx.TokenType.LEFT_BRACE):
+
+        def parse_init(parser: Parser) -> Result[Tuple[lx.Token, ast.AstExpr]]:
+            if not parser.match(lx.TokenType.IDENTIFIER):
+                return er.CompileError(
+                    message="expected identifier for field specification",
+                    regions=[parser.curr_region()],
+                )
+            name = parser.prev()
+            if not parser.match(lx.TokenType.EQUALS):
+                return er.CompileError(
+                    message="expected '=' for field value",
+                    regions=[parser.curr_region()],
+                )
+            value = parse_expr(parser, precedence=Precedence.TUPLE.next())
+            if isinstance(value, er.CompileError):
+                return value
+            return name, value
+
+        inits = finish_tuple(parser, parse_init, lx.TokenType.RIGHT_BRACE)
+        if isinstance(inits, er.CompileError):
+            return inits
+
+        init_dict: Dict[str, Tuple[lx.Token, ast.AstExpr]] = {}
+        for token, value in inits:
+            if str(token) in init_dict:
+                old_ident, _ = init_dict[str(token)]
+                # TODO: Don't do this here, make it an alist and have a de-duplication pass later
+                return er.CompileError(
+                    message="duplicate specification in construct",
+                    regions=[old_ident.lexeme, token.lexeme],
+                )
+            init_dict[str(token)] = token, value
+
+        region = er.SourceView.range(ident.lexeme, parser.prev().lexeme)
+        return ast.AstConstructExpr(
+            name=str(ident),
+            inits={name: value for name, (_, value) in init_dict.items()},
+            region=region,
+        )
+
+    return ast.AstIdentExpr(token=ident)
 
 
-def finish_bool_expr(parser: Parser) -> Result[ast.AstBoolExpr]:
+def finish_bool_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse a bool expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
     """
-    return ast.AstBoolExpr(parser.prev())
+    return ast.AstBoolExpr(literal=parser.prev())
 
 
-def finish_nil_expr(parser: Parser) -> Result[ast.AstNilExpr]:
+def finish_nil_expr(parser: Parser) -> Result[ast.AstExpr]:
     """
     Parse a nil expression from the parser or return an error. Assumes that the literal token has
     already been consumed.
     """
-    return ast.AstNilExpr(parser.prev())
+    return ast.AstNilExpr(literal=parser.prev())
 
 
 @enum.unique
@@ -945,6 +1083,9 @@ EXPR_TABLE: PrattTable[ast.AstExpr] = collections.defaultdict(
         ),
         lx.TokenType.COMMA: PrattRule(
             postfix=finish_tuple_expr, precedence=Precedence.TUPLE
+        ),
+        lx.TokenType.DOT: PrattRule(
+            postfix=finish_access_expr, precedence=Precedence.CALL
         ),
         lx.TokenType.MINUS: PrattRule(
             prefix=finish_unary_expr,

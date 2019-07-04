@@ -18,6 +18,10 @@ class TypeChecker(ast.DeepVisitor):
         super().__init__()
         self.expected_returns: List[ts.Type] = []
 
+    def struct_decl(self, node: ast.AstStructDecl) -> None:
+        super().struct_decl(node)
+        node.type_annot = ts.StructType.make(node)
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
         # Handle overall type
@@ -71,7 +75,8 @@ class TypeChecker(ast.DeepVisitor):
                 regions=[node.return_type.region],
             )
         node.binding.type_annot = ts.FunctionType.make(
-            [param.type_annot for param in node.params], node.return_type.type_annot
+            [param.binding.type_annot for param in node.params],
+            node.return_type.type_annot,
         )
         self.expected_returns.append(node.return_type.type_annot)
         node.block.accept(self)
@@ -79,10 +84,10 @@ class TypeChecker(ast.DeepVisitor):
 
     def param(self, node: ast.AstParam) -> None:
         super().param(node)
-        node.type_annot = node.param_type.type_annot
-        if not ts.valid(node.type_annot):
+        node.binding.type_annot = node.param_type.type_annot
+        if not ts.valid(node.binding.type_annot):
             self.errors.add(
-                message=f"invalid type {node.type_annot} for parameter",
+                message=f"invalid type {node.binding.type_annot} for parameter",
                 regions=[node.region],
             )
 
@@ -289,8 +294,54 @@ class TypeChecker(ast.DeepVisitor):
     def lambda_expr(self, node: ast.AstLambdaExpr) -> None:
         super().lambda_expr(node)
         node.type_annot = ts.FunctionType.make(
-            [param.type_annot for param in node.params], node.value.type_annot
+            [param.binding.type_annot for param in node.params], node.value.type_annot
         )
+
+    def construct_expr(self, node: ast.AstConstructExpr) -> None:
+        super().construct_expr(node)
+        if node.ref is None:
+            return
+        struct_type = node.ref.type_annot.get_struct()
+        if struct_type is None:
+            self.errors.add(
+                message=f"cannot construct non-struct type {node.ref.type_annot}",
+                regions=[node.region],
+            )
+            return
+        for param in struct_type.ref.iter_params():
+            if param.binding.name not in node.inits:
+                self.errors.add(
+                    message=f"missing field {param.binding.name} in constructor",
+                    regions=[param.region, node.region],
+                )
+            else:
+                init_expr = node.inits[param.binding.name]
+                if init_expr.type_annot != param.param_type.type_annot:
+                    self.errors.add(
+                        message=f"mismatched type for field, expected {param.param_type.type_annot} but got {init_expr.type_annot}",
+                        regions=[param.param_type.region, init_expr.region],
+                    )
+        node.type_annot = node.ref.type_annot
+
+    def access_expr(self, node: ast.AstAccessExpr) -> None:
+        super().access_expr(node)
+        struct_type = node.target.type_annot.get_struct()
+        if struct_type is None:
+            self.errors.add(
+                message=f"cannot access field from non-struct type {node.target.type_annot}",
+                regions=[node.region],
+            )
+        else:
+            node.ref = struct_type.ref
+            for binding, _ in struct_type.ref.iter_bindings():
+                if node.name == binding.name:
+                    node.type_annot = binding.type_annot
+                    break
+            else:
+                self.errors.add(
+                    message=f"reference to undeclared field {node.name} for struct {struct_type}",
+                    regions=[node.region],
+                )
 
     def ident_type(self, node: ast.AstIdentType) -> None:
         if node.ref:

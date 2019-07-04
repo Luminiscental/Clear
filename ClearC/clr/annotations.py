@@ -3,6 +3,7 @@ Contains definitions for annotations of the ast.
 """
 
 import enum
+import dataclasses as dc
 
 # Return annotations
 
@@ -41,14 +42,14 @@ class IndexAnnotType(enum.Enum):
         return self.name
 
 
+@dc.dataclass
 class IndexAnnot:
     """
     Annotation for the index and type of a value reference.
     """
 
-    def __init__(self, value: int, kind: IndexAnnotType) -> None:
-        self.value = value
-        self.kind = kind
+    value: int
+    kind: IndexAnnotType
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, IndexAnnot):

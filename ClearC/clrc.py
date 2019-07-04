@@ -84,6 +84,10 @@ def main() -> None:
     source_file_name, dest_file_name = _get_filenames()
     source = _read_source(source_file_name)
 
+    if not source:
+        print("No source code found in {source_file_name}")
+        sys.exit(1)
+
     print("--------")
 
     # Lexical analysis

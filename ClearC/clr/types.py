@@ -2,17 +2,31 @@
 Module defining the type system.
 """
 
-from typing import Union, NamedTuple, Set, List, Iterable, Optional, Any, Dict
+from typing import NamedTuple, Set, List, Iterable, Optional, Any, Dict
 
 import enum
+import dataclasses as dc
+
+# Module import for type annotations
+from clr import ast  # pylint: disable=unused-import
 
 import clr.util as util
 import clr.bytecode as bc
 
-UnitType = Union["UnresolvedType", "BuiltinType", "FunctionType", "TupleType"]
+
+class UnitType:
+    """
+    Base class for a unit type.
+    """
+
+    def valid(self) -> bool:
+        """
+        Returns true if this is a valid type for a value.
+        """
+        raise NotImplementedError
 
 
-class UnresolvedType:
+class UnresolvedType(UnitType):
     """
     Represents an unresolved type.
     """
@@ -26,18 +40,23 @@ class UnresolvedType:
     def __eq__(self, other: object) -> bool:
         if isinstance(other, UnresolvedType):
             return True
-        if isinstance(other, (BuiltinType, FunctionType, TupleType)):
+        if isinstance(other, (BuiltinType, StructType, FunctionType, TupleType)):
             return False
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
-        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType, TupleType)):
+        if isinstance(
+            other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
+        ):
             return not self == other
         return NotImplemented
 
+    def valid(self) -> bool:
+        return False
+
 
 @enum.unique
-class BuiltinType(enum.Enum):
+class BuiltinType(UnitType, enum.Enum):
     """
     Enumerates the builtin unit types.
     """
@@ -65,23 +84,62 @@ class BuiltinType(enum.Enum):
     def __eq__(self, other: object) -> bool:
         if isinstance(other, BuiltinType):
             return super().__eq__(other)
-        if isinstance(other, (UnresolvedType, FunctionType, TupleType)):
+        if isinstance(other, (UnresolvedType, StructType, FunctionType, TupleType)):
             return False
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
-        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType, TupleType)):
+        if isinstance(
+            other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
+        ):
             return not self == other
         return NotImplemented
 
     def valid(self) -> bool:
-        """
-        Returns true if this is a valid type for a value.
-        """
         return self != BuiltinType.VOID
 
 
-class FunctionType(NamedTuple):
+@dc.dataclass
+class StructType(UnitType):
+    """
+    Represents a struct type.
+    """
+
+    ref: "ast.AstStructDecl"
+
+    @staticmethod
+    def make(ref: "ast.AstStructDecl") -> "Type":
+        """
+        Make a struct type. Wraps the constructor.
+        """
+        return Type({StructType(ref)})
+
+    def __str__(self) -> str:
+        return self.ref.name
+
+    def __hash__(self) -> int:
+        return hash(str(self.ref))
+
+    def __eq__(self, other: object) -> bool:
+        if isinstance(other, StructType):
+            return self.ref == other.ref
+        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType, TupleType)):
+            return False
+        return NotImplemented
+
+    def __ne__(self, other: object) -> bool:
+        if isinstance(
+            other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
+        ):
+            return not self == other
+        return NotImplemented
+
+    def valid(self) -> bool:
+        return True
+
+
+@dc.dataclass
+class FunctionType(UnitType):
     """
     Represents a function type.
     """
@@ -109,25 +167,25 @@ class FunctionType(NamedTuple):
                 self.parameters == other.parameters
                 and self.return_type == other.return_type
             )
-        if isinstance(other, (UnresolvedType, BuiltinType, TupleType)):
+        if isinstance(other, (UnresolvedType, BuiltinType, StructType, TupleType)):
             return False
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
-        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType, TupleType)):
+        if isinstance(
+            other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
+        ):
             return not self == other
         return NotImplemented
 
     def valid(self) -> bool:
-        """
-        Returns true if this is a valid type for a value.
-        """
         return all(valid(param) for param in self.parameters) and (
             valid(self.return_type) or self.return_type == BuiltinType.VOID
         )
 
 
-class TupleType(NamedTuple):
+@dc.dataclass
+class TupleType(UnitType):
     """
     Represents a tuple type.
     """
@@ -151,19 +209,18 @@ class TupleType(NamedTuple):
     def __eq__(self, other: object) -> bool:
         if isinstance(other, TupleType):
             return self.elements == other.elements
-        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType)):
+        if isinstance(other, (UnresolvedType, BuiltinType, StructType, FunctionType)):
             return False
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
-        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType, TupleType)):
+        if isinstance(
+            other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
+        ):
             return not self == other
         return NotImplemented
 
     def valid(self) -> bool:
-        """
-        Returns true if this is a valid type for a value.
-        """
         return all(valid(elem) for elem in self.elements)
 
 
@@ -190,13 +247,16 @@ class Type:
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Type):
             return self.units == other.units
-        if isinstance(other, (UnresolvedType, BuiltinType, FunctionType, TupleType)):
+        if isinstance(
+            other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
+        ):
             return len(self.units) == 1 and other in self.units
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
         if isinstance(
-            other, (Type, UnresolvedType, BuiltinType, FunctionType, TupleType)
+            other,
+            (Type, UnresolvedType, BuiltinType, StructType, FunctionType, TupleType),
         ):
             return not self == other
         return NotImplemented
@@ -208,6 +268,12 @@ class Type:
         if isinstance(unit, kind):
             return unit
         return None
+
+    def get_struct(self) -> Optional[StructType]:
+        """
+        Returns a unit struct type if this is a unit struct type.
+        """
+        return self._get_as(StructType)
 
     def get_tuple(self) -> Optional[TupleType]:
         """
