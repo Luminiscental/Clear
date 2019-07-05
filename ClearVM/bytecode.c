@@ -14,25 +14,6 @@ static Result disassembleSimple(const char *name, size_t *index) {
     return RESULT_OK;
 }
 
-static Result disassembleExtractFields(uint8_t *code, size_t length,
-                                       size_t *index) {
-
-    *index = *index + 1;
-
-    if (*index > length - 2 * sizeof(uint8_t)) {
-
-        printf("\n|| EOF while parsing constant uint8_t\n");
-    }
-
-    uint8_t *offset = (uint8_t *)(code + *index);
-    uint8_t *field = (uint8_t *)(code + *index + sizeof(uint8_t));
-    *index = *index + 2 * sizeof(uint8_t);
-
-    printf("%-18s %d %d\n", "OP_EXTRACT_FIELD", *offset, *field);
-
-    return RESULT_OK;
-}
-
 #define DIS_UNARY(fName, format, type)                                         \
     static Result disassemble##fName(const char *name, uint8_t *code,          \
                                      size_t length, size_t *index) {           \
@@ -52,10 +33,35 @@ static Result disassembleExtractFields(uint8_t *code, size_t length,
         return RESULT_OK;                                                      \
     }
 
+#define DIS_BINARY(fName, format1, type1, format2, type2)                      \
+    static Result disassemble##fName(const char *name, uint8_t *code,          \
+                                     size_t length, size_t *index) {           \
+                                                                               \
+        *index = *index + 1;                                                   \
+        if (*index > length - sizeof(type1) - sizeof(type2)) {                 \
+                                                                               \
+            printf("\n|| EOF reached while parsing " #type1 ", " #type2        \
+                   " arguments\n");                                            \
+            return RESULT_ERR;                                                 \
+        }                                                                      \
+                                                                               \
+        type1 *arg1Ptr = (type1 *)(code + *index);                             \
+        *index += sizeof(type1);                                               \
+                                                                               \
+        type2 *arg2Ptr = (type2 *)(code + *index);                             \
+        *index += sizeof(type2);                                               \
+                                                                               \
+        printf("%-18s " format1 " " format2 "\n", name, *arg1Ptr, *arg2Ptr);   \
+                                                                               \
+        return RESULT_OK;                                                      \
+    }
+
 DIS_UNARY(U8, "%d", uint8_t)
 DIS_UNARY(S32, "'%d'", int32_t)
 DIS_UNARY(F64, "'%f'", double)
+DIS_BINARY(U8U8, "%d", uint8_t, "%d", uint8_t)
 
+#undef DIS_BINARY
 #undef DIS_UNARY
 
 static Result disassembleInstruction(uint8_t *code, size_t length,
@@ -72,6 +78,10 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
 #define U8(name)                                                               \
     case name: {                                                               \
         return disassembleU8(#name, code, length, index);                      \
+    } break;
+#define U8U8(name)                                                             \
+    case name: {                                                               \
+        return disassembleU8U8(#name, code, length, index);                    \
     } break;
 
         U8(OP_PUSH_CONST)
@@ -127,22 +137,18 @@ static Result disassembleInstruction(uint8_t *code, size_t length,
         U8(OP_STRUCT)
         U8(OP_DESTRUCT)
         U8(OP_GET_FIELD)
+        U8U8(OP_EXTRACT_FIELD)
+        U8(OP_SET_FIELD)
+        U8U8(OP_INSERT_FIELD)
 
-        case OP_EXTRACT_FIELD: {
+        U8(OP_REF_LOCAL)
+        SIMPLE(OP_DEREF)
+        SIMPLE(OP_SET_REF)
 
-            return disassembleExtractFields(code, length, index);
+        U8(OP_IS_VAL_TYPE)
+        U8(OP_IS_OBJ_TYPE)
 
-        } break;
-
-            U8(OP_SET_FIELD)
-
-            U8(OP_REF_LOCAL)
-            SIMPLE(OP_DEREF)
-            SIMPLE(OP_SET_REF)
-
-            U8(OP_IS_VAL_TYPE)
-            U8(OP_IS_OBJ_TYPE)
-
+#undef U8U8
 #undef U8
 #undef SIMPLE
 

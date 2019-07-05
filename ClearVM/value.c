@@ -320,7 +320,7 @@ bool valuesEqual(Value a, Value b) {
     }
 }
 
-// TODO: Make this consistent with OP_PRINT
+// Use for stack debugging only
 void printValue(Value value) {
 
     switch (value.type) {

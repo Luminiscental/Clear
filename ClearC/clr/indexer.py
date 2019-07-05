@@ -119,9 +119,10 @@ class IndexBuilder(ast.ContextVisitor):
         node.binding.index_annot.kind = an.IndexAnnotType.PARAM
 
     def struct_decl(self, node: ast.AstStructDecl) -> None:
-        for binding, is_param in node.iter_bindings():
+        for _, is_param in node.iter_bindings():
             if not is_param:
-                binding.accept(self)
+                node.indices.append(self._make_index())
+                # TODO: Index the declaration in the context of the generator function
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.val_init.accept(self)

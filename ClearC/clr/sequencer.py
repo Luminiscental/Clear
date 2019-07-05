@@ -23,8 +23,16 @@ class SequenceBuilder(ast.ContextVisitor):
         self.completed: List[AstNameDecl] = []
 
     def _decl(self, node: ast.AstDecl) -> None:
-        if node.scope and isinstance(node.scope, (ast.Ast, ast.AstBlockStmt)):
-            node.scope.sequence.append(node)
+        context = self._get_context()
+        if isinstance(context, (ast.AstBlockStmt, ast.Ast)):
+            context.sequence.append(node)
+        if isinstance(context, ast.AstFuncDecl):
+            context.block.sequence.append(node)
+        if isinstance(context, ast.AstStructDecl):
+            if node in context.fields and isinstance(
+                node, (ast.AstValueDecl, ast.AstFuncDecl)
+            ):
+                context.sequence.append(node)
 
     def _start(self, node: AstNameDecl) -> bool:
         if node in self.completed:
@@ -45,7 +53,9 @@ class SequenceBuilder(ast.ContextVisitor):
     def struct_decl(self, node: ast.AstStructDecl) -> None:
         if self._start(node):
             with self._name_decl(node):
-                raise NotImplementedError
+                for param in node.iter_params():
+                    node.sequence.append(param)
+                super().struct_decl(node)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         if self._start(node):
@@ -80,6 +90,10 @@ class SequenceWriter(ast.DeepVisitor):
     def start(self, node: ast.Ast) -> None:
         super().start(node)
         node.decls = node.sequence
+
+    def struct_decl(self, node: ast.AstStructDecl) -> None:
+        super().struct_decl(node)
+        node.fields = node.sequence
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
         super().block_stmt(node)

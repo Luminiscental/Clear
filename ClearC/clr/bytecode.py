@@ -211,11 +211,12 @@ class Opcode(enum.Enum):
     GET_FIELD = 44
     EXTRACT_FIELD = 45
     SET_FIELD = 46
-    REF_LOCAL = 47
-    DEREF = 48
-    SET_REF = 49
-    IS_VAL_TYPE = 50
-    IS_OBJ_TYPE = 51
+    INSERT_FIELD = 47
+    REF_LOCAL = 48
+    DEREF = 49
+    SET_REF = 50
+    IS_VAL_TYPE = 51
+    IS_OBJ_TYPE = 52
 
     def __str__(self) -> str:
         return "OP_" + self.name

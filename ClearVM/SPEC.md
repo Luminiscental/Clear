@@ -656,7 +656,19 @@ __Opcodes__
     Pops a value off the stack and sets the field at the given index of the struct below to it. If
     the value below isn't a struct or the index is too large this emits an error.
 
-- 0x2f (`OP_REF_LOCAL`)
+- 0x2f (`OP_INSERT_FIELD`)
+
+    _Parameters_: `offset` (unsigned byte), `index` (unsigned byte)
+
+    _Initial Stack_: `..., struct, ..., value`
+
+    _Final Stack_: `..., struct, ...`
+
+    Pops a value off the stack and peeks down the stack by the given offset to set the struct value
+    at that offset's field at the given index with the popped value. If the peeked value is not a
+    struct or the index is too large this emits an error.
+
+- 0x30 (`OP_REF_LOCAL`)
 
     _Parameters_: `index` (unsigned byte)
 
@@ -667,7 +679,7 @@ __Opcodes__
     Pushes an upvalue referencing the local at the given index (i.e. the value on the stack offset
     from the FP by the index). If the index is above the top of the stack this emits an error.
 
-- 0x30 (`OP_DEREF`)
+- 0x31 (`OP_DEREF`)
 
     _Parameters_: none
 
@@ -677,7 +689,7 @@ __Opcodes__
 
     Pops an upvalue and pushes its referenced value.
 
-- 0x31 (`OP_SET_REF`)
+- 0x32 (`OP_SET_REF`)
 
     _Parameters_: none
 
@@ -687,7 +699,7 @@ __Opcodes__
 
     Pops a value then an upvalue and sets the upvalues reference to the popped value.
 
-- 0x32 (`OP_IS_VAL_TYPE`)
+- 0x33 (`OP_IS_VAL_TYPE`)
 
     _Parameters_: `type`
 
@@ -698,7 +710,7 @@ __Opcodes__
     Peeks at the top of the stack and pushes a boolean for whether its type is equal to the
     argument.
 
-- 0x33 (`OP_IS_OBJ_TYPE`)
+- 0x34 (`OP_IS_OBJ_TYPE`)
 
     _Parameters_: `type`
 

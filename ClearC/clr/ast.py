@@ -379,6 +379,8 @@ class ContextVisitor(DeepVisitor):
 
 # Node definitions:
 
+# TODO: this expressions
+
 # Base node types:
 
 
@@ -557,6 +559,11 @@ class AstStructDecl(AstDecl, AstScope, AstTyped):
     fields: List[Union[AstParam, "AstValueDecl", "AstFuncDecl"]] = dc.field(
         default_factory=list
     )
+    # Annotations:
+    sequence: List[Union[AstParam, "AstValueDecl", "AstFuncDecl"]] = dc.field(
+        default_factory=list
+    )
+    indices: List[an.IndexAnnot] = dc.field(default_factory=list)
 
     def iter_params(self) -> Iterable[AstParam]:
         """
@@ -598,7 +605,7 @@ class AstValueDecl(AstDecl, AstTyped):
 
 
 @dc.dataclass
-class AstFuncDecl(AstDecl, AstFunction):
+class AstFuncDecl(AstDecl, AstFunction, AstTyped):
     """
     Ast node for a function declaration.
     """

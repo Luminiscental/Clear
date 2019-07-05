@@ -1,12 +1,19 @@
 
-struct Point {
-    num x;
-    num y;
+struct Context {
+    func() void callback;
 
-    val class_name := "Point";
+    func do_stuff() void {
+        print "doing stuff";
+    }
+
+    val class_name := "Context";
 }
 
-val p := Point { x=1, y=3 };
+func print_(str msg) void {
+    print msg;
+}
 
-print p.class_name;
-print str(p.x) + ", " + str(p.y);
+val c := Context { callback=func() print_("called") };
+c.callback();
+c.do_stuff();
+print c.class_name;

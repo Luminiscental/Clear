@@ -905,6 +905,38 @@ static Result op_setField(VM *vm) {
     return RESULT_OK;
 }
 
+static Result op_insertField(VM *vm) {
+
+    READ(offset)
+    READ(index)
+
+    traceOpcode(vm, "OP_INSERT_FIELD", false);
+    traceU8(offset, false);
+    traceU8(index, true);
+
+    POP(fieldValue)
+    PEEK(structValue, offset)
+
+    if (structValue->type != VAL_OBJ ||
+        structValue->as.obj->type != OBJ_STRUCT) {
+
+        printf("|| Cannot set field into non-struct value\n");
+        return RESULT_ERR;
+    }
+
+    StructObject *structObj = (StructObject *)structValue->as.obj->ptr;
+
+    if (index >= structObj->fieldCount) {
+
+        printf("|| Field %d is out of range\n", index);
+        return RESULT_ERR;
+    }
+
+    structObj->fields[index] = fieldValue;
+
+    return RESULT_OK;
+}
+
 static Result op_refLocal(VM *vm) {
 
     READ(index)
@@ -1082,6 +1114,7 @@ Result initVM(VM *vm) {
     INSTR(OP_GET_FIELD, op_getField);
     INSTR(OP_EXTRACT_FIELD, op_extractField);
     INSTR(OP_SET_FIELD, op_setField);
+    INSTR(OP_INSERT_FIELD, op_insertField);
 
     INSTR(OP_REF_LOCAL, op_refLocal);
     INSTR(OP_DEREF, op_deref);

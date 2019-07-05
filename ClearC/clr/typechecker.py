@@ -81,6 +81,7 @@ class TypeChecker(ast.DeepVisitor):
         self.expected_returns.append(node.return_type.type_annot)
         node.block.accept(self)
         self.expected_returns.pop()
+        node.type_annot = node.binding.type_annot
 
     def param(self, node: ast.AstParam) -> None:
         super().param(node)

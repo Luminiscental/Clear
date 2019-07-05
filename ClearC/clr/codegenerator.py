@@ -304,7 +304,22 @@ class CodeGenerator(ast.ContextVisitor):
         self.program.emit_return()
 
     def struct_decl(self, node: ast.AstStructDecl) -> None:
-        raise NotImplementedError
+        idx = 0
+        for field in node.fields:
+            if isinstance(field, ast.AstParam):
+                continue
+            with self.program.function(
+                ts.FunctionType.make([node.type_annot], field.type_annot), []
+            ):
+                if isinstance(field, ast.AstValueDecl):
+                    field.val_init.accept(self)
+                else:
+                    field.accept(self)
+                self.program.append_op(bc.Opcode.SET_RETURN)
+                self.program.append_op(bc.Opcode.POP)
+                self.program.emit_return()
+            self.program.declare(node.indices[idx])
+            idx += 1
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.val_init.accept(self)
@@ -504,27 +519,50 @@ class CodeGenerator(ast.ContextVisitor):
         if not isinstance(node.ref, ast.AstStructDecl):
             return
         struct = node.ref
-        with self.program.struct(struct.type_annot, field_count=len(struct.fields)):
-            for binding, is_param in struct.iter_bindings():
-                if is_param:
-                    node.inits[binding.name].accept(self)
+        binding_count = len(list(struct.iter_bindings()))
+        with self.program.struct(struct.type_annot, field_count=binding_count):
+            idx = 0
+            for field in struct.fields:
+                if isinstance(field, ast.AstParam):
+                    # Create the constructor parameter
+                    node.inits[field.binding.name].accept(self)
                 else:
-                    self.program.load(binding.index_annot)
-        for i, (_, is_param) in enumerate(struct.iter_bindings()):
-            if is_param:
+                    # Load the generator first
+                    self.program.load(struct.indices[idx])
+                    idx += 1
+                    # Add dummy values for tuple unpacking
+                    if isinstance(field, ast.AstValueDecl):
+                        for _ in field.bindings[1:]:
+                            self.program.append_op(bc.Opcode.PUSH_NIL)
+        # Call all the field generators
+        idx = 0
+        for field in struct.fields:
+            if isinstance(field, ast.AstParam):
+                idx += 1
                 continue
-            # Get the field generator
-            self.program.append_op(bc.Opcode.GET_FIELD)
-            self.program.append_op(1 + i)
-            # Get the constructed object
+            # Extract the generator
+            self.program.append_op(bc.Opcode.EXTRACT_FIELD)
+            self.program.append_op(0)
+            self.program.append_op(1 + idx)
+            # Call it
             self.program.load(node.index_annot)
-            # Call the field generator with it
-            self.program.call(args=1, non_void=True)
-            # Set the field
-            self.program.append_op(bc.Opcode.SET_FIELD)
-            self.program.append_op(1 + i)
+            self.program.call(1, non_void=True)
+            # Put the result in the struct
+            if isinstance(field, ast.AstValueDecl) and len(field.bindings) > 1:
+                self.program.append_op(bc.Opcode.DESTRUCT)
+                self.program.append_op(1)
+                for i in reversed(range(len(field.bindings))):
+                    self.program.append_op(bc.Opcode.INSERT_FIELD)
+                    self.program.append_op(i)
+                    self.program.append_op(1 + idx + i)
+                idx += len(field.bindings)
+            else:
+                self.program.append_op(bc.Opcode.SET_FIELD)
+                self.program.append_op(1 + idx)
+                idx += 1
 
     def access_expr(self, node: ast.AstAccessExpr) -> None:
+        super().access_expr(node)
         if not node.ref:
             return
         self.program.append_op(bc.Opcode.GET_FIELD)

@@ -81,6 +81,15 @@ class Parser:
             return curr.kind == kind
         return False
 
+    def check_all(self, pattern: List[lx.TokenType]) -> bool:
+        """
+        Checks to see if the current and following tokens match a list of types.
+        """
+        if self.current + len(pattern) >= len(self.tokens):
+            return False
+        match_tokens = self.tokens[self.current : self.current + len(pattern)]
+        return [token.kind for token in match_tokens] == pattern
+
     def match(self, kind: lx.TokenType) -> bool:
         """
         Checks if the current token is of a given type, and advances past it if it is.
@@ -145,7 +154,8 @@ def parse_decl(parser: Parser) -> Result[ast.AstDecl]:
         return finish_struct_decl(parser)
     if parser.match(lx.TokenType.VAL):
         return finish_value_decl(parser)
-    if parser.match(lx.TokenType.FUNC) and not parser.check(lx.TokenType.LEFT_PAREN):
+    if parser.check_all([lx.TokenType.FUNC, lx.TokenType.IDENTIFIER]):
+        parser.advance()
         return finish_func_decl(parser)
     return parse_stmt(parser)
 
@@ -187,9 +197,8 @@ def finish_struct_decl(parser: Parser) -> Result[ast.AstStructDecl]:
     ) -> Result[Union[ast.AstParam, ast.AstFuncDecl, ast.AstValueDecl]]:
         if parser.match(lx.TokenType.VAL):
             return finish_value_decl(parser)
-        if parser.match(lx.TokenType.FUNC) and not parser.check(
-            lx.TokenType.LEFT_PAREN
-        ):
+        if parser.check_all([lx.TokenType.FUNC, lx.TokenType.IDENTIFIER]):
+            parser.advance()
             return finish_func_decl(parser)
         param = parse_param(parser)
         if isinstance(param, er.CompileError):

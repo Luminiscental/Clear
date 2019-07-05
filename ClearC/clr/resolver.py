@@ -31,39 +31,11 @@ class NameTracker(ast.ContextVisitor):
         names[name] = node
 
     def struct_decl(self, node: ast.AstStructDecl) -> None:
+        super().struct_decl(node)
         self._set_name(node.name, node)
 
     def binding(self, node: ast.AstBinding) -> None:
         self._set_name(node.name, node)
-
-
-class ScopeTracker(ast.ContextVisitor):
-    """
-    Ast visitor to annotate what scope declarations are sequenced in.
-    """
-
-    def _decl(self, node: ast.AstDecl) -> None:
-        for context in reversed(self._contexts):
-            if isinstance(context, ast.AstScope):
-                node.scope = context
-                break
-            if isinstance(context, ast.AstFuncDecl):
-                node.scope = context.block
-                break
-
-    def if_stmt(self, node: ast.AstIfStmt) -> None:
-        super().if_stmt(node)
-        # The sub-blocks aren't sequenced separately
-        node.if_part[1].scope = None
-        for _, block in node.elif_parts:
-            block.scope = None
-        if node.else_part:
-            node.else_part.scope = None
-
-    def while_stmt(self, node: ast.AstWhileStmt) -> None:
-        super().while_stmt(node)
-        # The sub-block isn't sequenced separately
-        node.block.scope = None
 
 
 class NameResolver(ast.ContextVisitor):
@@ -111,6 +83,7 @@ class NameResolver(ast.ContextVisitor):
 
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
         self._resolve_name(node.name, node)
+        super().construct_expr(node)
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         if node.name not in ts.BUILTINS:
