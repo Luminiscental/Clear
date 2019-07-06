@@ -252,7 +252,7 @@ class AstPrinter(ast.AstVisitor):
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
         self._append(node.name)
         self._append(" {")
-        inits = list(node.inits.items())
+        inits = list(node.get_dict().items())
         if inits:
             self._append(" ")
 

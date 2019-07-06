@@ -289,7 +289,8 @@ class DeepVisitor(AstVisitor):
         node.value.accept(self)
 
     def construct_expr(self, node: "AstConstructExpr") -> None:
-        for _, value in node.inits.items():
+        for label, value in node.inits:
+            label.accept(self)
             value.accept(self)
 
     def access_expr(self, node: "AstAccessExpr") -> None:
@@ -422,7 +423,6 @@ class AstNode:
         """
         Accept a visitor to this node, calling the relevant method of the visitor.
         """
-        raise NotImplementedError
 
 
 @dc.dataclass
@@ -433,9 +433,6 @@ class AstTyped(AstNode):
 
     type_annot = ts.UNRESOLVED
 
-    def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError
-
 
 @dc.dataclass
 class AstIndexed(AstNode):
@@ -445,26 +442,17 @@ class AstIndexed(AstNode):
 
     index_annot = an.IndexAnnot(value=-1, kind=an.IndexAnnotType.UNRESOLVED)
 
-    def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError
-
 
 class AstType(AstTyped):
     """
     Base class for types to help mypy.
     """
 
-    def accept(self, visitor: AstVisitor) -> None:
-        pass
-
 
 class AstExpr(AstTyped):
     """
     Base class for expressions to help mypy.
     """
-
-    def accept(self, visitor: AstVisitor) -> None:
-        pass
 
 
 AstName = Union["AstBinding", "AstStructDecl"]
@@ -478,9 +466,6 @@ class AstScope(AstNode):
 
     names: Dict[str, AstName] = dc.field(default_factory=dict)
 
-    def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError
-
 
 @dc.dataclass
 class AstFunction(AstNode):
@@ -492,9 +477,6 @@ class AstFunction(AstNode):
     upvalues: List["AstBinding"] = dc.field(default_factory=list)
     upvalue_indices: List[an.IndexAnnot] = dc.field(default_factory=list)
 
-    def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError
-
 
 @dc.dataclass
 class AstDecl(AstNode):
@@ -504,9 +486,6 @@ class AstDecl(AstNode):
 
     return_annot = an.ReturnAnnot.NEVER
     scope: Optional[AstScope] = None
-
-    def accept(self, visitor: AstVisitor) -> None:
-        raise NotImplementedError
 
 
 AstStmt = Union[
@@ -903,15 +882,31 @@ class AstLambdaExpr(AstExpr, AstScope, AstFunction):
 
 
 @dc.dataclass
+class AstLabel(AstNode):
+    """
+    Ast node for an identifier with no extra meaning.
+    """
+
+    name: str = ""
+
+    @staticmethod
+    def make(token: lx.Token) -> "AstLabel":
+        return AstLabel(name=str(token), region=token.lexeme)
+
+
+@dc.dataclass
 class AstConstructExpr(AstExpr, AstIndexed):
     """
     Ast node for a construct expression.
     """
 
     name: str = ""
-    inits: Dict[str, AstExpr] = dc.field(default_factory=dict)
+    inits: List[Tuple[AstLabel, AstExpr]] = dc.field(default_factory=list)
     # Annotations:
     ref: Optional[AstStructDecl] = None
+
+    def get_dict(self) -> Dict[str, AstExpr]:
+        return {label.name: value for label, value in self.inits}
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.construct_expr(self)

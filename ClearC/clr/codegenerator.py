@@ -508,9 +508,10 @@ class CodeGenerator(ast.ContextVisitor):
             struct.type_annot, field_count=len(struct.params) + binding_count
         ):
             i = 0
+            inits = node.get_dict()
             # Load the parameters
             for param in struct.params:
-                node.inits[param.binding.name].accept(self)
+                inits[param.binding.name].accept(self)
                 i += 1
             # Load the generators
             for generator, bindings in struct.generators:

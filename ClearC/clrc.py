@@ -108,6 +108,7 @@ def main() -> None:
 
     # Semantic analysis
     subpasses = [
+        ("Resolve", rs.DuplicateChecker()),
         ("Resolve", rs.NameTracker()),
         ("Resolve", rs.NameResolver()),
         ("Sequencing", sq.SequenceBuilder()),

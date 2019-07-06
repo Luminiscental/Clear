@@ -314,14 +314,15 @@ class TypeChecker(ast.DeepVisitor):
                 regions=[node.region],
             )
             return
+        inits = node.get_dict()
         for param in struct_type.ref.params:
-            if param.binding.name not in node.inits:
+            if param.binding.name not in inits:
                 self.errors.add(
                     message=f"missing field {param.binding.name} in constructor",
                     regions=[param.region, node.region],
                 )
             else:
-                init_expr = node.inits[param.binding.name]
+                init_expr = inits[param.binding.name]
                 if init_expr.type_annot != param.param_type.type_annot:
                     self.errors.add(
                         message=f"mismatched type for field, expected {param.param_type.type_annot} but got {init_expr.type_annot}",

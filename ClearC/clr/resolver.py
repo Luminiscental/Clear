@@ -2,12 +2,51 @@
 Module for name resolution visitors / functions.
 """
 
-from typing import Union, Optional
+from typing import Union, Optional, List, DefaultDict
+
+import collections as co
 
 import clr.ast as ast
 import clr.types as ts
+import clr.errors as er
 
 # TODO: Warn on unused declarations
+
+
+class DuplicateChecker(ast.DeepVisitor):
+    """
+    Ast visitor to check for duplicate names in struct and constructors.
+    """
+
+    def _duplicate(
+        self, region: er.SourceView, prev: List[er.SourceView], kind: str
+    ) -> None:
+        self.errors.add(message=f"duplicate {kind} {region}", regions=[region] + prev)
+
+    def struct_decl(self, node: ast.AstStructDecl) -> None:
+        super().struct_decl(node)
+        names: DefaultDict[str, List[er.SourceView]] = co.defaultdict(list)
+        for param in node.params:
+            if param.binding.name in names:
+                self._duplicate(
+                    param.binding.region, names[param.binding.name], "struct parameter"
+                )
+            names[param.binding.name].append(param.binding.region)
+        for _, bindings in node.generators:
+            for binding in bindings:
+                if binding.name in names:
+                    self._duplicate(
+                        binding.region, names[binding.name], "struct declaration"
+                    )
+                names[binding.name].append(binding.region)
+
+    def construct_expr(self, node: ast.AstConstructExpr) -> None:
+        super().construct_expr(node)
+        names: DefaultDict[str, List[er.SourceView]] = co.defaultdict(list)
+        for label, _ in node.inits:
+            if label.name in names:
+                self._duplicate(label.region, names[label.name], "field specifier")
+            names[label.name].append(label.region)
 
 
 class NameTracker(ast.ContextVisitor):

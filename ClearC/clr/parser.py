@@ -865,6 +865,7 @@ def finish_lambda_expr(parser: Parser) -> Result[ast.AstExpr]:
     params = finish_tuple(parser, parse_param)
     if isinstance(params, er.CompileError):
         return params
+    # TODO: Decide on precedence here, maybe even force grouping
     value = parse_expr(parser, precedence=Precedence.TUPLE.next())
     if isinstance(value, er.CompileError):
         return value
@@ -942,7 +943,7 @@ def finish_ident_expr(parser: Parser) -> Result[ast.AstExpr]:
     # Check if it's a construct expression
     if parser.match(lx.TokenType.LEFT_BRACE):
 
-        def parse_init(parser: Parser) -> Result[Tuple[lx.Token, ast.AstExpr]]:
+        def parse_init(parser: Parser) -> Result[Tuple[ast.AstLabel, ast.AstExpr]]:
             if not parser.match(lx.TokenType.IDENTIFIER):
                 return er.CompileError(
                     message="expected identifier for field specification",
@@ -957,29 +958,14 @@ def finish_ident_expr(parser: Parser) -> Result[ast.AstExpr]:
             value = parse_expr(parser, precedence=Precedence.TUPLE.next())
             if isinstance(value, er.CompileError):
                 return value
-            return name, value
+            return ast.AstLabel.make(name), value
 
         inits = finish_tuple(parser, parse_init, lx.TokenType.RIGHT_BRACE)
         if isinstance(inits, er.CompileError):
             return inits
 
-        init_dict: Dict[str, Tuple[lx.Token, ast.AstExpr]] = {}
-        for token, value in inits:
-            if str(token) in init_dict:
-                old_ident, _ = init_dict[str(token)]
-                # TODO: Don't do this here, make it an alist and have a de-duplication pass later
-                return er.CompileError(
-                    message="duplicate specification in construct",
-                    regions=[old_ident.lexeme, token.lexeme],
-                )
-            init_dict[str(token)] = token, value
-
         region = er.SourceView.range(ident.lexeme, parser.prev().lexeme)
-        return ast.AstConstructExpr(
-            name=str(ident),
-            inits={name: value for name, (_, value) in init_dict.items()},
-            region=region,
-        )
+        return ast.AstConstructExpr(name=str(ident), inits=inits, region=region)
 
     return ast.AstIdentExpr.make(token=ident)
 
