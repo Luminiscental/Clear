@@ -4,7 +4,7 @@ Module defining a visitor to index identifiers of an ast.
 
 from typing import List, Iterator
 
-import contextlib
+import contextlib as cx
 
 import clr.ast as ast
 import clr.annotations as an
@@ -33,29 +33,25 @@ class UpvalueTracker(ast.ContextVisitor):
             # Globals can always be referenced directly
             if node.ref in self._global_refs:
                 return
+            # Find all the functions between the declaration and the reference
+            functions = []
             for context in reversed(self._contexts):
-                # If it's local to the function it's not an upvalue
                 if (
                     isinstance(context, ast.AstScope)
                     and node.ref in context.names.values()
-                ) or (
+                ):
+                    break
+                if (
                     isinstance(context, ast.AstFuncDecl)
                     and node.ref in context.block.names.values()
                 ):
-                    return
-                if isinstance(context, ast.AstFunction):
-                    function = context
                     break
-            else:
-                # No upvalues outside of functions
-                return
-            # Params aren't upvalues
-            if node.ref in function.params:
-                return
-            # Don't double count
-            if node.ref in function.upvalues:
-                return
-            function.upvalues.append(node.ref)
+                if isinstance(context, ast.AstFunction):
+                    functions.append(context)
+            # Add it as an upvalue to any such functions
+            for function in functions:
+                if node.ref not in function.upvalues:
+                    function.upvalues.append(node.ref)
 
 
 class IndexBuilder(ast.ContextVisitor):
@@ -86,9 +82,11 @@ class IndexBuilder(ast.ContextVisitor):
             self._frames.append(base_stack)
 
     def _pop_context(self) -> ast.AstContext:
-        self._name_counts.pop()
-        self._frames.pop()
-        return super()._pop_context()
+        context = super()._pop_context()
+        if isinstance(context, (ast.AstFunction, ast.AstScope)):
+            self._name_counts.pop()
+            self._frames.pop()
+        return context
 
     def _make_index(self) -> an.IndexAnnot:
         # Get the index value based on how many indices are already in scope
@@ -105,33 +103,19 @@ class IndexBuilder(ast.ContextVisitor):
     def _temp_index(self) -> an.IndexAnnot:
         return an.IndexAnnot(value=self._frames[-1] - 1, kind=an.IndexAnnotType.LOCAL)
 
-    @contextlib.contextmanager
+    @cx.contextmanager
     def _stack(self, offset: int) -> Iterator[None]:
         prev_stack = self._frames[-1]
         yield
         self._frames[-1] = prev_stack + offset
 
     def binding(self, node: ast.AstBinding) -> None:
-        context = self._get_context()
-        if not isinstance(context, ast.AstStructDecl):
-            node.index_annot = self._make_index()
+        node.index_annot = self._make_index()
 
     def param(self, node: ast.AstParam) -> None:
-        super().param(node)
-        node.binding.index_annot.kind = an.IndexAnnotType.PARAM
-
-    def struct_decl(self, node: ast.AstStructDecl) -> None:
-        for _, is_param in node.iter_bindings():
-            if not is_param:
-                node.indices.append(self._make_index())
-        for field in node.fields:
-            # Make function context for generator
-            self._name_counts.append(1)
-            self._frames.append(1)
-            # TODO: Handle upvalues
-            field.accept(self)
-            self._name_counts.pop()
-            self._frames.pop()
+        if not isinstance(self._get_context(), ast.AstStructDecl):
+            super().param(node)
+            node.binding.index_annot.kind = an.IndexAnnotType.PARAM
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.val_init.accept(self)

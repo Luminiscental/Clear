@@ -46,13 +46,13 @@ class AstPrinter(ast.AstVisitor):
         self._append("{")
         self._indent += 1
 
-        for field in node.fields:
-            if isinstance(field, ast.AstParam):
-                self._startline()
-                field.accept(self)
-                self._append(";")
-            else:
-                field.accept(self)
+        for param in node.params:
+            self._startline()
+            param.accept(self)
+            self._append(";")
+
+        for generator, _ in node.generators:
+            generator.block.decls[0].accept(self)
 
         self._indent -= 1
         self._startline()

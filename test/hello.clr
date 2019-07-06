@@ -1,26 +1,29 @@
+{
+    val outside_message := "Doing stuff";
 
-struct Context {
-    func() void callback;
+    struct Context {
+        func() void callback;
 
-    func do_stuff() void {
-        val message := "Doing stuff";
-        func inner(str context) void {
-            print context + ": " + message;
+        func do_stuff() void {
+            func inner(str context) void {
+                print context + ": " + outside_message;
+            }
+            if (true) {
+                val context, _ := "func", 2;
+                inner(context);
+            }
         }
-        if (true) {
-            val context, _ := "func", 2;
-            inner(context);
-        }
+
+        val class_name, description := "Context", "idk has a callback and stuff u kno";
     }
 
-    val class_name := "Context";
-}
+    func print_(str msg) void {
+        print msg;
+    }
 
-func print_(str msg) void {
-    print msg;
+    val c := Context { callback=func() print_("called") };
+    c.callback();
+    c.do_stuff();
+    print c.class_name;
+    print c.description;
 }
-
-val c := Context { callback=func() print_("called") };
-c.callback();
-c.do_stuff();
-print c.class_name;

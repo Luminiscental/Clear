@@ -229,11 +229,14 @@ class Type:
     Class representing the type of a value, with a set of subtypes.
     """
 
-    def __init__(self, units: Set[UnitType]) -> None:
+    def __init__(self, units: Set[UnitType], is_any: bool = False) -> None:
         self.units = units
         self.contract()
+        self.is_any = is_any
 
     def __str__(self) -> str:
+        if self.is_any:
+            return "anything"
         if BuiltinType.NIL in self.units:
             target = " | ".join(
                 str(unit) for unit in self.units if unit != BuiltinType.NIL
@@ -246,11 +249,11 @@ class Type:
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Type):
-            return self.units == other.units
+            return self.is_any or self.units == other.units
         if isinstance(
             other, (UnresolvedType, BuiltinType, StructType, FunctionType, TupleType)
         ):
-            return len(self.units) == 1 and other in self.units
+            return self.is_any or len(self.units) == 1 and other in self.units
         return NotImplemented
 
     def __ne__(self, other: object) -> bool:
@@ -326,20 +329,30 @@ def union(types: Iterable[Type]) -> Type:
     """
     Returns the union of an iterable of types.
     """
-    return Type(set.union(*(subtype.units for subtype in types)))
+    if any(subtype.is_any for subtype in types):
+        return ANY
+    return Type(set.union(*(subtype.units for subtype in types if not subtype.is_any)))
 
 
 def intersection(types: Iterable[Type]) -> Type:
     """
     Returns the intersection of an iterable of types.
     """
-    return Type(set.intersection(*(subtype.units for subtype in types)))
+    if all(subtype.is_any for subtype in types):
+        return ANY
+    return Type(
+        set.intersection(*(subtype.units for subtype in types if not subtype.is_any))
+    )
 
 
 def difference(lhs: Type, rhs: Type) -> Type:
     """
     Returns the difference between two types.
     """
+    if rhs == ANY:
+        return Type(set())
+    if not rhs.units:
+        return lhs
     return Type(set.difference(lhs.units, rhs.units))
 
 
@@ -369,6 +382,7 @@ BOOL = Type({BuiltinType.BOOL})
 NUM = Type({BuiltinType.NUM})
 STR = Type({BuiltinType.STR})
 UNRESOLVED = Type({UnresolvedType()})
+ANY = Type(set(), is_any=True)
 
 
 class Builtin(NamedTuple):

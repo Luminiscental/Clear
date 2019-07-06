@@ -35,7 +35,8 @@ class NameTracker(ast.ContextVisitor):
         self._set_name(node.name, node)
 
     def binding(self, node: ast.AstBinding) -> None:
-        self._set_name(node.name, node)
+        if not isinstance(self._get_context(), ast.AstStructDecl):
+            self._set_name(node.name, node)
 
 
 class NameResolver(ast.ContextVisitor):
@@ -64,14 +65,14 @@ class NameResolver(ast.ContextVisitor):
                 message=f"reference to undeclared name {name}", regions=[node.region]
             )
             return
-        if isinstance(node, ast.AstConstructExpr):
-            if not isinstance(ref, ast.AstStructDecl):
+        if isinstance(node, (ast.AstConstructExpr, ast.AstIdentType)):
+            if isinstance(ref, ast.AstStructDecl):
+                node.ref = ref
+            else:
                 self.errors.add(
                     message=f"invalid reference to value {node.name}, expected struct",
                     regions=[node.region],
                 )
-            else:
-                node.ref = ref
         else:
             if isinstance(ref, ast.AstStructDecl):
                 self.errors.add(

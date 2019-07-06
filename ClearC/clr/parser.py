@@ -657,7 +657,7 @@ def finish_ident_type(parser: Parser) -> Result[ast.AstIdentType]:
     Parse an identifier type from the parser or return an error. Assumes that the identifier token
     has already been consumed.
     """
-    return ast.AstIdentType(token=parser.prev())
+    return ast.AstIdentType.make(token=parser.prev())
 
 
 def finish_void_type(parser: Parser) -> Result[ast.AstVoidType]:
@@ -981,7 +981,7 @@ def finish_ident_expr(parser: Parser) -> Result[ast.AstExpr]:
             region=region,
         )
 
-    return ast.AstIdentExpr(token=ident)
+    return ast.AstIdentExpr.make(token=ident)
 
 
 def finish_bool_expr(parser: Parser) -> Result[ast.AstExpr]:

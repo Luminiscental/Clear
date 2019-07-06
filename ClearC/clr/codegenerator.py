@@ -4,7 +4,7 @@ Module for generating code from an annotated ast.
 
 from typing import List, Tuple, Optional, Iterator, Dict
 
-import contextlib
+import contextlib as cx
 
 import clr.ast as ast
 import clr.annotations as an
@@ -114,7 +114,7 @@ class Program:
         for jump in end_jumps:
             self.end_jump(jump)
 
-    @contextlib.contextmanager
+    @cx.contextmanager
     def function(
         self, type_annot: ts.Type, upvalues: List[an.IndexAnnot]
     ) -> Iterator[None]:
@@ -136,7 +136,7 @@ class Program:
             for ref in upvalues:
                 self.upvalue(ref)
 
-    @contextlib.contextmanager
+    @cx.contextmanager
     def struct(self, type_annot: ts.Type, field_count: int) -> Iterator[None]:
         """
         Context manager for creating a type tagged struct.
@@ -152,7 +152,7 @@ class Program:
         self.append_op(bc.Opcode.STRUCT)
         self.append_op(field_count + 1)
 
-    @contextlib.contextmanager
+    @cx.contextmanager
     def condition(self, condition: bool) -> Iterator[None]:
         """
         Context manager for conditional execution. Pops a boolean value off the stack and only
@@ -302,24 +302,6 @@ class CodeGenerator(ast.ContextVisitor):
             self.program.append_op(bc.Opcode.POP)
         # Emit the return
         self.program.emit_return()
-
-    def struct_decl(self, node: ast.AstStructDecl) -> None:
-        idx = 0
-        for field in node.fields:
-            if isinstance(field, ast.AstParam):
-                continue
-            with self.program.function(
-                ts.FunctionType.make([node.type_annot], field.type_annot), []
-            ):
-                if isinstance(field, ast.AstValueDecl):
-                    field.val_init.accept(self)
-                else:
-                    field.accept(self)
-                self.program.append_op(bc.Opcode.SET_RETURN)
-                self.program.append_op(bc.Opcode.POP)
-                self.program.emit_return()
-            self.program.declare(node.indices[idx])
-            idx += 1
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.val_init.accept(self)
@@ -519,27 +501,28 @@ class CodeGenerator(ast.ContextVisitor):
         if not isinstance(node.ref, ast.AstStructDecl):
             return
         struct = node.ref
-        binding_count = len(list(struct.iter_bindings()))
-        with self.program.struct(struct.type_annot, field_count=binding_count):
-            idx = 0
-            for field in struct.fields:
-                if isinstance(field, ast.AstParam):
-                    # Create the constructor parameter
-                    node.inits[field.binding.name].accept(self)
-                else:
-                    # Load the generator first
-                    self.program.load(struct.indices[idx])
-                    idx += 1
-                    # Add dummy values for tuple unpacking
-                    if isinstance(field, ast.AstValueDecl):
-                        for _ in field.bindings[1:]:
-                            self.program.append_op(bc.Opcode.PUSH_NIL)
-        # Call all the field generators
-        idx = 0
-        for field in struct.fields:
-            if isinstance(field, ast.AstParam):
-                idx += 1
-                continue
+        binding_count = 0
+        for _, bindings in struct.generators:
+            binding_count += len(bindings)
+        with self.program.struct(
+            struct.type_annot, field_count=len(struct.params) + binding_count
+        ):
+            i = 0
+            # Load the parameters
+            for param in struct.params:
+                node.inits[param.binding.name].accept(self)
+                i += 1
+            # Load the generators
+            for generator, bindings in struct.generators:
+                self.program.load(generator.binding.index_annot)
+                i += len(bindings)
+                # Add nil values to fill the slots that will be unpacked later
+                if len(bindings) > 1:
+                    for _ in bindings[1:]:
+                        self.program.append_op(bc.Opcode.PUSH_NIL)
+        # Call the generators
+        idx = len(struct.params)
+        for generator, bindings in struct.generators:
             # Extract the generator
             self.program.append_op(bc.Opcode.EXTRACT_FIELD)
             self.program.append_op(0)
@@ -548,18 +531,17 @@ class CodeGenerator(ast.ContextVisitor):
             self.program.load(node.index_annot)
             self.program.call(1, non_void=True)
             # Put the result in the struct
-            if isinstance(field, ast.AstValueDecl) and len(field.bindings) > 1:
+            if len(bindings) > 1:
                 self.program.append_op(bc.Opcode.DESTRUCT)
                 self.program.append_op(1)
-                for i in reversed(range(len(field.bindings))):
+                for i in reversed(range(len(bindings))):
                     self.program.append_op(bc.Opcode.INSERT_FIELD)
                     self.program.append_op(i)
                     self.program.append_op(1 + idx + i)
-                idx += len(field.bindings)
             else:
                 self.program.append_op(bc.Opcode.SET_FIELD)
                 self.program.append_op(1 + idx)
-                idx += 1
+            idx += len(bindings)
 
     def access_expr(self, node: ast.AstAccessExpr) -> None:
         super().access_expr(node)
@@ -567,6 +549,16 @@ class CodeGenerator(ast.ContextVisitor):
             return
         self.program.append_op(bc.Opcode.GET_FIELD)
         struct = node.ref
-        for i, (binding, _) in enumerate(struct.iter_bindings()):
-            if binding.name == node.name:
-                self.program.append_op(1 + i)
+        for param_index, param in enumerate(struct.params):
+            if param.binding.name == node.name:
+                self.program.append_op(1 + param_index)
+                return
+        generator_index = 0
+        for _, bindings in struct.generators:
+            for binding_index, binding in enumerate(bindings):
+                if binding.name == node.name:
+                    self.program.append_op(
+                        1 + len(struct.params) + generator_index + binding_index
+                    )
+                    return
+            generator_index += len(bindings)

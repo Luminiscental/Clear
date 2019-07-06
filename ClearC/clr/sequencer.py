@@ -4,7 +4,7 @@ Module for sequencing visitors / functions.
 
 from typing import List, Union, Iterator
 
-import contextlib
+import contextlib as cx
 
 import clr.ast as ast
 
@@ -29,9 +29,8 @@ class SequenceBuilder(ast.ContextVisitor):
         if isinstance(context, ast.AstFuncDecl):
             context.block.sequence.append(node)
         if isinstance(context, ast.AstStructDecl):
-            if node in context.fields and isinstance(
-                node, (ast.AstValueDecl, ast.AstFuncDecl)
-            ):
+            # Should always be true
+            if isinstance(node, ast.AstFuncDecl):
                 context.sequence.append(node)
 
     def _start(self, node: AstNameDecl) -> bool:
@@ -44,7 +43,7 @@ class SequenceBuilder(ast.ContextVisitor):
             return False
         return True
 
-    @contextlib.contextmanager
+    @cx.contextmanager
     def _name_decl(self, node: AstNameDecl) -> Iterator[None]:
         self.started.append(node)
         yield
@@ -53,9 +52,11 @@ class SequenceBuilder(ast.ContextVisitor):
     def struct_decl(self, node: ast.AstStructDecl) -> None:
         if self._start(node):
             with self._name_decl(node):
-                for param in node.iter_params():
-                    node.sequence.append(param)
-                super().struct_decl(node)
+                self._push_context(node)
+                for generator, _ in node.generators:
+                    generator.accept(self)
+                self._pop_context()
+                self._decl(node)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         if self._start(node):
@@ -93,7 +94,16 @@ class SequenceWriter(ast.DeepVisitor):
 
     def struct_decl(self, node: ast.AstStructDecl) -> None:
         super().struct_decl(node)
-        node.fields = node.sequence
+
+        def get_bindings(target: ast.AstFuncDecl) -> List[ast.AstBinding]:
+            for generator, bindings in node.generators:
+                if generator == target:
+                    return bindings
+            return []
+
+        node.generators = [
+            (generator, get_bindings(generator)) for generator in node.sequence
+        ]
 
     def block_stmt(self, node: ast.AstBlockStmt) -> None:
         super().block_stmt(node)

@@ -19,8 +19,13 @@ class TypeChecker(ast.DeepVisitor):
         self.expected_returns: List[ts.Type] = []
 
     def struct_decl(self, node: ast.AstStructDecl) -> None:
-        super().struct_decl(node)
         node.type_annot = ts.StructType.make(node)
+        for param in node.params:
+            param.accept(self)
+        for generator, _ in node.generators:
+            self.expected_returns.append(ts.ANY)
+            generator.block.accept(self)
+            self.expected_returns.pop()
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
@@ -309,7 +314,7 @@ class TypeChecker(ast.DeepVisitor):
                 regions=[node.region],
             )
             return
-        for param in struct_type.ref.iter_params():
+        for param in struct_type.ref.params:
             if param.binding.name not in node.inits:
                 self.errors.add(
                     message=f"missing field {param.binding.name} in constructor",
@@ -334,7 +339,7 @@ class TypeChecker(ast.DeepVisitor):
             )
         else:
             node.ref = struct_type.ref
-            for binding, _ in struct_type.ref.iter_bindings():
+            for binding in struct_type.ref.iter_bindings():
                 if node.name == binding.name:
                     node.type_annot = binding.type_annot
                     break
@@ -346,7 +351,7 @@ class TypeChecker(ast.DeepVisitor):
 
     def ident_type(self, node: ast.AstIdentType) -> None:
         if node.ref:
-            self.errors.add(message=f"invalid type {node.name}", regions=[node.region])
+            node.type_annot = ts.StructType.make(node.ref)
         else:
             node.type_annot = ts.BuiltinType.get(node.name)
 
