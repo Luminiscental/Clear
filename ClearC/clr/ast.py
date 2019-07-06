@@ -310,7 +310,9 @@ class DeepVisitor(AstVisitor):
             subtype.accept(self)
 
 
-AstContext = Union["AstScope", "AstFuncDecl"]
+AstContext = Union[
+    "AstScope", "AstStructDecl", "AstFuncDecl", "AstIfStmt", "AstWhileStmt"
+]
 
 
 class ContextVisitor(DeepVisitor):
@@ -357,6 +359,26 @@ class ContextVisitor(DeepVisitor):
         self._push_context(node)
         for decl in node.decls:
             decl.accept(self)
+        self._pop_context()
+        self._decl(node)
+
+    def if_stmt(self, node: "AstIfStmt") -> None:
+        self._push_context(node)
+        node.if_part[0].accept(self)
+        node.if_part[1].accept(self)
+        for cond, block in node.elif_parts:
+            cond.accept(self)
+            block.accept(self)
+        if node.else_part:
+            node.else_part.accept(self)
+        self._pop_context()
+        self._decl(node)
+
+    def while_stmt(self, node: "AstWhileStmt") -> None:
+        self._push_context(node)
+        if node.cond:
+            node.cond.accept(self)
+        node.block.accept(self)
         self._pop_context()
         self._decl(node)
 
@@ -550,7 +572,7 @@ class AstBlockStmt(AstDecl, AstScope):
 
 
 @dc.dataclass
-class AstStructDecl(AstDecl, AstScope, AstTyped):
+class AstStructDecl(AstDecl, AstTyped):
     """
     Ast node for a struct declaration.
     """

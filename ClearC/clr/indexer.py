@@ -112,7 +112,9 @@ class IndexBuilder(ast.ContextVisitor):
         self._frames[-1] = prev_stack + offset
 
     def binding(self, node: ast.AstBinding) -> None:
-        node.index_annot = self._make_index()
+        context = self._get_context()
+        if not isinstance(context, ast.AstStructDecl):
+            node.index_annot = self._make_index()
 
     def param(self, node: ast.AstParam) -> None:
         super().param(node)
@@ -122,7 +124,14 @@ class IndexBuilder(ast.ContextVisitor):
         for _, is_param in node.iter_bindings():
             if not is_param:
                 node.indices.append(self._make_index())
-                # TODO: Index the declaration in the context of the generator function
+        for field in node.fields:
+            # Make function context for generator
+            self._name_counts.append(1)
+            self._frames.append(1)
+            # TODO: Handle upvalues
+            field.accept(self)
+            self._name_counts.pop()
+            self._frames.pop()
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         node.val_init.accept(self)

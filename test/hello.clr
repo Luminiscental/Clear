@@ -3,7 +3,14 @@ struct Context {
     func() void callback;
 
     func do_stuff() void {
-        print "doing stuff";
+        val message := "Doing stuff";
+        func inner(str context) void {
+            print context + ": " + message;
+        }
+        if (true) {
+            val context, _ := "func", 2;
+            inner(context);
+        }
     }
 
     val class_name := "Context";
