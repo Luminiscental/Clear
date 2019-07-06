@@ -554,6 +554,9 @@ class AstBlockStmt(AstDecl, AstScope):
         visitor.block_stmt(self)
 
 
+# TODO: Static declarations
+
+
 class AstStructDecl(AstDecl, AstTyped):
     """
     Ast node for a struct declaration.
@@ -569,7 +572,7 @@ class AstStructDecl(AstDecl, AstTyped):
         self.name = name
         self.params = [field for field in fields if isinstance(field, AstParam)]
         self.generators: List[Tuple["AstFuncDecl", List["AstBinding"]]] = []
-        for i, field in enumerate(fields):
+        for field in fields:
             if isinstance(field, AstParam):
                 continue
             decls: List[AstDecl] = [field]
