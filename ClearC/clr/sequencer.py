@@ -11,6 +11,8 @@ import clr.ast as ast
 
 AstNameDecl = Union[ast.AstValueDecl, ast.AstFuncDecl, ast.AstStructDecl]
 
+# TODO: Track dependencies to give better error messages
+
 
 class SequenceBuilder(ast.DeepVisitor):
     """
@@ -32,16 +34,6 @@ class SequenceBuilder(ast.DeepVisitor):
             if isinstance(node, ast.AstFuncDecl):
                 node.context.sequence.append(node)
 
-    def _start(self, node: AstNameDecl) -> bool:
-        if node in self.completed:
-            return False
-        if node in self.started:
-            self.errors.add(
-                message="circular dependency for value", regions=[node.region]
-            )
-            return False
-        return True
-
     @cx.contextmanager
     def _name_decl(self, node: AstNameDecl) -> Iterator[None]:
         self.started.append(node)
@@ -49,19 +41,40 @@ class SequenceBuilder(ast.DeepVisitor):
         self.completed.append(node)
 
     def struct_decl(self, node: ast.AstStructDecl) -> None:
-        if self._start(node):
-            with self._name_decl(node):
-                super().struct_decl(node)
+        if node in self.completed:
+            return
+        if node in self.started:
+            self.errors.add(
+                message="circular dependency for struct declaration",
+                regions=[node.region],
+            )
+            return
+        with self._name_decl(node):
+            super().struct_decl(node)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
-        if self._start(node):
-            with self._name_decl(node):
-                super().value_decl(node)
+        if node in self.completed:
+            return
+        if node in self.started:
+            self.errors.add(
+                message="circular dependency for value declaration",
+                regions=[node.region],
+            )
+            return
+        with self._name_decl(node):
+            super().value_decl(node)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        if self._start(node):
-            with self._name_decl(node):
-                super().func_decl(node)
+        if node in self.completed:
+            return
+        if node in self.started:
+            self.errors.add(
+                message="circular dependency for function declaration",
+                regions=[node.region],
+            )
+            return
+        with self._name_decl(node):
+            super().func_decl(node)
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         if node.ref and node.ref.dependency:
@@ -71,14 +84,27 @@ class SequenceBuilder(ast.DeepVisitor):
         if node.ref:
             node.ref.accept(self)
 
+    def _access_generator(self, generator: ast.AstFuncDecl) -> None:
+        if generator in self.completed:
+            return
+        if generator in self.started:
+            self.errors.add(
+                message="circular dependency for field declaration",
+                regions=[generator.block.decls[0].region],
+            )
+            return
+        generator.accept(self)
+
+    def _access_this(self, node: ast.AstIdentExpr, field: str) -> None:
+        if node.struct:
+            for generator, bindings in node.struct.generators:
+                for binding in bindings:
+                    if binding.name == field:
+                        self._access_generator(generator)
+
     def access_expr(self, node: ast.AstAccessExpr) -> None:
-        if isinstance(node.target, ast.AstIdentExpr):
-            if node.target.name == "this" and node.target.struct:
-                for generator, bindings in node.target.struct.generators:
-                    for binding in bindings:
-                        if binding.name == node.name:
-                            generator.accept(self)
-                            return
+        if isinstance(node.target, ast.AstIdentExpr) and node.target.name == "this":
+            self._access_this(node.target, node.name)
 
 
 class SequenceWriter(ast.DeepVisitor):

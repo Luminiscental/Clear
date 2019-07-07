@@ -122,7 +122,8 @@ class SourceView:
                 start = self.start - index if starts else 0
                 end = self.end - index if ends else len(line)
                 # Add the information to the list
-                lines.append((line_number, line, " " * start + "~" * (end - start)))
+                # Subtract 1 from underline to avoid underlining \n
+                lines.append((line_number, line, " " * start + "~" * (end - start - 1)))
                 # Stop iterating if the error self ended
                 if ends:
                     break
