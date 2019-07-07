@@ -336,6 +336,12 @@ class ContextVisitor(DeepVisitor):
     def _pop_context(self) -> AstContext:
         return self._contexts.pop()
 
+    def _get_struct(self) -> Optional["AstStructDecl"]:
+        for context in reversed(self._contexts):
+            if isinstance(context, AstStructDecl):
+                return context
+        return None
+
     def start(self, node: "Ast") -> None:
         self._push_context(node)
         super().start(node)
@@ -406,12 +412,12 @@ class ContextVisitor(DeepVisitor):
 
 # Node definitions:
 
-# TODO: this expressions
+# TODO: Mutable values / assignment
 
 # Base node types:
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstNode:
     """
     Base class for an ast node. All nodes must be able to accept an ast visitor.
@@ -425,7 +431,7 @@ class AstNode:
         """
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstTyped(AstNode):
     """
     Base class for nodes with type annotations.
@@ -434,7 +440,7 @@ class AstTyped(AstNode):
     type_annot = ts.UNRESOLVED
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstIndexed(AstNode):
     """
     Base class for nodes with index annotations.
@@ -458,7 +464,7 @@ class AstExpr(AstTyped):
 AstName = Union["AstBinding", "AstStructDecl"]
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstScope(AstNode):
     """
     Base class for a node with scope.
@@ -467,7 +473,7 @@ class AstScope(AstNode):
     names: Dict[str, AstName] = dc.field(default_factory=dict)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstFunction(AstNode):
     """
     Base class for a function node.
@@ -478,7 +484,7 @@ class AstFunction(AstNode):
     upvalue_indices: List[an.IndexAnnot] = dc.field(default_factory=list)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstDecl(AstNode):
     """
     Base class for declarations, annotated with return possibilities and scope.
@@ -486,6 +492,7 @@ class AstDecl(AstNode):
 
     return_annot = an.ReturnAnnot.NEVER
     scope: Optional[AstScope] = None
+    context: Optional[AstContext] = None
 
 
 AstStmt = Union[
@@ -500,7 +507,7 @@ AstStmt = Union[
 # Specific nodes:
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class Ast(AstScope):
     """
     The root ast node.
@@ -514,13 +521,15 @@ class Ast(AstScope):
         visitor.start(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstBinding(AstTyped, AstIndexed):
     """
     Ast node for a value binding.
     """
 
     name: str = ""
+    # Annotations:
+    dependency: Optional[AstDecl] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binding(self)
@@ -540,7 +549,7 @@ class AstParam(AstNode):
         visitor.param(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstBlockStmt(AstDecl, AstScope):
     """
     Ast node for a block statement.
@@ -618,7 +627,7 @@ class AstStructDecl(AstDecl, AstTyped):
         visitor.struct_decl(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstValueDecl(AstDecl, AstTyped):
     """
     Ast node for a value declaration.
@@ -632,7 +641,7 @@ class AstValueDecl(AstDecl, AstTyped):
         visitor.value_decl(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstFuncDecl(AstDecl, AstFunction, AstTyped):
     """
     Ast node for a function declaration.
@@ -647,7 +656,7 @@ class AstFuncDecl(AstDecl, AstFunction, AstTyped):
         visitor.func_decl(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstPrintStmt(AstDecl):
     """
     Ast node for a print statement.
@@ -659,7 +668,7 @@ class AstPrintStmt(AstDecl):
         visitor.print_stmt(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstIfStmt(AstDecl):
     """
     Ast node for an if statement.
@@ -675,7 +684,7 @@ class AstIfStmt(AstDecl):
         visitor.if_stmt(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstWhileStmt(AstDecl):
     """
     Ast node for a while statement.
@@ -688,7 +697,7 @@ class AstWhileStmt(AstDecl):
         visitor.while_stmt(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstReturnStmt(AstDecl):
     """
     Ast node for a return statement.
@@ -700,7 +709,7 @@ class AstReturnStmt(AstDecl):
         visitor.return_stmt(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstExprStmt(AstDecl):
     """
     Ast node for an expression statement.
@@ -712,7 +721,7 @@ class AstExprStmt(AstDecl):
         visitor.expr_stmt(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstUnaryExpr(AstExpr):
     """
     Ast node for a unary expression.
@@ -727,7 +736,7 @@ class AstUnaryExpr(AstExpr):
         visitor.unary_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstBinaryExpr(AstExpr):
     """
     Ast node for a binary expression.
@@ -785,7 +794,7 @@ class AstStrExpr(AstExpr):
         visitor.str_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstIdentExpr(AstExpr, AstIndexed):
     """
     Ast node for an identifier expression.
@@ -794,6 +803,7 @@ class AstIdentExpr(AstExpr, AstIndexed):
     name: str = ""
     # Annotations:
     ref: Optional[AstBinding] = None
+    struct: Optional[AstStructDecl] = None
 
     @staticmethod
     def make(token: lx.Token) -> "AstIdentExpr":
@@ -831,7 +841,7 @@ class AstNilExpr(AstExpr):
         visitor.nil_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstCaseExpr(AstExpr, AstScope):
     """
     Ast node for a case expression.
@@ -846,7 +856,7 @@ class AstCaseExpr(AstExpr, AstScope):
         visitor.case_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstCallExpr(AstExpr):
     """
     Ast node for a function call expression.
@@ -859,7 +869,7 @@ class AstCallExpr(AstExpr):
         visitor.call_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstTupleExpr(AstExpr):
     """
     Ast node for a tuple expression.
@@ -871,7 +881,7 @@ class AstTupleExpr(AstExpr):
         visitor.tuple_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstLambdaExpr(AstExpr, AstScope, AstFunction):
     """
     Ast node for a lambda expression.
@@ -884,7 +894,7 @@ class AstLambdaExpr(AstExpr, AstScope, AstFunction):
         visitor.lambda_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstLabel(AstNode):
     """
     Ast node for an identifier with no extra meaning.
@@ -894,10 +904,13 @@ class AstLabel(AstNode):
 
     @staticmethod
     def make(token: lx.Token) -> "AstLabel":
+        """
+        Make a label node from an identifier token.
+        """
         return AstLabel(name=str(token), region=token.lexeme)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstConstructExpr(AstExpr, AstIndexed):
     """
     Ast node for a construct expression.
@@ -909,13 +922,16 @@ class AstConstructExpr(AstExpr, AstIndexed):
     ref: Optional[AstStructDecl] = None
 
     def get_dict(self) -> Dict[str, AstExpr]:
+        """
+        Return a dictionary of field name to value.
+        """
         return {label.name: value for label, value in self.inits}
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.construct_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstAccessExpr(AstExpr):
     """
     Ast node for an access expression.
@@ -930,7 +946,7 @@ class AstAccessExpr(AstExpr):
         visitor.access_expr(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstIdentType(AstType):
     """
     Ast node for an atomic type.
@@ -963,7 +979,7 @@ class AstVoidType(AstType):
         visitor.void_type(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstFuncType(AstType):
     """
     Ast node for a function type.
@@ -976,7 +992,7 @@ class AstFuncType(AstType):
         visitor.func_type(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstOptionalType(AstType):
     """
     Ast node for an optional type.
@@ -988,7 +1004,7 @@ class AstOptionalType(AstType):
         visitor.optional_type(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstUnionType(AstType):
     """
     Ast node for a union type.
@@ -1000,7 +1016,7 @@ class AstUnionType(AstType):
         visitor.union_type(self)
 
 
-@dc.dataclass
+@dc.dataclass(eq=False, repr=False)
 class AstTupleType(AstType):
     """
     Ast node for a tuple type.

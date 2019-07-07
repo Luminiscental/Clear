@@ -865,8 +865,7 @@ def finish_lambda_expr(parser: Parser) -> Result[ast.AstExpr]:
     params = finish_tuple(parser, parse_param)
     if isinstance(params, er.CompileError):
         return params
-    # TODO: Decide on precedence here, maybe even force grouping
-    value = parse_expr(parser, precedence=Precedence.TUPLE.next())
+    value = parse_expr(parser, precedence=Precedence.LAMBDA)
     if isinstance(value, er.CompileError):
         return value
     region = er.SourceView.range(start, parser.prev().lexeme)
@@ -995,15 +994,16 @@ class Precedence(enum.Enum):
     NONE = 0
     ASSIGNMENT = 1
     TUPLE = 2
-    OR = 3
-    AND = 4
-    EQUALITY = 5
-    COMPARISON = 6
-    TERM = 7
-    FACTOR = 8
-    UNARY = 9
-    CALL = 10
-    MAX = 11
+    LAMBDA = 3
+    OR = 4
+    AND = 5
+    EQUALITY = 6
+    COMPARISON = 7
+    TERM = 8
+    FACTOR = 9
+    UNARY = 10
+    CALL = 11
+    MAX = 12
 
     def __lt__(self, other: "Precedence") -> bool:
         return int(self.value) < int(other.value)

@@ -12,7 +12,7 @@ import clr.ast as ast
 AstNameDecl = Union[ast.AstValueDecl, ast.AstFuncDecl, ast.AstStructDecl]
 
 
-class SequenceBuilder(ast.ContextVisitor):
+class SequenceBuilder(ast.DeepVisitor):
     """
     Ast visitor to annotate the execution order of declarations.
     """
@@ -23,15 +23,14 @@ class SequenceBuilder(ast.ContextVisitor):
         self.completed: List[AstNameDecl] = []
 
     def _decl(self, node: ast.AstDecl) -> None:
-        context = self._get_context()
-        if isinstance(context, (ast.AstBlockStmt, ast.Ast)):
-            context.sequence.append(node)
-        if isinstance(context, ast.AstFuncDecl):
-            context.block.sequence.append(node)
-        if isinstance(context, ast.AstStructDecl):
+        if isinstance(node.context, (ast.AstBlockStmt, ast.Ast)):
+            node.context.sequence.append(node)
+        if isinstance(node.context, ast.AstFuncDecl):
+            node.context.block.sequence.append(node)
+        if isinstance(node.context, ast.AstStructDecl):
             # Should always be true
             if isinstance(node, ast.AstFuncDecl):
-                context.sequence.append(node)
+                node.context.sequence.append(node)
 
     def _start(self, node: AstNameDecl) -> bool:
         if node in self.completed:
@@ -52,11 +51,7 @@ class SequenceBuilder(ast.ContextVisitor):
     def struct_decl(self, node: ast.AstStructDecl) -> None:
         if self._start(node):
             with self._name_decl(node):
-                self._push_context(node)
-                for generator, _ in node.generators:
-                    generator.accept(self)
-                self._pop_context()
-                self._decl(node)
+                super().struct_decl(node)
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         if self._start(node):
@@ -69,18 +64,21 @@ class SequenceBuilder(ast.ContextVisitor):
                 super().func_decl(node)
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        if node.ref:
-            for context in reversed(self._contexts):
-                if isinstance(context, ast.AstFuncDecl):
-                    if node.ref == context:
-                        # If it's the recursion upvalue don't lookup
-                        return
-                    break
-            node.ref.accept(self)
+        if node.ref and node.ref.dependency:
+            node.ref.dependency.accept(self)
 
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
         if node.ref:
             node.ref.accept(self)
+
+    def access_expr(self, node: ast.AstAccessExpr) -> None:
+        if isinstance(node.target, ast.AstIdentExpr):
+            if node.target.name == "this" and node.target.struct:
+                for generator, bindings in node.target.struct.generators:
+                    for binding in bindings:
+                        if binding.name == node.name:
+                            generator.accept(self)
+                            return
 
 
 class SequenceWriter(ast.DeepVisitor):

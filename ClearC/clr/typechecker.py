@@ -23,6 +23,8 @@ class TypeChecker(ast.DeepVisitor):
         for param in node.params:
             param.accept(self)
         for generator, _ in node.generators:
+            for param in generator.params:
+                param.accept(self)
             self.expected_returns.append(ts.ANY)
             generator.block.accept(self)
             self.expected_returns.pop()

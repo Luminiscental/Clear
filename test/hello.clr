@@ -1,29 +1,14 @@
-{
-    val outside_message := "Doing stuff";
 
-    struct Context {
-        func() void callback;
+struct Rect {
+    num width;
+    num height;
 
-        func do_stuff() void {
-            func inner(str context) void {
-                print context + ": " + outside_message;
-            }
-            if (true) {
-                val context, _ := "func", 2;
-                inner(context);
-            }
-        }
+    val display := "Rect(" + str(this.width) + ", " + str(this.height) + "): "
+        + "p=" + str(this.perimeter) + ", a=" + str(this.area);
 
-        val class_name, description := "Context", "idk has a callback and stuff u kno";
-    }
-
-    func print_(str msg) void {
-        print msg;
-    }
-
-    val c := Context { callback=func() print_("called") };
-    c.callback();
-    c.do_stuff();
-    print c.class_name;
-    print c.description;
+    val perimeter := 2 * this.width + 2 * this.height;
+    val area := this.width * this.height;
 }
+
+val rect := Rect { width=6, height=3 };
+print rect.display;

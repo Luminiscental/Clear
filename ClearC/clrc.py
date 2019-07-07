@@ -123,12 +123,11 @@ def main() -> None:
     for name, visitor in subpasses:
         tree.accept(visitor)
         _check_errors(name, visitor.errors.get())
-
-    if DEBUG:
-        print("Sequenced Ast:")
-        print("--------")
-        tree.accept(pr.AstPrinter())
-        print("--------")
+        if DEBUG and isinstance(visitor, sq.SequenceWriter):
+            print("Sequenced Ast:")
+            print("--------")
+            tree.accept(pr.AstPrinter())
+            print("--------")
 
     # Code generation
     assembled = _assemble_code(*cg.generate_code(tree))

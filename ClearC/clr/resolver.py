@@ -11,6 +11,7 @@ import clr.types as ts
 import clr.errors as er
 
 # TODO: Warn on unused declarations
+# TODO: Error on declaring "this" bindings
 
 
 class DuplicateChecker(ast.DeepVisitor):
@@ -69,6 +70,9 @@ class NameTracker(ast.ContextVisitor):
             )
         names[name] = node
 
+    def _decl(self, node: ast.AstDecl) -> None:
+        node.context = self._get_context()
+
     def struct_decl(self, node: ast.AstStructDecl) -> None:
         super().struct_decl(node)
         self._set_name(node.name, node)
@@ -121,6 +125,15 @@ class NameResolver(ast.ContextVisitor):
             else:
                 node.ref = ref
 
+    def value_decl(self, node: ast.AstValueDecl) -> None:
+        super().value_decl(node)
+        for binding in node.bindings:
+            binding.dependency = node
+
+    def func_decl(self, node: ast.AstFuncDecl) -> None:
+        super().func_decl(node)
+        node.binding.dependency = node
+
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
         self._resolve_name(node.name, node)
         super().construct_expr(node)
@@ -128,6 +141,8 @@ class NameResolver(ast.ContextVisitor):
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         if node.name not in ts.BUILTINS:
             self._resolve_name(node.name, node)
+            if node.name == "this":
+                node.struct = self._get_struct()
 
     def ident_type(self, node: ast.AstIdentType) -> None:
         if node.name not in {annot.value for annot in ts.BuiltinType}:
