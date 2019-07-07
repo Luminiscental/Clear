@@ -22,6 +22,8 @@ import clr.codegenerator as cg
 
 DEBUG = True
 
+# TODO: tests
+
 
 def _get_filenames() -> Tuple[str, str]:
     if len(sys.argv) < 2:

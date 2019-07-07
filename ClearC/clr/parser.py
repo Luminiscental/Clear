@@ -4,7 +4,6 @@ Contains functions and definitions for parsing a list of tokens into a parse tre
 
 from typing import (
     List,
-    Dict,
     Sequence,
     Iterable,
     Optional,

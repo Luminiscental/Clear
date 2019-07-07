@@ -413,6 +413,8 @@ class ContextVisitor(DeepVisitor):
 # Node definitions:
 
 # TODO: Mutable values / assignment
+# TODO: Decorators
+# TODO: Properties
 
 # Base node types:
 
