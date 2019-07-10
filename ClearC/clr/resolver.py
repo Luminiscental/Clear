@@ -11,7 +11,6 @@ import clr.types as ts
 import clr.errors as er
 
 # TODO: Warn on unused declarations
-# TODO: Error on declaring "this" bindings
 
 
 class DuplicateChecker(ast.DeepVisitor):

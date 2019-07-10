@@ -1126,6 +1126,7 @@ EXPR_TABLE: PrattTable[ast.AstExpr] = collections.defaultdict(
         lx.TokenType.NUM_LITERAL: PrattRule(prefix=finish_num_expr),
         lx.TokenType.INT_LITERAL: PrattRule(prefix=finish_int_expr),
         lx.TokenType.IDENTIFIER: PrattRule(prefix=finish_ident_expr),
+        lx.TokenType.THIS: PrattRule(prefix=finish_ident_expr),
         lx.TokenType.TRUE: PrattRule(prefix=finish_bool_expr),
         lx.TokenType.FALSE: PrattRule(prefix=finish_bool_expr),
         lx.TokenType.NIL: PrattRule(prefix=finish_nil_expr),

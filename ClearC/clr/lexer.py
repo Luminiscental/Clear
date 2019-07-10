@@ -66,6 +66,7 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
             TokenType.AS,
             TokenType.CASE,
             TokenType.STRUCT,
+            TokenType.THIS,
         }
 
         keywords = {keyword.value: keyword for keyword in keyword_set}
@@ -114,6 +115,7 @@ class TokenType(enum.Enum):
     AS = "as"
     CASE = "case"
     STRUCT = "struct"
+    THIS = "this"
     # Symbols
     EQUALS = "="
     DOUBLE_EQUALS = "=="

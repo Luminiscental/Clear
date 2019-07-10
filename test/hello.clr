@@ -1,23 +1,11 @@
 
-struct Rect {
-    num width;
-    num height;
-
-    func display() void {
-        print "Rect(" + str(this.width) + ", " + str(this.height) + ")";
-        print "[perimeter=" + str(this.perimeter) + ", area=" + str(this.area) + "]";
-
-        this.a();
-    }
-
-    func a() void {
-        print "a()";
-        this.display();
-    }
-
-    val area := this.width * this.height;
-    val perimeter := 2 * (this.width + this.height);
+struct Point {
+    num x;
+    num y;
+    val string := "(" + str(this.x) + ", " + str(this.y) + ")";
 }
 
-val rect := Rect { width=6, height=3 };
-rect.display();
+// val this := 2;
+
+val p := Point { x=1, y=2 };
+print p.string;
