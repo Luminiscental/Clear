@@ -29,6 +29,33 @@ class TypeChecker(ast.DeepVisitor):
             generator.block.accept(self)
             self.expected_returns.pop()
 
+    def _apply_decorators(
+        self, decorators: List[ast.AstExpr], orig: ts.Type
+    ) -> ts.Type:
+        result = orig
+        for decorator in reversed(decorators):
+            func = decorator.type_annot.get_function()
+            if func is None:
+                self.errors.add(
+                    message=f"cannot apply decorator of type {decorator.type_annot}, must be a function",
+                    regions=[decorator.region],
+                )
+            elif len(func.parameters) != 1:
+                self.errors.add(
+                    message=f"invalid function type {decorator.type_annot} for decorator, must have 1 parameter",
+                    regions=[decorator.region],
+                )
+            elif func.parameters[0] != result:
+                self.errors.add(
+                    message=f"mismatched target type {result} for decorator expecting {func.parameters[0]}",
+                    regions=[decorator.region],
+                )
+            else:
+                result = func.return_type
+                continue
+            result = ts.UNRESOLVED
+        return result
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
         super().value_decl(node)
         # Handle overall type
@@ -47,6 +74,14 @@ class TypeChecker(ast.DeepVisitor):
                     message="cannot declare value as void",
                     regions=[node.val_init.region],
                 )
+        # Handle decorator types
+        if node.decorators:
+            if len(node.bindings) > 1:
+                self.errors.add(
+                    message="cannot apply decorator to tuple unpacked value",
+                    regions=[node.decorators[0].region],
+                )
+            node.type_annot = self._apply_decorators(node.decorators, node.type_annot)
         # Distribute to bindings
         if len(node.bindings) == 1:
             node.bindings[0].type_annot = node.type_annot
@@ -70,6 +105,8 @@ class TypeChecker(ast.DeepVisitor):
                     binding.type_annot = subtype
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
+        for decorator in node.decorators:
+            decorator.accept(self)
         for param in node.params:
             param.accept(self)
         node.return_type.accept(self)
@@ -88,6 +125,9 @@ class TypeChecker(ast.DeepVisitor):
         self.expected_returns.append(node.return_type.type_annot)
         node.block.accept(self)
         self.expected_returns.pop()
+        node.binding.type_annot = self._apply_decorators(
+            node.decorators, node.binding.type_annot
+        )
         node.type_annot = node.binding.type_annot
 
     def param(self, node: ast.AstParam) -> None:

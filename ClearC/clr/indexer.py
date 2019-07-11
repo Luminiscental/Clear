@@ -118,10 +118,26 @@ class IndexBuilder(ast.ContextVisitor):
             node.binding.index_annot.kind = an.IndexAnnotType.PARAM
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
-        node.val_init.accept(self)
-        self._frames[-1] -= 1
+        with self._stack(0):
+            for decorator in node.decorators:
+                decorator.accept(self)
+            node.val_init.accept(self)
         for binding in node.bindings:
             binding.accept(self)
+        self._decl(node)
+
+    def func_decl(self, node: ast.AstFuncDecl) -> None:
+        with self._stack(0):
+            for decorator in node.decorators:
+                decorator.accept(self)
+            self._push_context(node)
+            for param in node.params:
+                param.accept(self)
+            for decl in node.block.decls:
+                decl.accept(self)
+            self._pop_context()
+        node.binding.accept(self)
+        self._decl(node)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:
         with self._stack(0):

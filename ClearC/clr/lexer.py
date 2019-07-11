@@ -42,6 +42,7 @@ def tokenize_source(source: str) -> Tuple[List["Token"], List[er.CompileError]]:
         (r"\*", TokenType.STAR),
         (r"/", TokenType.SLASH),
         (r"\.", TokenType.DOT),
+        (r"@", TokenType.AT),
     ]
     fallback_rule = (r".", TokenType.ERROR)
 
@@ -138,6 +139,7 @@ class TokenType(enum.Enum):
     STAR = "*"
     SLASH = "/"
     DOT = "."
+    AT = "@"
     # Special
     ERROR = "<ERROR>"
 

@@ -60,6 +60,10 @@ class AstPrinter(ast.AstVisitor):
 
     def value_decl(self, node: ast.AstValueDecl) -> None:
         self._startline()
+        for decorator in node.decorators:
+            self._append("@")
+            decorator.accept(self)
+            self._startline()
         self._append("val ")
         node.bindings[0].accept(self)
         for binding in node.bindings[1:]:
@@ -79,6 +83,10 @@ class AstPrinter(ast.AstVisitor):
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
         self._startline()
+        for decorator in node.decorators:
+            self._append("@")
+            decorator.accept(self)
+            self._startline()
         self._append(f"func {node.binding.name}(")
         if node.params:
             node.params[0].accept(self)

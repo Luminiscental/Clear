@@ -9,8 +9,6 @@ import contextlib as cx
 import clr.ast as ast
 
 
-AstNameDecl = Union[ast.AstValueDecl, ast.AstFuncDecl, ast.AstStructDecl]
-
 # TODO: Track dependencies to give better error messages
 
 
@@ -21,8 +19,8 @@ class SequenceBuilder(ast.DeepVisitor):
 
     def __init__(self) -> None:
         super().__init__()
-        self.started: List[AstNameDecl] = []
-        self.completed: List[AstNameDecl] = []
+        self.started: List[Union[ast.AstNameDecl, ast.AstStructDecl]] = []
+        self.completed: List[Union[ast.AstNameDecl, ast.AstStructDecl]] = []
 
     def _decl(self, node: ast.AstDecl) -> None:
         if isinstance(node.context, (ast.AstBlockStmt, ast.Ast)):
@@ -35,7 +33,9 @@ class SequenceBuilder(ast.DeepVisitor):
                 node.context.sequence.append(node)
 
     @cx.contextmanager
-    def _name_decl(self, node: AstNameDecl) -> Iterator[None]:
+    def _name_decl(
+        self, node: Union[ast.AstNameDecl, ast.AstStructDecl]
+    ) -> Iterator[None]:
         self.started.append(node)
         yield
         self.completed.append(node)

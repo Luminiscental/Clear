@@ -329,6 +329,7 @@ def union(types: Iterable[Type]) -> Type:
     """
     Returns the union of an iterable of types.
     """
+    types = list(types)
     if any(subtype.is_any for subtype in types):
         return ANY
     return Type(set.union(*(subtype.units for subtype in types if not subtype.is_any)))
@@ -338,6 +339,7 @@ def intersection(types: Iterable[Type]) -> Type:
     """
     Returns the intersection of an iterable of types.
     """
+    types = list(types)
     if all(subtype.is_any for subtype in types):
         return ANY
     return Type(

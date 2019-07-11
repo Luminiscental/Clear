@@ -208,6 +208,8 @@ class DeepVisitor(AstVisitor):
         self._decl(node)
 
     def value_decl(self, node: "AstValueDecl") -> None:
+        for decorator in node.decorators:
+            decorator.accept(self)
         for binding in node.bindings:
             binding.accept(self)
         if node.val_type:
@@ -216,6 +218,8 @@ class DeepVisitor(AstVisitor):
         self._decl(node)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
+        for decorator in node.decorators:
+            decorator.accept(self)
         node.binding.accept(self)
         for param in node.params:
             param.accept(self)
@@ -357,6 +361,8 @@ class ContextVisitor(DeepVisitor):
         self._decl(node)
 
     def func_decl(self, node: "AstFuncDecl") -> None:
+        for decorator in node.decorators:
+            decorator.accept(self)
         node.binding.accept(self)
         self._push_context(node)
         for param in node.params:
@@ -413,7 +419,6 @@ class ContextVisitor(DeepVisitor):
 # Node definitions:
 
 # TODO: Mutable values / assignment
-# TODO: Decorators
 # TODO: Properties
 
 # Base node types:
@@ -506,6 +511,15 @@ AstStmt = Union[
     "AstExprStmt",
 ]
 
+
+class AstNameDecl(AstDecl):
+    """
+    Base class for name declarations, annotated with possible decorators.
+    """
+
+    decorators: List[AstExpr] = dc.field(default_factory=list)
+
+
 # Specific nodes:
 
 
@@ -531,7 +545,7 @@ class AstBinding(AstTyped, AstIndexed):
 
     name: str = ""
     # Annotations:
-    dependency: Optional[AstDecl] = None
+    dependency: Optional[AstNameDecl] = None
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binding(self)
@@ -576,7 +590,7 @@ class AstStructDecl(AstDecl, AstTyped):
     def __init__(
         self,
         name: str,
-        fields: List[Union[AstParam, "AstValueDecl", "AstFuncDecl"]],
+        fields: List[Union[AstParam, AstNameDecl]],
         region: er.SourceView,
     ) -> None:
         super().__init__(region=region)
@@ -599,7 +613,7 @@ class AstStructDecl(AstDecl, AstTyped):
                     )
                 decls.append(AstReturnStmt(expr=expr))
                 bindings = field.bindings
-            else:
+            elif isinstance(field, AstFuncDecl):
                 decls.append(AstReturnStmt(expr=AstIdentExpr(name=field.binding.name)))
                 bindings = [field.binding]
             params = [
@@ -630,7 +644,7 @@ class AstStructDecl(AstDecl, AstTyped):
 
 
 @dc.dataclass(eq=False, repr=False)
-class AstValueDecl(AstDecl, AstTyped):
+class AstValueDecl(AstNameDecl, AstTyped):
     """
     Ast node for a value declaration.
     """
@@ -644,7 +658,7 @@ class AstValueDecl(AstDecl, AstTyped):
 
 
 @dc.dataclass(eq=False, repr=False)
-class AstFuncDecl(AstDecl, AstFunction, AstTyped):
+class AstFuncDecl(AstNameDecl, AstFunction, AstTyped):
     """
     Ast node for a function declaration.
     """

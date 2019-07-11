@@ -143,19 +143,43 @@ def parse_token(parser: Parser, kinds: Iterable[lx.TokenType]) -> Optional[lx.To
     return None
 
 
+def parse_name_decl(parser: Parser) -> Optional[Result[ast.AstNameDecl]]:
+    """
+    Parse a named declaration from the parser or return an error.
+
+    AstNameDecl : AstValueDecl | AstFuncDecl ;
+    """
+    decorators = []
+    while parser.match(lx.TokenType.AT):
+        decorator = parse_expr(parser)
+        if isinstance(decorator, er.CompileError):
+            return decorator
+        decorators.append(decorator)
+
+    result: Optional[Result[ast.AstNameDecl]] = None
+
+    if parser.match(lx.TokenType.VAL):
+        result = finish_value_decl(parser)
+    elif parser.check_all([lx.TokenType.FUNC, lx.TokenType.IDENTIFIER]):
+        parser.advance()
+        result = finish_func_decl(parser)
+
+    if isinstance(result, ast.AstNameDecl):
+        result.decorators = decorators
+    return result
+
+
 def parse_decl(parser: Parser) -> Result[ast.AstDecl]:
     """
     Parse a declaration from the parser or return an error.
 
-    AstDecl : AstStructDecl | AstValueDecl | AstFuncDecl | AstStmt ;
+    AstDecl : AstStructDecl | AstNameDecl | AstStmt ;
     """
+    name_decl = parse_name_decl(parser)
+    if name_decl is not None:
+        return name_decl
     if parser.match(lx.TokenType.STRUCT):
         return finish_struct_decl(parser)
-    if parser.match(lx.TokenType.VAL):
-        return finish_value_decl(parser)
-    if parser.check_all([lx.TokenType.FUNC, lx.TokenType.IDENTIFIER]):
-        parser.advance()
-        return finish_func_decl(parser)
     return parse_stmt(parser)
 
 
@@ -191,14 +215,10 @@ def finish_struct_decl(parser: Parser) -> Result[ast.AstStructDecl]:
             message="expected '{' for struct body", regions=[parser.curr_region()]
         )
 
-    def parse_field(
-        parser: Parser
-    ) -> Result[Union[ast.AstParam, ast.AstFuncDecl, ast.AstValueDecl]]:
-        if parser.match(lx.TokenType.VAL):
-            return finish_value_decl(parser)
-        if parser.check_all([lx.TokenType.FUNC, lx.TokenType.IDENTIFIER]):
-            parser.advance()
-            return finish_func_decl(parser)
+    def parse_field(parser: Parser) -> Result[Union[ast.AstParam, ast.AstNameDecl]]:
+        name_decl = parse_name_decl(parser)
+        if name_decl is not None:
+            return name_decl
         param = parse_param(parser)
         if isinstance(param, er.CompileError):
             return param
@@ -223,8 +243,8 @@ def finish_struct_decl(parser: Parser) -> Result[ast.AstStructDecl]:
 
 def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
     """
-    Parse a value declaration from the parser or return an error. Assumes that the "val" token has
-    already been consumed.
+    Parse a value declaration from the parser or return an error. Assumes that the "val" token
+    along with any decorators have already been consumed.
 
     AstValueDecl : "val" AstBinding ( ", " AstBinding )* ":" AstType? "=" AstExpr ";" ;
     """
@@ -270,7 +290,7 @@ def finish_value_decl(parser: Parser) -> Result[ast.AstValueDecl]:
 def finish_func_decl(parser: Parser) -> Result[ast.AstFuncDecl]:
     """
     Parse a function declaration from the parser or return an error. Assumes that the "func" token
-    has already been consumed.
+    along with any decorators have already been consumed.
 
     AstFuncDecl : "func" IDENTIFIER "(" ( AstParam ( "," AstParam )* )? ")" AstType AstBlockStmt ;
     """

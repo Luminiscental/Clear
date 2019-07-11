@@ -303,8 +303,20 @@ class CodeGenerator(ast.ContextVisitor):
         # Emit the return
         self.program.emit_return()
 
+    @cx.contextmanager
+    def decorators(self, decorators: List[ast.AstExpr]) -> Iterator[None]:
+        """
+        Context manager for decorating a value.
+        """
+        for decorator in decorators:
+            decorator.accept(self)
+        yield
+        for _ in decorators:
+            self.program.call(1, non_void=True)
+
     def value_decl(self, node: ast.AstValueDecl) -> None:
-        node.val_init.accept(self)
+        with self.decorators(node.decorators):
+            node.val_init.accept(self)
         if len(node.bindings) == 1:
             self.program.declare(node.bindings[0].index_annot)
         else:
@@ -316,10 +328,14 @@ class CodeGenerator(ast.ContextVisitor):
                 self.program.declare(binding.index_annot)
 
     def func_decl(self, node: ast.AstFuncDecl) -> None:
-        with self.program.function(node.binding.type_annot, node.upvalue_indices):
-            super().func_decl(node)
-            if node.return_type.type_annot == ts.VOID:
-                self._return(node)
+        with self.decorators(node.decorators):
+            with self.program.function(node.binding.type_annot, node.upvalue_indices):
+                self._push_context(node)
+                for decl in node.block.decls:
+                    decl.accept(self)
+                self._pop_context()
+                if node.return_type.type_annot == ts.VOID:
+                    self._return(node)
         self.program.declare(node.binding.index_annot)
 
     def print_stmt(self, node: ast.AstPrintStmt) -> None:

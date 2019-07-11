@@ -1,11 +1,28 @@
 
-struct Point {
-    num x;
-    num y;
-    val string := "(" + str(this.x) + ", " + str(this.y) + ")";
+// @square
+// @double
+// val number := 3;
+// 
+// print number;
+// 
+// func square(num x) num {
+//     return x * x;
+// }
+// 
+// func double(num x) num {
+//     return 2 * x;
+// }
+
+func apply(num value) func(func(num) num) num {
+    func applier(func(num) num f) num {
+        return f(value);
+    }
+    return applier;
 }
 
-// val this := 2;
+@apply(4)
+func triple(num x) num {
+    return x + x + x;
+}
 
-val p := Point { x=1, y=2 };
-print p.string;
+print triple;
