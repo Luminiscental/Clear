@@ -241,6 +241,20 @@ class Program:
             self.append_op(bc.Opcode.PUSH_LOCAL)
             self.append_op(index_annot.value)
 
+    def set(self, index_annot: an.IndexAnnot) -> None:
+        """
+        Set a value from the top of the stack given its index.
+        """
+        if index_annot.kind == an.IndexAnnotType.GLOBAL:
+            self.append_op(bc.Opcode.SET_GLOBAL)
+            self.append_op(index_annot.value)
+        elif index_annot.kind == an.IndexAnnotType.UPVALUE:
+            self.get_upvalue(index_annot.value)
+            self.append_op(bc.Opcode.SET_REF)
+        else:
+            self.append_op(bc.Opcode.SET_LOCAL)
+            self.append_op(index_annot.value)
+
     def call(self, args: int, non_void: bool) -> None:
         """
         Call a function with the given number of args.
@@ -355,6 +369,10 @@ class CodeGenerator(ast.ContextVisitor):
             self.program.append_op(bc.Opcode.POP)
         # Reset so they don't get popped again
         node.names.clear()
+
+    def set_stmt(self, node: ast.AstSetStmt) -> None:
+        node.value.accept(self)
+        self.program.set(node.target.index_annot)
 
     def if_stmt(self, node: ast.AstIfStmt) -> None:
         end_jumps = []

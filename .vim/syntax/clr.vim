@@ -1,4 +1,4 @@
-syn keyword clrKeywords val var print if else and or return func while struct void this with as prop case
+syn keyword clrKeywords val var print if else and or return func while struct void this with as prop case set
 hi link clrKeywords Type
 
 syn keyword clrBuiltins str num int bool clock

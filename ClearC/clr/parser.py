@@ -396,6 +396,8 @@ def parse_stmt(parser: Parser) -> Result[ast.AstStmt]:
         return finish_print_stmt(parser)
     if parser.match(lx.TokenType.LEFT_BRACE):
         return finish_block_stmt(parser)
+    if parser.match(lx.TokenType.SET):
+        return finish_set_stmt(parser)
     if parser.match(lx.TokenType.IF):
         return finish_if_stmt(parser)
     if parser.match(lx.TokenType.WHILE):
@@ -458,6 +460,40 @@ def finish_block_stmt(parser: Parser) -> Result[ast.AstBlockStmt]:
         decls.append(decl)
     return ast.AstBlockStmt(
         decls=decls, region=er.SourceView.range(start, parser.prev().lexeme)
+    )
+
+
+def finish_set_stmt(parser: Parser) -> Result[ast.AstSetStmt]:
+    """
+    Parse a set statement from the parser or return an error. Assumes that the "set" token has
+    already been consumed.
+
+    AstSetStmt : "set" AstExpr "=" AstExpr ";" ;
+    """
+    start = parser.prev().lexeme
+    target_token = parse_token(parser, [lx.TokenType.IDENTIFIER])
+    if target_token is None:
+        return er.CompileError(
+            message="expected identifier expression to set",
+            regions=[parser.curr_region()],
+        )
+    target = ast.AstIdentExpr.make(token=target_token)
+    if not parser.match(lx.TokenType.EQUALS):
+        return er.CompileError(
+            message="expected '=' for value to set", regions=[parser.curr_region()]
+        )
+    value = parse_expr(parser)
+    if isinstance(value, er.CompileError):
+        return value
+    if not parser.match(lx.TokenType.SEMICOLON):
+        return er.CompileError(
+            message="expected ';' to end set statement",
+            regions=[value.region, parser.curr_region()],
+        )
+    return ast.AstSetStmt(
+        target=target,
+        value=value,
+        region=er.SourceView.range(start, parser.prev().lexeme),
     )
 
 

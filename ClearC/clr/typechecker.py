@@ -150,6 +150,14 @@ class TypeChecker(ast.DeepVisitor):
                     regions=[node.region],
                 )
 
+    def set_stmt(self, node: ast.AstSetStmt) -> None:
+        super().set_stmt(node)
+        if not ts.contains(node.value.type_annot, node.target.type_annot):
+            self.errors.add(
+                message=f"mismatched type {node.value.type_annot} assigned to {node.target.type_annot}",
+                regions=[node.value.region, node.target.region],
+            )
+
     def _check_cond(self, cond: ast.AstExpr) -> None:
         if cond.type_annot != ts.BOOL:
             self.errors.add(

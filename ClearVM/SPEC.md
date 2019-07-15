@@ -693,11 +693,11 @@ __Opcodes__
 
     _Parameters_: none
 
-    _Initial Stack_: `..., upvalue, value`
+    _Initial Stack_: `..., value, upvalue`
 
     _Final Stack_: `...`
 
-    Pops a value then an upvalue and sets the upvalues reference to the popped value.
+    Pops an upvalue then another value and sets the upvalue's reference to the popped value.
 
 - 0x33 (`OP_IS_VAL_TYPE`)
 

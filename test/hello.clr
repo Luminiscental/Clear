@@ -1,28 +1,14 @@
 
-// @square
-// @double
-// val number := 3;
-// 
-// print number;
-// 
-// func square(num x) num {
-//     return x * x;
-// }
-// 
-// func double(num x) num {
-//     return 2 * x;
-// }
-
-func apply(num value) func(func(num) num) num {
-    func applier(func(num) num f) num {
-        return f(value);
+func make_counter() func() int {
+    val i := 0i;
+    func counter() int {
+        set i = i + 1i;
+        return i - 1i;
     }
-    return applier;
+    return counter;
 }
 
-@apply(4)
-func triple(num x) num {
-    return x + x + x;
-}
-
-print triple;
+val counter := make_counter();
+print counter();
+print counter();
+print counter();

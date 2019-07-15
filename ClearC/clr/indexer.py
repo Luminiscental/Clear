@@ -143,6 +143,12 @@ class IndexBuilder(ast.ContextVisitor):
         with self._stack(0):
             super().print_stmt(node)
 
+    def set_stmt(self, node: ast.AstSetStmt) -> None:
+        with self._stack(0):
+            node.target.accept(self)
+        with self._stack(0):
+            node.value.accept(self)
+
     def if_stmt(self, node: ast.AstIfStmt) -> None:
         conds = [node.if_part] + node.elif_parts
         for condition, block in conds:

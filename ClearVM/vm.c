@@ -979,8 +979,8 @@ static Result op_setRef(VM *vm) {
 
     traceOpcode(vm, "OP_SET_REF", true);
 
-    POP(value)
     POP(upvalue)
+    POP(value)
 
     if (upvalue.type != VAL_OBJ || upvalue.as.obj->type != OBJ_UPVALUE) {
 

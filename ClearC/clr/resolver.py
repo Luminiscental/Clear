@@ -133,6 +133,18 @@ class NameResolver(ast.ContextVisitor):
         super().func_decl(node)
         node.binding.dependency = node
 
+    def set_stmt(self, node: ast.AstSetStmt) -> None:
+        super().set_stmt(node)
+        for context in reversed(self._contexts):
+            if (
+                isinstance(context, ast.AstFuncDecl)
+                and node.target.ref == context.binding
+            ):
+                self.errors.add(
+                    message=f"cannot set function within its own body",
+                    regions=[context.binding.region, node.target.region],
+                )
+
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
         self._resolve_name(node.name, node)
         super().construct_expr(node)

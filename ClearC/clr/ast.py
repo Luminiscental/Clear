@@ -63,6 +63,11 @@ class AstVisitor:
         Visit a block statement node.
         """
 
+    def set_stmt(self, node: "AstSetStmt") -> None:
+        """
+        Visit a set statement node.
+        """
+
     def if_stmt(self, node: "AstIfStmt") -> None:
         """
         Visit an if statement node.
@@ -235,6 +240,11 @@ class DeepVisitor(AstVisitor):
     def block_stmt(self, node: "AstBlockStmt") -> None:
         for decl in node.decls:
             decl.accept(self)
+        self._decl(node)
+
+    def set_stmt(self, node: "AstSetStmt") -> None:
+        node.target.accept(self)
+        node.value.accept(self)
         self._decl(node)
 
     def if_stmt(self, node: "AstIfStmt") -> None:
@@ -418,9 +428,6 @@ class ContextVisitor(DeepVisitor):
 
 # Node definitions:
 
-# TODO: Mutable values / assignment
-# TODO: Properties
-
 # Base node types:
 
 
@@ -504,6 +511,7 @@ class AstDecl(AstNode):
 
 AstStmt = Union[
     "AstPrintStmt",
+    "AstSetStmt",
     "AstBlockStmt",
     "AstIfStmt",
     "AstWhileStmt",
@@ -577,9 +585,6 @@ class AstBlockStmt(AstDecl, AstScope):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.block_stmt(self)
-
-
-# TODO: Static declarations
 
 
 class AstStructDecl(AstDecl, AstTyped):
@@ -830,6 +835,19 @@ class AstIdentExpr(AstExpr, AstIndexed):
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.ident_expr(self)
+
+
+@dc.dataclass(eq=False, repr=False)
+class AstSetStmt(AstDecl):
+    """
+    Ast node for a set statement.
+    """
+
+    target: AstIdentExpr = dc.field(default_factory=AstIdentExpr)
+    value: AstExpr = dc.field(default_factory=AstExpr)
+
+    def accept(self, visitor: AstVisitor) -> None:
+        visitor.set_stmt(self)
 
 
 class AstBoolExpr(AstExpr):
