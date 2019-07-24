@@ -148,6 +148,9 @@ class NameResolver(ast.ContextVisitor):
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
         self._resolve_name(node.name, node)
         super().construct_expr(node)
+        for context in reversed(self._contexts):
+            if context == node.ref:
+                node.inside = True
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
         if node.name not in ts.BUILTINS:

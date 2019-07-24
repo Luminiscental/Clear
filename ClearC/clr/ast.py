@@ -374,6 +374,7 @@ class ContextVisitor(DeepVisitor):
         for decorator in node.decorators:
             decorator.accept(self)
         node.binding.accept(self)
+        node.return_type.accept(self)
         self._push_context(node)
         for param in node.params:
             param.accept(self)
@@ -520,6 +521,7 @@ AstStmt = Union[
 ]
 
 
+@dc.dataclass(eq=False, repr=False)
 class AstNameDecl(AstDecl):
     """
     Base class for name declarations, annotated with possible decorators.
@@ -954,6 +956,7 @@ class AstConstructExpr(AstExpr, AstIndexed):
     inits: List[Tuple[AstLabel, AstExpr]] = dc.field(default_factory=list)
     # Annotations:
     ref: Optional[AstStructDecl] = None
+    inside: bool = False
 
     def get_dict(self) -> Dict[str, AstExpr]:
         """

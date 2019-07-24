@@ -81,7 +81,7 @@ class SequenceBuilder(ast.DeepVisitor):
             node.ref.dependency.accept(self)
 
     def construct_expr(self, node: ast.AstConstructExpr) -> None:
-        if node.ref:
+        if node.ref and not node.inside:
             node.ref.accept(self)
 
     def _access_generator(self, generator: ast.AstFuncDecl) -> None:
