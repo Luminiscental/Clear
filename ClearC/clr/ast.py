@@ -556,6 +556,7 @@ class AstBinding(AstTyped, AstIndexed):
     name: str = ""
     # Annotations:
     dependency: Optional[AstNameDecl] = None
+    is_recurse: bool = False
 
     def accept(self, visitor: AstVisitor) -> None:
         visitor.binding(self)

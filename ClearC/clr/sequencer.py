@@ -12,6 +12,21 @@ import clr.ast as ast
 # TODO: Track dependencies to give better error messages
 
 
+class RecursionMarker(ast.ContextVisitor):
+    """
+    Ast visitor to mark bindings that refer recursively to the enclosing
+    function.
+    """
+
+    def ident_expr(self, node: ast.AstIdentExpr) -> None:
+        if (
+            node.ref
+            and isinstance(node.ref.dependency, ast.AstFuncDecl)
+            and node.ref.dependency in self._contexts
+        ):
+            node.ref.is_recurse = True
+
+
 class SequenceBuilder(ast.DeepVisitor):
     """
     Ast visitor to annotate the execution order of declarations.
@@ -77,7 +92,7 @@ class SequenceBuilder(ast.DeepVisitor):
             super().func_decl(node)
 
     def ident_expr(self, node: ast.AstIdentExpr) -> None:
-        if node.ref and node.ref.dependency:
+        if node.ref and node.ref.dependency and not node.ref.is_recurse:
             node.ref.dependency.accept(self)
 
     def construct_expr(self, node: ast.AstConstructExpr) -> None:

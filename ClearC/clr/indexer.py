@@ -234,7 +234,7 @@ class IndexWriter(ast.ContextVisitor):
                 break
         else:
             return ref.index_annot
-        if ref == function:
+        if ref.dependency == function:
             # It's the recursion upvalue
             return an.IndexAnnot(value=0, kind=an.IndexAnnotType.UPVALUE)
         if ref in function.upvalues:

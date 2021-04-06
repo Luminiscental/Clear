@@ -1,14 +1,17 @@
 
+print;
 print "-- Value declaration";
 
 val a := 2;
 print a;
 
+print;
 print "-- Mutation";
 
 set a = 3;
-print a;
+print "a = " + str(a);
 
+print;
 print "-- Tuple unpacking";
 
 val number, string := 3.4, "hello";
@@ -16,43 +19,86 @@ val tuple := (1, 2), 3;
 val _a, _b := tuple;
 val _c, _d := _a;
 
-print str(_b) + ", " + str(_c) + ", " + str(_d);
+print "b, c, d = " + str(_b) + ", " + str(_c) + ", " + str(_d);
 
+print;
 print "-- Function declaration";
 
 func double(num x) num {
     return x * 2;
 }
 
-print double(number);
+print "2 * 3.4 = " + str(double(number));
 
+print;
+print "-- Recursion";
+
+func factorial(int n) int {
+    if (n == 0i) {
+        return 1i;
+    }
+    return n * factorial(n - 1i);
+}
+
+print "5! = " + str(factorial(5i));
+
+func parent(int m) int {
+    func child(int n) int {
+        if (n == 1i) {
+            return 1i;
+        } else if (n >= 8i) {
+            return n + parent(n / 2i);
+        } else {
+            return n * child(n - 1i);
+        }
+    }
+    return child(m) + child(m - 1i);
+}
+
+print "8 + 3! + 4! + 7! = " + str(parent(8i));
+
+// Circular dependencies cause compile errors:
+//
+// func accomplice1() int {
+//     return accomplice2();
+// }
+// 
+// func accomplice2() int {
+//     return accomplice1();
+// }
+
+print;
 print "-- Scoping";
 
 {
     val a := "2";
-    print a;
+    print "inner a = " + a;
 }
-print a;
+print "outer a = " + str(a);
 
+print;
 print "-- Control flow";
 
 if (false) {
-    print "false";
+    print "if (false)";
 } else {
-    print "true";
+    print "else (false)";
 }
 
+print "while 0 -> 5:";
 val i := 0i;
 while (i < 5i) {
-    print i;
+    print "    " + str(i);
     set i = i + 1i;
 }
 
+print;
 print "-- First class function objects";
 
 val function := double;
-print function(a);
+print "2a = " + str(function(a));
 
+print;
 print "-- Decorators / higher-order functions";
 
 func call_twice(func() void original) func() void {
@@ -70,6 +116,7 @@ func hello_world() void {
 
 hello_world();
 
+print;
 print "-- Struct declaration";
 
 struct Point {
@@ -78,8 +125,9 @@ struct Point {
 }
 
 val p := Point { x=1, y=-1 };
-print "(" + str(p.x) + ", " + str(p.y) + ")";
+print "p = (" + str(p.x) + ", " + str(p.y) + ")";
 
+print;
 print "-- Declaration fields";
 
 struct Point_ {
@@ -93,15 +141,16 @@ struct Point_ {
 }
 
 val q := Point_ { x=3, y=1 };
-print q.string;
-print q.scale(-3).string;
+print "q = " + q.string;
+print "-3q = " + q.scale(-3).string;
 
+print;
 print "-- Lambdas and set statements";
 
 val point_maker := func(num z) Point_ { x=z, y=z };
-print point_maker(3).string;
+print "diag(3) = " + point_maker(3).string;
 {
     val temp := Point_ { x=1, y=2 };
     set point_maker = temp.scale;
 }
-print point_maker(3).string;
+print "3 * (1, 2) = " + point_maker(3).string;

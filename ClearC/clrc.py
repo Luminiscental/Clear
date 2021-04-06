@@ -113,6 +113,7 @@ def main() -> None:
         ("Resolve", rs.DuplicateChecker()),
         ("Resolve", rs.NameTracker()),
         ("Resolve", rs.NameResolver()),
+        ("Sequencing", sq.RecursionMarker()),
         ("Sequencing", sq.SequenceBuilder()),
         ("Sequencing", sq.SequenceWriter()),
         ("Type", tc.TypeChecker()),
