@@ -1,14 +1,107 @@
 
-func make_counter() func() int {
-    val i := 0i;
-    func counter() int {
-        set i = i + 1i;
-        return i - 1i;
-    }
-    return counter;
+print "-- Value declaration";
+
+val a := 2;
+print a;
+
+print "-- Mutation";
+
+set a = 3;
+print a;
+
+print "-- Tuple unpacking";
+
+val number, string := 3.4, "hello";
+val tuple := (1, 2), 3;
+val _a, _b := tuple;
+val _c, _d := _a;
+
+print str(_b) + ", " + str(_c) + ", " + str(_d);
+
+print "-- Function declaration";
+
+func double(num x) num {
+    return x * 2;
 }
 
-val counter := make_counter();
-print counter();
-print counter();
-print counter();
+print double(number);
+
+print "-- Scoping";
+
+{
+    val a := "2";
+    print a;
+}
+print a;
+
+print "-- Control flow";
+
+if (false) {
+    print "false";
+} else {
+    print "true";
+}
+
+val i := 0i;
+while (i < 5i) {
+    print i;
+    set i = i + 1i;
+}
+
+print "-- First class function objects";
+
+val function := double;
+print function(a);
+
+print "-- Decorators / higher-order functions";
+
+func call_twice(func() void original) func() void {
+    func wrapper() void {
+        original();
+        original();
+    }
+    return wrapper;
+}
+
+@call_twice
+func hello_world() void {
+    print "Hello World!";
+}
+
+hello_world();
+
+print "-- Struct declaration";
+
+struct Point {
+    num x;
+    num y;
+}
+
+val p := Point { x=1, y=-1 };
+print "(" + str(p.x) + ", " + str(p.y) + ")";
+
+print "-- Declaration fields";
+
+struct Point_ {
+    num x;
+    num y;
+
+    val string := "(" + str(this.x) + ", " + str(this.y) + ")";
+    func scale(num factor) Point_ {
+        return Point_ { x=factor * this.x, y=factor * this.y };
+    }
+}
+
+val q := Point_ { x=3, y=1 };
+print q.string;
+print q.scale(-3).string;
+
+print "-- Lambdas and set statements";
+
+val point_maker := func(num z) Point_ { x=z, y=z };
+print point_maker(3).string;
+{
+    val temp := Point_ { x=1, y=2 };
+    set point_maker = temp.scale;
+}
+print point_maker(3).string;
